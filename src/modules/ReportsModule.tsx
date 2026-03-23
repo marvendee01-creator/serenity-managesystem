@@ -93,9 +93,8 @@ export default function ReportsModule() {
               <th className="text-left px-3 py-2 font-medium">Txn No</th>
               <th className="text-left px-3 py-2 font-medium">Date</th>
               <th className="text-left px-3 py-2 font-medium">Module</th>
-              <th className="text-right px-3 py-2 font-medium">Guests</th>
+              <th className="text-left px-3 py-2 font-medium">Customer</th>
               <th className="text-right px-3 py-2 font-medium">Amount</th>
-              <th className="text-left px-3 py-2 font-medium">Pay</th>
             </tr>
           </thead>
           <tbody>
