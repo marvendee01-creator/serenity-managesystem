@@ -9,6 +9,7 @@ import { toast } from "sonner";
 const ROOM_TYPES = ["Barkada Room", "Kubo Room"] as const;
 
 export default function RoomModule() {
+  const [customerName, setCustomerName] = useState("");
   const [roomType, setRoomType] = useState<string>(ROOM_TYPES[0]);
   const [adults, setAdults] = useState(0);
   const [children, setChildren] = useState(0);
@@ -35,6 +36,7 @@ export default function RoomModule() {
         transaction_no: `SR-${Date.now()}`,
         date_time: new Date().toISOString(),
         module: "Room",
+        customer_name: customerName || undefined,
         room_type: roomType,
         adults, children,
         total_headcount: headcount,
@@ -42,11 +44,11 @@ export default function RoomModule() {
         payment_method: payment,
       });
       toast.success("Room transaction saved!");
-      setAdults(0); setChildren(0); setAmount("");
+      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [roomType, adults, children, headcount, amount, payment]);
+  }, [customerName, roomType, adults, children, headcount, amount, payment]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -56,6 +58,10 @@ export default function RoomModule() {
 
   return (
     <ModuleShell title="Room" icon={<BedDouble size={20} />} onSave={handleSave} saveLabel="Record Room" saving={saving}>
+      <div>
+        <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
+        <input type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
+      </div>
       <div>
         <label className="text-sm font-medium block mb-2">Room Type</label>
         <div className="flex gap-2">

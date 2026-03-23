@@ -9,6 +9,7 @@ import { toast } from "sonner";
 const TYPES = ["Exclusive", "Non-Exclusive"] as const;
 
 export default function BookingModule() {
+  const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
   const [adults, setAdults] = useState(0);
   const [children, setChildren] = useState(0);
@@ -31,6 +32,7 @@ export default function BookingModule() {
         transaction_no: `SR-${Date.now()}`,
         date_time: new Date().toISOString(),
         module: "Booking",
+        customer_name: customerName || undefined,
         booking_type: bookingType,
         adults, children,
         total_headcount: headcount,
@@ -38,11 +40,11 @@ export default function BookingModule() {
         payment_method: payment,
       });
       toast.success("Booking saved!");
-      setAdults(0); setChildren(0); setAmount("");
+      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [bookingType, adults, children, headcount, amount, total, payment]);
+  }, [customerName, bookingType, adults, children, headcount, amount, total, payment]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -52,6 +54,10 @@ export default function BookingModule() {
 
   return (
     <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
+      <div>
+        <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
+        <input type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
+      </div>
       <div>
         <label className="text-sm font-medium block mb-2">Booking Type</label>
         <div className="flex gap-2">

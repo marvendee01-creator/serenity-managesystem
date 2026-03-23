@@ -7,6 +7,7 @@ import { addTransaction } from "@/lib/db";
 import { toast } from "sonner";
 
 export default function EntranceModule() {
+  const [customerName, setCustomerName] = useState("");
   const [adults, setAdults] = useState(0);
   const [children, setChildren] = useState(0);
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
@@ -27,17 +28,18 @@ export default function EntranceModule() {
         transaction_no: `SR-${Date.now()}`,
         date_time: new Date().toISOString(),
         module: "Entrance",
+        customer_name: customerName || undefined,
         adults, children,
         total_headcount: headcount,
         amount_paid: amt,
         payment_method: payment,
       });
       toast.success("Entrance recorded!");
-      setAdults(0); setChildren(0); setAmount("");
+      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [adults, children, headcount, amount, payment]);
+  }, [customerName, adults, children, headcount, amount, payment]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -49,6 +51,10 @@ export default function EntranceModule() {
 
   return (
     <ModuleShell title="Entrance" icon={<DoorOpen size={20} />} onSave={handleSave} saveLabel="Record Entry" saving={saving}>
+      <div>
+        <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
+        <input type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
+      </div>
       <Stepper label="Adults" value={adults} onChange={setAdults} />
       <Stepper label="Children" value={children} onChange={setChildren} />
       <div className="pos-card">

@@ -25,9 +25,9 @@ export default function ReportsModule() {
   const totalChildren = data.reduce((s, t) => s + t.children, 0);
 
   const exportCSV = () => {
-    const headers = ["Transaction No", "Date/Time", "Module", "Game Type", "Adults", "Children", "Headcount", "Amount", "Payment"];
+    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Game Type", "Adults", "Children", "Headcount", "Amount", "Payment"];
     const rows = data.map((t) => [
-      t.transaction_no, t.date_time, t.module, t.game_type || "", t.adults, t.children, t.total_headcount, t.amount_paid, t.payment_method,
+      t.transaction_no, t.date_time, t.module, t.customer_name || "", t.game_type || "", t.adults, t.children, t.total_headcount, t.amount_paid, t.payment_method,
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -93,23 +93,21 @@ export default function ReportsModule() {
               <th className="text-left px-3 py-2 font-medium">Txn No</th>
               <th className="text-left px-3 py-2 font-medium">Date</th>
               <th className="text-left px-3 py-2 font-medium">Module</th>
-              <th className="text-right px-3 py-2 font-medium">Guests</th>
+              <th className="text-left px-3 py-2 font-medium">Customer</th>
               <th className="text-right px-3 py-2 font-medium">Amount</th>
-              <th className="text-left px-3 py-2 font-medium">Pay</th>
             </tr>
           </thead>
           <tbody>
             {data.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
             )}
             {data.map((t) => (
               <tr key={t.id} className="border-t border-border hover:bg-muted/50">
                 <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
                 <td className="px-3 py-2 text-xs">{new Date(t.date_time).toLocaleDateString()}</td>
                 <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount || "—"}</td>
+                <td className="px-3 py-2">{t.customer_name || "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
-                <td className="px-3 py-2">{t.payment_method}</td>
               </tr>
             ))}
           </tbody>
