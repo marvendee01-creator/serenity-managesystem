@@ -32,6 +32,7 @@ export default function BookingModule() {
         transaction_no: `SR-${Date.now()}`,
         date_time: new Date().toISOString(),
         module: "Booking",
+        customer_name: customerName || undefined,
         booking_type: bookingType,
         adults, children,
         total_headcount: headcount,
@@ -39,7 +40,7 @@ export default function BookingModule() {
         payment_method: payment,
       });
       toast.success("Booking saved!");
-      setAdults(0); setChildren(0); setAmount("");
+      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
