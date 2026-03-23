@@ -7,6 +7,7 @@ import { addTransaction } from "@/lib/db";
 import { toast } from "sonner";
 
 export default function EntranceModule() {
+  const [customerName, setCustomerName] = useState("");
   const [adults, setAdults] = useState(0);
   const [children, setChildren] = useState(0);
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
