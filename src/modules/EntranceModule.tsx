@@ -39,7 +39,7 @@ export default function EntranceModule() {
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [adults, children, headcount, amount, payment]);
+  }, [customerName, adults, children, headcount, amount, payment]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
