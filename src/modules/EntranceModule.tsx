@@ -51,6 +51,10 @@ export default function EntranceModule() {
 
   return (
     <ModuleShell title="Entrance" icon={<DoorOpen size={20} />} onSave={handleSave} saveLabel="Record Entry" saving={saving}>
+      <div>
+        <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
+        <input type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
+      </div>
       <Stepper label="Adults" value={adults} onChange={setAdults} />
       <Stepper label="Children" value={children} onChange={setChildren} />
       <div className="pos-card">

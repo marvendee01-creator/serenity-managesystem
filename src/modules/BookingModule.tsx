@@ -55,6 +55,10 @@ export default function BookingModule() {
   return (
     <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
       <div>
+        <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
+        <input type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
+      </div>
+      <div>
         <label className="text-sm font-medium block mb-2">Booking Type</label>
         <div className="flex gap-2">
           {TYPES.map((t) => (

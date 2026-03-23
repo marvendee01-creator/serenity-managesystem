@@ -99,16 +99,15 @@ export default function ReportsModule() {
           </thead>
           <tbody>
             {data.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
             )}
             {data.map((t) => (
               <tr key={t.id} className="border-t border-border hover:bg-muted/50">
                 <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
                 <td className="px-3 py-2 text-xs">{new Date(t.date_time).toLocaleDateString()}</td>
                 <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount || "—"}</td>
+                <td className="px-3 py-2">{t.customer_name || "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
-                <td className="px-3 py-2">{t.payment_method}</td>
               </tr>
             ))}
           </tbody>
