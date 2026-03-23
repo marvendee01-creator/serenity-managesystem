@@ -36,6 +36,7 @@ export default function RoomModule() {
         transaction_no: `SR-${Date.now()}`,
         date_time: new Date().toISOString(),
         module: "Room",
+        customer_name: customerName || undefined,
         room_type: roomType,
         adults, children,
         total_headcount: headcount,
@@ -43,7 +44,7 @@ export default function RoomModule() {
         payment_method: payment,
       });
       toast.success("Room transaction saved!");
-      setAdults(0); setChildren(0); setAmount("");
+      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
