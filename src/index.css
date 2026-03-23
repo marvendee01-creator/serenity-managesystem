@@ -2,95 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 33 100% 98%;
+    --foreground: 25 30% 15%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 33 60% 97%;
+    --card-foreground: 25 30% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 25 30% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 30 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 33 100% 94%;
+    --secondary-foreground: 25 40% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 33 30% 92%;
+    --muted-foreground: 25 10% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 27 100% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 33 30% 85%;
+    --input: 33 30% 85%;
+    --ring: 30 100% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 25 30% 12%;
+    --sidebar-foreground: 33 60% 90%;
+    --sidebar-primary: 30 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 25 25% 18%;
+    --sidebar-accent-foreground: 33 60% 90%;
+    --sidebar-border: 25 20% 20%;
+    --sidebar-ring: 30 100% 50%;
+
+    /* Custom tokens */
+    --success: 152 60% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 100% 51%;
+    --warning-foreground: 25 30% 15%;
+    --info: 210 70% 50%;
+    --info-foreground: 0 0% 100%;
+
+    --pos-surface: 33 40% 95%;
+    --pos-active: 30 100% 50%;
+    --pos-active-foreground: 0 0% 100%;
   }
 }
 
@@ -100,6 +65,85 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
+
+  /* Keyboard-first focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  .pos-card {
+    @apply bg-card rounded-xl shadow-sm border border-border p-4;
+  }
+
+  .pos-input {
+    @apply h-12 text-lg bg-background border border-input rounded-lg px-4 
+           focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1
+           tabular-nums;
+  }
+
+  .module-btn {
+    @apply flex flex-col items-center justify-center gap-2 p-4 rounded-xl
+           bg-card border-2 border-transparent
+           hover:border-primary/40 hover:shadow-md
+           focus-visible:border-primary focus-visible:shadow-md
+           transition-all duration-200 ease-out
+           active:scale-[0.97] cursor-pointer select-none;
+  }
+
+  .module-btn-active {
+    @apply border-primary bg-primary/10 shadow-md;
+  }
+
+  .toggle-btn {
+    @apply px-6 h-11 rounded-lg font-medium text-sm border-2 border-border
+           bg-background transition-all duration-150 ease-out
+           hover:border-primary/40 active:scale-[0.97]
+           focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .toggle-btn-active {
+    @apply bg-primary text-primary-foreground border-primary shadow-sm;
+  }
+
+  .stepper-btn {
+    @apply w-12 h-12 rounded-lg bg-secondary text-secondary-foreground
+           font-bold text-xl flex items-center justify-center
+           hover:bg-primary hover:text-primary-foreground
+           active:scale-[0.95] transition-all duration-150 ease-out
+           focus-visible:ring-2 focus-visible:ring-ring;
+  }
+}
+
+/* Splash screen animation */
+@keyframes splash-fade-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes splash-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.splash-enter {
+  animation: splash-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.splash-exit {
+  animation: splash-fade-out 0.5s ease-out forwards;
+}
+
+/* Scroll reveal */
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(16px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.reveal-up {
+  animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
