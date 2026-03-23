@@ -21,8 +21,19 @@ export default function BookingModule() {
 
   useEffect(() => { getSettings().then((s) => setExclusiveFee(s.exclusive_fee)); }, []);
 
+  // Auto-fill amount when Exclusive is selected
+  useEffect(() => {
+    if (bookingType === "Exclusive") {
+      setAmount(exclusiveFee.toString());
+    } else {
+      setAmount("");
+      setTimeout(() => amountRef.current?.focus(), 50);
+    }
+  }, [bookingType, exclusiveFee]);
+
   const headcount = adults + children;
-  const total = bookingType === "Exclusive" ? exclusiveFee : parseFloat(amount) || 0;
+  const isExclusive = bookingType === "Exclusive";
+  const total = isExclusive ? exclusiveFee : parseFloat(amount) || 0;
 
   const handleSave = useCallback(async () => {
     if (total === 0) { toast.error("Enter amount"); return; }
@@ -36,12 +47,12 @@ export default function BookingModule() {
         booking_type: bookingType,
         adults, children,
         total_headcount: headcount,
-        amount_paid: parseFloat(amount) || total,
+        amount_paid: total,
         payment_method: payment,
       });
       toast.success("Booking saved!");
       setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
-      amountRef.current?.focus();
+      setBookingType(TYPES[0]);
     } catch { toast.error("Failed to save"); }
     setSaving(false);
   }, [customerName, bookingType, adults, children, headcount, amount, total, payment]);
@@ -66,16 +77,29 @@ export default function BookingModule() {
           ))}
         </div>
       </div>
-      {bookingType === "Exclusive" && (
-        <div className="pos-card">
-          <p className="text-sm text-muted-foreground">Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>
-        </div>
-      )}
       <Stepper label="Adults" value={adults} onChange={setAdults} />
       <Stepper label="Children" value={children} onChange={setChildren} />
+      <div className="pos-card">
+        <p className="text-sm text-muted-foreground mb-1">Total Headcount</p>
+        <p className="text-2xl font-bold tabular-nums">{headcount}</p>
+      </div>
+      {isExclusive && (
+        <div className="pos-card border-primary/20">
+          <p className="text-sm text-muted-foreground">Exclusive Fee</p>
+          <p className="text-xl font-bold text-primary tabular-nums">₱{exclusiveFee.toLocaleString()}</p>
+        </div>
+      )}
       <div>
         <label className="text-sm font-medium block mb-1">Amount Paid</label>
-        <input ref={amountRef} type="number" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+        <input
+          ref={amountRef}
+          type="number"
+          className="pos-input w-full"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          disabled={isExclusive}
+        />
       </div>
       <div>
         <label className="text-sm font-medium block mb-2">Payment Method</label>
