@@ -9,6 +9,7 @@ import { toast } from "sonner";
 const TYPES = ["Exclusive", "Non-Exclusive"] as const;
 
 export default function BookingModule() {
+  const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
   const [adults, setAdults] = useState(0);
   const [children, setChildren] = useState(0);
