@@ -48,7 +48,7 @@ export default function RoomModule() {
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [roomType, adults, children, headcount, amount, payment]);
+  }, [customerName, roomType, adults, children, headcount, amount, payment]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
