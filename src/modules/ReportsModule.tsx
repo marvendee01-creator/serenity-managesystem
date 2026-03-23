@@ -25,9 +25,9 @@ export default function ReportsModule() {
   const totalChildren = data.reduce((s, t) => s + t.children, 0);
 
   const exportCSV = () => {
-    const headers = ["Transaction No", "Date/Time", "Module", "Game Type", "Adults", "Children", "Headcount", "Amount", "Payment"];
+    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Game Type", "Adults", "Children", "Headcount", "Amount", "Payment"];
     const rows = data.map((t) => [
-      t.transaction_no, t.date_time, t.module, t.game_type || "", t.adults, t.children, t.total_headcount, t.amount_paid, t.payment_method,
+      t.transaction_no, t.date_time, t.module, t.customer_name || "", t.game_type || "", t.adults, t.children, t.total_headcount, t.amount_paid, t.payment_method,
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
