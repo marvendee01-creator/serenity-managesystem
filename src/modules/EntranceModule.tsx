@@ -28,13 +28,14 @@ export default function EntranceModule() {
         transaction_no: `SR-${Date.now()}`,
         date_time: new Date().toISOString(),
         module: "Entrance",
+        customer_name: customerName || undefined,
         adults, children,
         total_headcount: headcount,
         amount_paid: amt,
         payment_method: payment,
       });
       toast.success("Entrance recorded!");
-      setAdults(0); setChildren(0); setAmount("");
+      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
       amountRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
