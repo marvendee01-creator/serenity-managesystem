@@ -9,6 +9,7 @@ import { toast } from "sonner";
 const ROOM_TYPES = ["Barkada Room", "Kubo Room"] as const;
 
 export default function RoomModule() {
+  const [customerName, setCustomerName] = useState("");
   const [roomType, setRoomType] = useState<string>(ROOM_TYPES[0]);
   const [adults, setAdults] = useState(0);
   const [children, setChildren] = useState(0);
