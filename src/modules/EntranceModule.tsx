@@ -1,23 +1,24 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { DoorOpen } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
-import Stepper from "@/components/Stepper";
 import PaymentToggle from "@/components/PaymentToggle";
 import { addTransaction } from "@/lib/db";
 import { toast } from "sonner";
 
 export default function EntranceModule() {
   const [customerName, setCustomerName] = useState("");
-  const [adults, setAdults] = useState(0);
-  const [children, setChildren] = useState(0);
+  const [adults, setAdults] = useState("");
+  const [children, setChildren] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
-  const amountRef = useRef<HTMLInputElement>(null);
+  const firstRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { amountRef.current?.focus(); }, []);
+  useEffect(() => { firstRef.current?.focus(); }, []);
 
-  const headcount = adults + children;
+  const a = parseInt(adults) || 0;
+  const c = parseInt(children) || 0;
+  const headcount = a + c;
 
   const handleSave = useCallback(async () => {
     const amt = parseFloat(amount) || 0;
@@ -29,17 +30,17 @@ export default function EntranceModule() {
         date_time: new Date().toISOString(),
         module: "Entrance",
         customer_name: customerName || undefined,
-        adults, children,
+        adults: a, children: c,
         total_headcount: headcount,
         amount_paid: amt,
         payment_method: payment,
       });
       toast.success("Entrance recorded!");
-      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
-      amountRef.current?.focus();
+      setCustomerName(""); setAdults(""); setChildren(""); setAmount("");
+      firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, adults, children, headcount, amount, payment]);
+  }, [customerName, a, c, headcount, amount, payment]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -53,26 +54,23 @@ export default function EntranceModule() {
     <ModuleShell title="Entrance" icon={<DoorOpen size={20} />} onSave={handleSave} saveLabel="Record Entry" saving={saving}>
       <div>
         <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
-        <input type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
+        <input ref={firstRef} type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
       </div>
-      <Stepper label="Adults" value={adults} onChange={setAdults} />
-      <Stepper label="Children" value={children} onChange={setChildren} />
+      <div>
+        <label className="text-sm font-medium block mb-1">Adults</label>
+        <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
+      </div>
+      <div>
+        <label className="text-sm font-medium block mb-1">Children</label>
+        <input type="number" className="pos-input w-full" value={children} onChange={(e) => setChildren(e.target.value)} placeholder="0" min="0" />
+      </div>
       <div className="pos-card">
         <p className="text-sm text-muted-foreground mb-1">Total Headcount</p>
         <p className="text-2xl font-bold tabular-nums">{headcount}</p>
       </div>
       <div>
         <label className="text-sm font-medium block mb-1">Amount Paid</label>
-        <input
-          ref={amountRef}
-          type="number"
-          className="pos-input w-full"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          min="0"
-          step="0.01"
-        />
+        <input type="number" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" min="0" step="0.01" />
       </div>
       <div>
         <label className="text-sm font-medium block mb-2">Payment Method</label>
