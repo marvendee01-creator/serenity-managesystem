@@ -4,6 +4,19 @@ import { getTransactions, type Transaction } from "@/lib/db";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  const mm = (d.getMonth() + 1).toString().padStart(2, "0");
+  const dd = d.getDate().toString().padStart(2, "0");
+  const yyyy = d.getFullYear();
+  let h = d.getHours();
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  const min = d.getMinutes().toString().padStart(2, "0");
+  const sec = d.getSeconds().toString().padStart(2, "0");
+  return `${mm}/${dd}/${yyyy} ${h.toString().padStart(2, "0")}:${min}:${sec} ${ampm}`;
+}
+
 export default function ReportsModule() {
   const [data, setData] = useState<Transaction[]>([]);
   const [moduleFilter, setModuleFilter] = useState("All");
@@ -25,9 +38,9 @@ export default function ReportsModule() {
   const totalChildren = data.reduce((s, t) => s + t.children, 0);
 
   const exportCSV = () => {
-    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Game Type", "Adults", "Children", "Headcount", "Amount", "Payment"];
+    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Adults", "Children", "Headcount", "Amount", "Payment"];
     const rows = data.map((t) => [
-      t.transaction_no, t.date_time, t.module, t.customer_name || "", t.game_type || "", t.adults, t.children, t.total_headcount, t.amount_paid, t.payment_method,
+      t.transaction_no, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.children, t.total_headcount, t.amount_paid, t.payment_method,
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -40,7 +53,7 @@ export default function ReportsModule() {
   };
 
   return (
-    <div className="reveal-up max-w-4xl mx-auto">
+    <div className="reveal-up max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
           <FileText size={20} />
@@ -91,23 +104,31 @@ export default function ReportsModule() {
           <thead>
             <tr className="bg-muted">
               <th className="text-left px-3 py-2 font-medium">Txn No</th>
-              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-left px-3 py-2 font-medium">Date/Time</th>
               <th className="text-left px-3 py-2 font-medium">Module</th>
               <th className="text-left px-3 py-2 font-medium">Customer</th>
+              <th className="text-right px-3 py-2 font-medium">Adults</th>
+              <th className="text-right px-3 py-2 font-medium">Children</th>
+              <th className="text-right px-3 py-2 font-medium">Headcount</th>
               <th className="text-right px-3 py-2 font-medium">Amount</th>
+              <th className="text-left px-3 py-2 font-medium">Payment</th>
             </tr>
           </thead>
           <tbody>
             {data.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
             )}
             {data.map((t) => (
               <tr key={t.id} className="border-t border-border hover:bg-muted/50">
                 <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
-                <td className="px-3 py-2 text-xs">{new Date(t.date_time).toLocaleDateString()}</td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(t.date_time)}</td>
                 <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
                 <td className="px-3 py-2">{t.customer_name || "—"}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{t.adults}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{t.children}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
+                <td className="px-3 py-2">{t.payment_method}</td>
               </tr>
             ))}
           </tbody>

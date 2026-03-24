@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { CalendarDays } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
-import Stepper from "@/components/Stepper";
 import PaymentToggle from "@/components/PaymentToggle";
 import { addTransaction, getSettings } from "@/lib/db";
 import { toast } from "sonner";
@@ -11,17 +10,18 @@ const TYPES = ["Exclusive", "Non-Exclusive"] as const;
 export default function BookingModule() {
   const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
-  const [adults, setAdults] = useState(0);
-  const [children, setChildren] = useState(0);
+  const [adults, setAdults] = useState("");
+  const [children, setChildren] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amount, setAmount] = useState("");
   const [exclusiveFee, setExclusiveFee] = useState(5000);
   const [saving, setSaving] = useState(false);
+  const firstRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => { firstRef.current?.focus(); }, []);
   useEffect(() => { getSettings().then((s) => setExclusiveFee(s.exclusive_fee)); }, []);
 
-  // Auto-fill amount when Exclusive is selected
   useEffect(() => {
     if (bookingType === "Exclusive") {
       setAmount(exclusiveFee.toString());
@@ -31,7 +31,9 @@ export default function BookingModule() {
     }
   }, [bookingType, exclusiveFee]);
 
-  const headcount = adults + children;
+  const a = parseInt(adults) || 0;
+  const c = parseInt(children) || 0;
+  const headcount = a + c;
   const isExclusive = bookingType === "Exclusive";
   const total = isExclusive ? exclusiveFee : parseFloat(amount) || 0;
 
@@ -45,17 +47,18 @@ export default function BookingModule() {
         module: "Booking",
         customer_name: customerName || undefined,
         booking_type: bookingType,
-        adults, children,
+        adults: a, children: c,
         total_headcount: headcount,
         amount_paid: total,
         payment_method: payment,
       });
       toast.success("Booking saved!");
-      setCustomerName(""); setAdults(0); setChildren(0); setAmount("");
+      setCustomerName(""); setAdults(""); setChildren(""); setAmount("");
       setBookingType(TYPES[0]);
+      firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, adults, children, headcount, amount, total, payment]);
+  }, [customerName, bookingType, a, c, headcount, amount, total, payment]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -67,7 +70,7 @@ export default function BookingModule() {
     <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
       <div>
         <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
-        <input type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
+        <input ref={firstRef} type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
       </div>
       <div>
         <label className="text-sm font-medium block mb-2">Booking Type</label>
@@ -77,8 +80,14 @@ export default function BookingModule() {
           ))}
         </div>
       </div>
-      <Stepper label="Adults" value={adults} onChange={setAdults} />
-      <Stepper label="Children" value={children} onChange={setChildren} />
+      <div>
+        <label className="text-sm font-medium block mb-1">Adults</label>
+        <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
+      </div>
+      <div>
+        <label className="text-sm font-medium block mb-1">Children</label>
+        <input type="number" className="pos-input w-full" value={children} onChange={(e) => setChildren(e.target.value)} placeholder="0" min="0" />
+      </div>
       <div className="pos-card">
         <p className="text-sm text-muted-foreground mb-1">Total Headcount</p>
         <p className="text-2xl font-bold tabular-nums">{headcount}</p>
@@ -91,15 +100,7 @@ export default function BookingModule() {
       )}
       <div>
         <label className="text-sm font-medium block mb-1">Amount Paid</label>
-        <input
-          ref={amountRef}
-          type="number"
-          className="pos-input w-full"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          disabled={isExclusive}
-        />
+        <input ref={amountRef} type="number" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" disabled={isExclusive} />
       </div>
       <div>
         <label className="text-sm font-medium block mb-2">Payment Method</label>
