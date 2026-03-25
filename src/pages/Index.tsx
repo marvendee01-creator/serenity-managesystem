@@ -9,6 +9,7 @@ import tablesIcon from "@/assets/icons/tables.png";
 import reportsIcon from "@/assets/icons/reports.png";
 import cashierIcon from "@/assets/icons/cashier.png";
 import settingsIcon from "@/assets/icons/settings.png";
+import maintenanceIcon from "@/assets/icons/maintenance.png";
 import SplashScreen from "@/components/SplashScreen";
 import EntranceModule from "@/modules/EntranceModule";
 import RoomModule from "@/modules/RoomModule";
@@ -18,6 +19,7 @@ import TableRentModule from "@/modules/TableRentModule";
 import ReportsModule from "@/modules/ReportsModule";
 import CashierModule from "@/modules/CashierModule";
 import SettingsModule from "@/modules/SettingsModule";
+import MaintenanceModule from "@/modules/MaintenanceModule";
 
 const MODULES = [
   { id: "entrance", label: "Entrance", icon: entranceIcon },
@@ -28,6 +30,7 @@ const MODULES = [
   { id: "reports", label: "Reports", icon: reportsIcon },
   { id: "cashier", label: "Cashier", icon: cashierIcon },
   { id: "settings", label: "Settings", icon: settingsIcon },
+  { id: "maintenance", label: "Maintenance", icon: maintenanceIcon },
 ] as const;
 
 type ModuleId = (typeof MODULES)[number]["id"];
@@ -41,6 +44,7 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   reports: ReportsModule,
   cashier: CashierModule,
   settings: SettingsModule,
+  maintenance: MaintenanceModule,
 };
 
 export default function Index() {

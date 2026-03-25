@@ -32,6 +32,19 @@ export interface Settings {
   table_rent_rate: number;
 }
 
+export interface CashierReportPettyItem {
+  date: string;
+  particulars: string;
+  receipt_no: string;
+  amount: number;
+}
+
+export interface CashierReportDenom {
+  label: string;
+  value: number;
+  quantity: number;
+}
+
 export interface CashierReport {
   id?: number;
   date: string;
@@ -41,6 +54,8 @@ export interface CashierReport {
   expected_ending_cash: number;
   actual_cash: number;
   cash_over_short: number;
+  petty_items?: CashierReportPettyItem[];
+  denoms?: CashierReportDenom[];
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -152,6 +167,17 @@ export async function getCashierReports(): Promise<CashierReport[]> {
     const req = store.getAll();
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => resolve([]);
+  });
+}
+
+export async function deleteCashierReport(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("cashier_reports", "readwrite");
+    const store = tx.objectStore("cashier_reports");
+    store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
