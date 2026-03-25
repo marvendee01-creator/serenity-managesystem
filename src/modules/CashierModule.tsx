@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Banknote, Download, Plus, Trash2, Eye, Printer } from "lucide-react";
-import ModuleShell from "@/components/ModuleShell";
-import { saveCashierReport } from "@/lib/db";
+import { Banknote, Download, Plus, Trash2, Printer, Save, ArrowLeft } from "lucide-react";
+import { saveCashierReport, deleteCashierReport, type CashierReport } from "@/lib/db";
 import { toast } from "sonner";
 
 interface PettyItem {
@@ -29,18 +28,93 @@ const DEFAULT_DENOMS: DenomRow[] = [
   { label: "₱0.25", value: 0.25, quantity: "" },
 ];
 
-export default function CashierModule() {
-  const [beginningCash, setBeginningCash] = useState("");
-  const [sales, setSales] = useState("");
+interface CashierModuleProps {
+  editReport?: CashierReport | null;
+  onBack?: () => void;
+}
+
+export function buildCashierReportHTML(report: {
+  date: string;
+  beginning_cash: number;
+  sales: number;
+  petty_cash: number;
+  expected_ending_cash: number;
+  actual_cash: number;
+  cash_over_short: number;
+  petty_items?: { date: string; particulars: string; receipt_no: string; amount: number }[];
+  denoms?: { label: string; value: number; quantity: number }[];
+}) {
+  const d = new Date(report.date);
+  const dateStr = `${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}/${d.getFullYear()}`;
+  const totalCashAvailable = report.beginning_cash + report.sales;
+  const pettyItems = report.petty_items || [];
+  const denomItems = report.denoms || [];
+
+  return `
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
+      h2 { text-align: center; font-size: 14px; margin: 4px 0; }
+      h3 { font-size: 12px; margin: 12px 0 4px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+      td, th { border: 1px solid #999; padding: 3px 6px; font-size: 11px; }
+      th { background: #f0f0f0; text-align: left; }
+      .right { text-align: right; }
+      .bold { font-weight: bold; }
+      .negative { color: red; }
+    </style>
+    <h2>SERENITY INLAND RESORT</h2>
+    <h2>DAILY CASHIER REPORT</h2>
+    <p style="text-align:center">${dateStr}</p>
+    <h3>A. CASH SUMMARY</h3>
+    <table>
+      <tr><td>Beginning Cash</td><td class="right">₱${report.beginning_cash.toLocaleString()}</td></tr>
+      <tr><td>Sales</td><td class="right">₱${report.sales.toLocaleString()}</td></tr>
+      <tr class="bold"><td>Total Cash Available</td><td class="right">₱${totalCashAvailable.toLocaleString()}</td></tr>
+      <tr><td>Petty Cash</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
+      <tr class="bold"><td>Expected Ending Cash</td><td class="right">₱${report.expected_ending_cash.toLocaleString()}</td></tr>
+      <tr><td>Actual Cash</td><td class="right">₱${report.actual_cash.toLocaleString()}</td></tr>
+      <tr class="bold"><td>Cash Over/Short</td><td class="right ${report.cash_over_short < 0 ? 'negative' : ''}">₱${report.cash_over_short.toLocaleString()}</td></tr>
+    </table>
+    <h3>B. PETTY CASH EXPENSE DETAILS</h3>
+    <table>
+      <tr><th>Date</th><th>Particulars</th><th>Receipt No.</th><th class="right">Amount</th></tr>
+      ${pettyItems.map(p => `<tr><td>${p.date}</td><td>${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
+    </table>
+    <h3>C. CASH DENOMINATION</h3>
+    <table>
+      <tr><th>Denomination</th><th class="right">Quantity</th><th class="right">Amount</th></tr>
+      ${denomItems.map(d => `<tr><td>${d.label}</td><td class="right">${d.quantity}</td><td class="right">₱${(d.value * d.quantity).toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="2" class="right">Total</td><td class="right">₱${report.actual_cash.toLocaleString()}</td></tr>
+    </table>
+  `;
+}
+
+export function printCashierReport(report: Parameters<typeof buildCashierReportHTML>[0]) {
+  const w = window.open("", "_blank", "width=800,height=1000");
+  if (!w) return;
+  w.document.write(`<html><head><title>Cashier Report</title></head><body>${buildCashierReportHTML(report)}<script>window.print();</script></body></html>`);
+  w.document.close();
+}
+
+export default function CashierModule({ editReport, onBack }: CashierModuleProps) {
+  const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginning_cash.toString() : "");
+  const [sales, setSales] = useState(editReport ? editReport.sales.toString() : "");
   const [saving, setSaving] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const firstRef = useRef<HTMLInputElement>(null);
 
-  const [pettyItems, setPettyItems] = useState<PettyItem[]>([
-    { date: "", particulars: "", receipt_no: "", amount: "" },
-  ]);
+  const [pettyItems, setPettyItems] = useState<PettyItem[]>(
+    editReport?.petty_items?.length
+      ? editReport.petty_items.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: p.amount.toString() }))
+      : [{ date: "", particulars: "", receipt_no: "", amount: "" }]
+  );
 
-  const [denoms, setDenoms] = useState<DenomRow[]>(DEFAULT_DENOMS.map(d => ({ ...d })));
+  const [denoms, setDenoms] = useState<DenomRow[]>(
+    editReport?.denoms?.length
+      ? editReport.denoms.map(d => ({ label: d.label, value: d.value, quantity: d.quantity ? d.quantity.toString() : "" }))
+      : DEFAULT_DENOMS.map(d => ({ ...d }))
+  );
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -60,86 +134,50 @@ export default function CashierModule() {
   const updateDenom = (i: number, val: string) =>
     setDenoms(prev => prev.map((d, idx) => idx === i ? { ...d, quantity: val } : d));
 
+  const buildReportData = () => ({
+    date: editReport?.date || new Date().toISOString(),
+    beginning_cash: bc,
+    sales: s,
+    petty_cash: totalPettyCash,
+    expected_ending_cash: expected,
+    actual_cash: totalActualCash,
+    cash_over_short: overShort,
+    petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+    denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
+  });
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      await saveCashierReport({
-        date: new Date().toISOString(),
-        beginning_cash: bc, sales: s, petty_cash: totalPettyCash,
-        expected_ending_cash: expected, actual_cash: totalActualCash, cash_over_short: overShort,
-      });
+      await saveCashierReport(buildReportData());
       toast.success("Cashier report saved!");
-      setBeginningCash(""); setSales("");
-      setPettyItems([{ date: "", particulars: "", receipt_no: "", amount: "" }]);
-      setDenoms(DEFAULT_DENOMS.map(d => ({ ...d })));
-      firstRef.current?.focus();
+      if (!editReport) {
+        setBeginningCash(""); setSales("");
+        setPettyItems([{ date: "", particulars: "", receipt_no: "", amount: "" }]);
+        setDenoms(DEFAULT_DENOMS.map(d => ({ ...d })));
+        firstRef.current?.focus();
+      }
+      if (onBack) onBack();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [bc, s, totalPettyCash, expected, totalActualCash, overShort]);
+  }, [bc, s, totalPettyCash, expected, totalActualCash, overShort, editReport, onBack]);
 
-  const getReportDate = () => {
-    const d = new Date();
-    return `${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}/${d.getFullYear()}`;
-  };
+  const handleDelete = useCallback(async () => {
+    if (!editReport?.id) return;
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    try {
+      await deleteCashierReport(editReport.id);
+      toast.success("Report deleted");
+      if (onBack) onBack();
+    } catch { toast.error("Failed to delete"); }
+  }, [editReport, confirmDelete, onBack]);
 
-  const buildReportHTML = () => {
-    const date = getReportDate();
-    return `
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
-        h2 { text-align: center; font-size: 14px; margin: 4px 0; }
-        h3 { font-size: 12px; margin: 12px 0 4px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-        td, th { border: 1px solid #999; padding: 3px 6px; font-size: 11px; }
-        th { background: #f0f0f0; text-align: left; }
-        .right { text-align: right; }
-        .bold { font-weight: bold; }
-        .negative { color: red; }
-      </style>
-      <h2>SERENITY INLAND RESORT</h2>
-      <h2>DAILY CASHIER REPORT</h2>
-      <p style="text-align:center">${date}</p>
-      <h3>A. CASH SUMMARY</h3>
-      <table>
-        <tr><td>Beginning Cash</td><td class="right">₱${bc.toLocaleString()}</td></tr>
-        <tr><td>Sales</td><td class="right">₱${s.toLocaleString()}</td></tr>
-        <tr class="bold"><td>Total Cash Available</td><td class="right">₱${totalCashAvailable.toLocaleString()}</td></tr>
-        <tr><td>Petty Cash</td><td class="right">₱${totalPettyCash.toLocaleString()}</td></tr>
-        <tr class="bold"><td>Expected Ending Cash</td><td class="right">₱${expected.toLocaleString()}</td></tr>
-        <tr><td>Actual Cash</td><td class="right">₱${totalActualCash.toLocaleString()}</td></tr>
-        <tr class="bold"><td>Cash Over/Short</td><td class="right ${overShort < 0 ? 'negative' : ''}">₱${overShort.toLocaleString()}</td></tr>
-      </table>
-      <h3>B. PETTY CASH EXPENSE DETAILS</h3>
-      <table>
-        <tr><th>Date</th><th>Particulars</th><th>Receipt No.</th><th class="right">Amount</th></tr>
-        ${pettyItems.map(p => `<tr><td>${p.date}</td><td>${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${(parseFloat(p.amount)||0).toLocaleString()}</td></tr>`).join('')}
-        <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${totalPettyCash.toLocaleString()}</td></tr>
-      </table>
-      <h3>C. CASH DENOMINATION</h3>
-      <table>
-        <tr><th>Denomination</th><th class="right">Quantity</th><th class="right">Amount</th></tr>
-        ${denoms.map(d => {
-          const qty = parseFloat(d.quantity) || 0;
-          const amt = d.value * qty;
-          return `<tr><td>${d.label}</td><td class="right">${qty}</td><td class="right">₱${amt.toLocaleString()}</td></tr>`;
-        }).join('')}
-        <tr class="bold"><td colspan="2" class="right">Total</td><td class="right">₱${totalActualCash.toLocaleString()}</td></tr>
-      </table>
-    `;
-  };
-
-  const handlePreview = () => setShowPreview(true);
-
-  const handlePrint = () => {
-    const w = window.open("", "_blank", "width=800,height=1000");
-    if (!w) return;
-    w.document.write(`<html><head><title>Cashier Report</title></head><body>${buildReportHTML()}<script>window.print();</script></body></html>`);
-    w.document.close();
-  };
+  const handlePrint = () => printCashierReport(buildReportData());
 
   const exportReport = () => {
-    const date = new Date();
-    const fmt = getReportDate();
+    const data = buildReportData();
+    const d = new Date(data.date);
+    const fmt = `${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}/${d.getFullYear()}`;
     const rows: string[][] = [
       ["DAILY CASHIER REPORT", fmt],
       [],
@@ -159,9 +197,9 @@ export default function CashierModule() {
       [],
       ["C. CASH DENOMINATION"],
       ["Denomination", "Quantity", "Amount"],
-      ...denoms.map(d => {
-        const qty = parseFloat(d.quantity) || 0;
-        return [d.label, qty.toString(), (d.value * qty).toLocaleString()];
+      ...denoms.map(dd => {
+        const qty = parseFloat(dd.quantity) || 0;
+        return [dd.label, qty.toString(), (dd.value * qty).toLocaleString()];
       }),
       ["", "Total", totalActualCash.toLocaleString()],
     ];
@@ -170,7 +208,7 @@ export default function CashierModule() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cashier_report_${date.toISOString().slice(0,10)}.csv`;
+    a.download = `cashier_report_${d.toISOString().slice(0,10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Report exported!");
@@ -180,8 +218,17 @@ export default function CashierModule() {
   const computedClass = "pos-input w-full bg-muted cursor-not-allowed opacity-80";
 
   return (
-    <>
-      <ModuleShell title="Daily Cashier Report" icon={<Banknote size={20} />} onSave={handleSave} saveLabel="Generate Daily Report" saving={saving}>
+    <div className="reveal-up max-w-lg mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <Banknote size={20} />
+        </div>
+        <h2 className="text-xl font-bold text-foreground" style={{ lineHeight: "1.2" }}>
+          {editReport ? "Edit Cashier Report" : "Daily Cashier Report"}
+        </h2>
+      </div>
+
+      <div className="space-y-4">
         {/* A. CASH SUMMARY */}
         <div className="pos-card space-y-3">
           <h3 className="text-sm font-bold text-foreground tracking-wide">A. CASH SUMMARY</h3>
@@ -281,34 +328,34 @@ export default function CashierModule() {
 
         {/* Actions */}
         <div className="space-y-2">
-          <button onClick={handlePreview} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
-            <Eye size={16} /> Preview Report
+          <button onClick={handleSave} disabled={saving} className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all disabled:opacity-50">
+            <Save size={18} /> {saving ? "Saving..." : "Save"}
           </button>
           <button onClick={handlePrint} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
-            <Printer size={16} /> Print Report
+            <Printer size={16} /> Print
           </button>
           <button onClick={exportReport} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
             <Download size={16} /> Export to Excel
           </button>
-        </div>
-      </ModuleShell>
-
-      {/* Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowPreview(false)}>
-          <div className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
-            <div dangerouslySetInnerHTML={{ __html: buildReportHTML() }} />
-            <div className="flex gap-2 mt-4">
-              <button onClick={handlePrint} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all">
-                Print
+          {editReport?.id && (
+            <>
+              <button onClick={handleDelete} className={`w-full flex items-center justify-center gap-2 h-11 rounded-lg font-medium text-sm active:scale-[0.97] transition-all ${confirmDelete ? "bg-destructive text-destructive-foreground" : "bg-secondary text-destructive hover:bg-destructive/10"}`}>
+                <Trash2 size={16} /> {confirmDelete ? "Confirm Delete" : "Delete"}
               </button>
-              <button onClick={() => setShowPreview(false)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 active:scale-95 transition-all">
-                Close
-              </button>
-            </div>
-          </div>
+              {confirmDelete && (
+                <button onClick={() => setConfirmDelete(false)} className="w-full h-9 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Cancel
+                </button>
+              )}
+            </>
+          )}
+          {onBack && (
+            <button onClick={onBack} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
+              <ArrowLeft size={16} /> Back
+            </button>
+          )}
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }

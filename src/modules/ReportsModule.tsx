@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { FileText, Download } from "lucide-react";
-import { getTransactions, type Transaction } from "@/lib/db";
+import { FileText, Download, Printer, Banknote, Eye } from "lucide-react";
+import { getTransactions, getCashierReports, type Transaction, type CashierReport } from "@/lib/db";
+import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
@@ -17,12 +18,28 @@ function formatDateTime(iso: string) {
   return `${mm}/${dd}/${yyyy} ${h.toString().padStart(2, "0")}:${min}:${sec} ${ampm}`;
 }
 
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
+}
+
+type Tab = "transactions" | "cashier";
+
 export default function ReportsModule() {
+  const [tab, setTab] = useState<Tab>("transactions");
   const [data, setData] = useState<Transaction[]>([]);
   const [moduleFilter, setModuleFilter] = useState("All");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [gameFilter, setGameFilter] = useState("");
+
+  // Cashier reports state
+  const [cashierReports, setCashierReports] = useState<CashierReport[]>([]);
+  const [cashierFilter, setCashierFilter] = useState<"Daily" | "Monthly">("Daily");
+  const [cashierDate, setCashierDate] = useState("");
+  const [editingReport, setEditingReport] = useState<CashierReport | null>(null);
+  const [previewReport, setPreviewReport] = useState<CashierReport | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     getTransactions({
@@ -32,6 +49,22 @@ export default function ReportsModule() {
       game_type: gameFilter || undefined,
     }).then(setData);
   }, [moduleFilter, dateFrom, dateTo, gameFilter]);
+
+  useEffect(() => {
+    getCashierReports().then(reports => {
+      let filtered = reports;
+      if (cashierDate) {
+        if (cashierFilter === "Daily") {
+          filtered = reports.filter(r => r.date.slice(0, 10) === cashierDate);
+        } else {
+          const ym = cashierDate.slice(0, 7);
+          filtered = reports.filter(r => r.date.slice(0, 7) === ym);
+        }
+      }
+      filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setCashierReports(filtered);
+    });
+  }, [tab, cashierFilter, cashierDate, refreshKey]);
 
   const totalAmount = data.reduce((s, t) => s + t.amount_paid, 0);
   const totalAdults = data.reduce((s, t) => s + t.adults, 0);
@@ -52,6 +85,15 @@ export default function ReportsModule() {
     URL.revokeObjectURL(url);
   };
 
+  if (editingReport) {
+    return (
+      <CashierModule
+        editReport={editingReport}
+        onBack={() => { setEditingReport(null); setRefreshKey(k => k + 1); }}
+      />
+    );
+  }
+
   return (
     <div className="reveal-up max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
@@ -61,79 +103,191 @@ export default function ReportsModule() {
         <h2 className="text-xl font-bold" style={{ lineHeight: "1.2" }}>Reports</h2>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <select className="pos-input text-sm" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
-          {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <input type="date" className="pos-input text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="From" />
-        <input type="date" className="pos-input text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="To" />
-        {moduleFilter === "Games Rental" && (
-          <select className="pos-input text-sm" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}>
-            <option value="">All Games</option>
-            {["Volleyball", "Dart", "Basketball", "Billiard"].map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
-        )}
+      {/* Tab switcher */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setTab("transactions")}
+          className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all ${tab === "transactions" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+        >
+          Transactions
+        </button>
+        <button
+          onClick={() => setTab("cashier")}
+          className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${tab === "cashier" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+        >
+          <Banknote size={16} /> Cashier Reports
+        </button>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="pos-card text-center">
-          <p className="text-xs text-muted-foreground">Transactions</p>
-          <p className="text-lg font-bold tabular-nums">{data.length}</p>
-        </div>
-        <div className="pos-card text-center">
-          <p className="text-xs text-muted-foreground">Total Guests</p>
-          <p className="text-lg font-bold tabular-nums">{totalAdults + totalChildren}</p>
-          <p className="text-xs text-muted-foreground">{totalAdults}A / {totalChildren}C</p>
-        </div>
-        <div className="pos-card text-center">
-          <p className="text-xs text-muted-foreground">Total Amount</p>
-          <p className="text-lg font-bold tabular-nums">₱{totalAmount.toLocaleString()}</p>
-        </div>
-      </div>
-
-      {/* Export */}
-      <button onClick={exportCSV} className="mb-4 flex items-center gap-2 px-4 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
-        <Download size={16} /> Export CSV
-      </button>
-
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted">
-              <th className="text-left px-3 py-2 font-medium">Txn No</th>
-              <th className="text-left px-3 py-2 font-medium">Date/Time</th>
-              <th className="text-left px-3 py-2 font-medium">Module</th>
-              <th className="text-left px-3 py-2 font-medium">Customer</th>
-              <th className="text-right px-3 py-2 font-medium">Adults</th>
-              <th className="text-right px-3 py-2 font-medium">Children</th>
-              <th className="text-right px-3 py-2 font-medium">Headcount</th>
-              <th className="text-right px-3 py-2 font-medium">Amount</th>
-              <th className="text-left px-3 py-2 font-medium">Payment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+      {tab === "transactions" && (
+        <>
+          {/* Filters */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <select className="pos-input text-sm" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
+              {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <input type="date" className="pos-input text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="From" />
+            <input type="date" className="pos-input text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="To" />
+            {moduleFilter === "Games Rental" && (
+              <select className="pos-input text-sm" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}>
+                <option value="">All Games</option>
+                {["Volleyball", "Dart", "Basketball", "Billiard"].map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
             )}
-            {data.map((t) => (
-              <tr key={t.id} className="border-t border-border hover:bg-muted/50">
-                <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
-                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(t.date_time)}</td>
-                <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
-                <td className="px-3 py-2">{t.customer_name || "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{t.adults}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{t.children}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
-                <td className="px-3 py-2">{t.payment_method}</td>
-              </tr>
+          </div>
+
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="pos-card text-center">
+              <p className="text-xs text-muted-foreground">Transactions</p>
+              <p className="text-lg font-bold tabular-nums">{data.length}</p>
+            </div>
+            <div className="pos-card text-center">
+              <p className="text-xs text-muted-foreground">Total Guests</p>
+              <p className="text-lg font-bold tabular-nums">{totalAdults + totalChildren}</p>
+              <p className="text-xs text-muted-foreground">{totalAdults}A / {totalChildren}C</p>
+            </div>
+            <div className="pos-card text-center">
+              <p className="text-xs text-muted-foreground">Total Amount</p>
+              <p className="text-lg font-bold tabular-nums">₱{totalAmount.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <button onClick={exportCSV} className="mb-4 flex items-center gap-2 px-4 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+            <Download size={16} /> Export CSV
+          </button>
+
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="text-left px-3 py-2 font-medium">Txn No</th>
+                  <th className="text-left px-3 py-2 font-medium">Date/Time</th>
+                  <th className="text-left px-3 py-2 font-medium">Module</th>
+                  <th className="text-left px-3 py-2 font-medium">Customer</th>
+                  <th className="text-right px-3 py-2 font-medium">Adults</th>
+                  <th className="text-right px-3 py-2 font-medium">Children</th>
+                  <th className="text-right px-3 py-2 font-medium">Headcount</th>
+                  <th className="text-right px-3 py-2 font-medium">Amount</th>
+                  <th className="text-left px-3 py-2 font-medium">Payment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.length === 0 && (
+                  <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+                )}
+                {data.map((t) => (
+                  <tr key={t.id} className="border-t border-border hover:bg-muted/50">
+                    <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
+                    <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(t.date_time)}</td>
+                    <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
+                    <td className="px-3 py-2">{t.customer_name || "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{t.adults}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{t.children}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
+                    <td className="px-3 py-2">{t.payment_method}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {tab === "cashier" && (
+        <>
+          {/* Cashier Filters */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <select className="pos-input text-sm" value={cashierFilter} onChange={e => setCashierFilter(e.target.value as "Daily" | "Monthly")}>
+              <option value="Daily">Daily</option>
+              <option value="Monthly">Monthly</option>
+            </select>
+            <input
+              type={cashierFilter === "Monthly" ? "month" : "date"}
+              className="pos-input text-sm"
+              value={cashierDate}
+              onChange={e => setCashierDate(e.target.value)}
+            />
+          </div>
+
+          {/* Cashier Reports List */}
+          <div className="space-y-3">
+            {cashierReports.length === 0 && (
+              <div className="pos-card text-center py-8 text-muted-foreground text-sm">No cashier reports found</div>
+            )}
+            {cashierReports.map(report => (
+              <div key={report.id} className="pos-card">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-bold">{formatDate(report.date)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Sales: ₱{report.sales.toLocaleString()} | Over/Short: <span className={report.cash_over_short < 0 ? "text-destructive" : ""}>{report.cash_over_short < 0 ? "-" : ""}₱{Math.abs(report.cash_over_short).toLocaleString()}</span>
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setPreviewReport(report)}
+                      className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all"
+                      title="Preview"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button
+                      onClick={() => printCashierReport(report)}
+                      className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all"
+                      title="Print"
+                    >
+                      <Printer size={16} />
+                    </button>
+                    <button
+                      onClick={() => setEditingReport(report)}
+                      className="h-9 px-3 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 active:scale-95 transition-all"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div className="text-center">
+                    <p className="text-muted-foreground">Beginning</p>
+                    <p className="font-medium tabular-nums">₱{report.beginning_cash.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-muted-foreground">Sales</p>
+                    <p className="font-medium tabular-nums">₱{report.sales.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-muted-foreground">Expected</p>
+                    <p className="font-medium tabular-nums">₱{report.expected_ending_cash.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-muted-foreground">Actual</p>
+                    <p className="font-medium tabular-nums">₱{report.actual_cash.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* Preview Modal */}
+          {previewReport && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setPreviewReport(null)}>
+              <div className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+                <div dangerouslySetInnerHTML={{ __html: buildCashierReportHTML(previewReport) }} />
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => printCashierReport(previewReport)} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all">
+                    Print
+                  </button>
+                  <button onClick={() => setPreviewReport(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 active:scale-95 transition-all">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

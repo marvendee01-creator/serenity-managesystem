@@ -170,6 +170,17 @@ export async function getCashierReports(): Promise<CashierReport[]> {
   });
 }
 
+export async function deleteCashierReport(id: number): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("cashier_reports", "readwrite");
+    const store = tx.objectStore("cashier_reports");
+    store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function exportAllData(): Promise<string> {
   const db = await openDB();
   const data: Record<string, unknown[]> = {};
