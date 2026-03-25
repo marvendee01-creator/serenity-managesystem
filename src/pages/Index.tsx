@@ -44,6 +44,7 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   reports: ReportsModule,
   cashier: CashierModule,
   settings: SettingsModule,
+  maintenance: MaintenanceModule,
 };
 
 export default function Index() {
