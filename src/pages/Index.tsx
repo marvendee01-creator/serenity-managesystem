@@ -30,6 +30,7 @@ const MODULES = [
   { id: "reports", label: "Reports", icon: reportsIcon },
   { id: "cashier", label: "Cashier", icon: cashierIcon },
   { id: "settings", label: "Settings", icon: settingsIcon },
+  { id: "maintenance", label: "Maintenance", icon: maintenanceIcon },
 ] as const;
 
 type ModuleId = (typeof MODULES)[number]["id"];
