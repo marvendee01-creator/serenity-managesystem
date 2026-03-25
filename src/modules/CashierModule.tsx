@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Banknote, Download, Plus, Trash2 } from "lucide-react";
+import { Banknote, Download, Plus, Trash2, Eye, Printer } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import { saveCashierReport } from "@/lib/db";
 import { toast } from "sonner";
@@ -13,60 +13,52 @@ interface PettyItem {
 
 interface DenomRow {
   label: string;
-  value: number | null; // null = coins (manual)
+  value: number;
   quantity: string;
-  manualAmount: string;
 }
 
 const DEFAULT_DENOMS: DenomRow[] = [
-  { label: "₱1,000", value: 1000, quantity: "", manualAmount: "" },
-  { label: "₱500", value: 500, quantity: "", manualAmount: "" },
-  { label: "₱100", value: 100, quantity: "", manualAmount: "" },
-  { label: "₱50", value: 50, quantity: "", manualAmount: "" },
-  { label: "₱20", value: 20, quantity: "", manualAmount: "" },
-  { label: "Coins", value: null, quantity: "", manualAmount: "" },
+  { label: "₱1,000", value: 1000, quantity: "" },
+  { label: "₱500", value: 500, quantity: "" },
+  { label: "₱100", value: 100, quantity: "" },
+  { label: "₱50", value: 50, quantity: "" },
+  { label: "₱20", value: 20, quantity: "" },
+  { label: "₱10", value: 10, quantity: "" },
+  { label: "₱5", value: 5, quantity: "" },
+  { label: "₱1", value: 1, quantity: "" },
+  { label: "₱0.25", value: 0.25, quantity: "" },
 ];
 
 export default function CashierModule() {
   const [beginningCash, setBeginningCash] = useState("");
   const [sales, setSales] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const firstRef = useRef<HTMLInputElement>(null);
 
-  // B. Petty Cash
   const [pettyItems, setPettyItems] = useState<PettyItem[]>([
     { date: "", particulars: "", receipt_no: "", amount: "" },
   ]);
 
-  // C. Denominations
   const [denoms, setDenoms] = useState<DenomRow[]>(DEFAULT_DENOMS.map(d => ({ ...d })));
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
-  // Computed values
   const bc = parseFloat(beginningCash) || 0;
   const s = parseFloat(sales) || 0;
   const totalCashAvailable = bc + s;
-
   const totalPettyCash = pettyItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-
-  const totalActualCash = denoms.reduce((sum, d) => {
-    if (d.value === null) return sum + (parseFloat(d.manualAmount) || 0);
-    return sum + d.value * (parseInt(d.quantity) || 0);
-  }, 0);
-
+  const totalActualCash = denoms.reduce((sum, d) => sum + d.value * (parseFloat(d.quantity) || 0), 0);
   const expected = totalCashAvailable - totalPettyCash;
   const overShort = totalActualCash - expected;
 
-  // Petty cash handlers
   const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", receipt_no: "", amount: "" }]);
   const removePettyRow = (i: number) => setPettyItems(prev => prev.filter((_, idx) => idx !== i));
   const updatePetty = (i: number, field: keyof PettyItem, val: string) =>
     setPettyItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
 
-  // Denom handlers
-  const updateDenom = (i: number, field: "quantity" | "manualAmount", val: string) =>
-    setDenoms(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d));
+  const updateDenom = (i: number, val: string) =>
+    setDenoms(prev => prev.map((d, idx) => idx === i ? { ...d, quantity: val } : d));
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -85,9 +77,69 @@ export default function CashierModule() {
     setSaving(false);
   }, [bc, s, totalPettyCash, expected, totalActualCash, overShort]);
 
+  const getReportDate = () => {
+    const d = new Date();
+    return `${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}/${d.getFullYear()}`;
+  };
+
+  const buildReportHTML = () => {
+    const date = getReportDate();
+    return `
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
+        h2 { text-align: center; font-size: 14px; margin: 4px 0; }
+        h3 { font-size: 12px; margin: 12px 0 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        td, th { border: 1px solid #999; padding: 3px 6px; font-size: 11px; }
+        th { background: #f0f0f0; text-align: left; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .negative { color: red; }
+      </style>
+      <h2>SERENITY INLAND RESORT</h2>
+      <h2>DAILY CASHIER REPORT</h2>
+      <p style="text-align:center">${date}</p>
+      <h3>A. CASH SUMMARY</h3>
+      <table>
+        <tr><td>Beginning Cash</td><td class="right">₱${bc.toLocaleString()}</td></tr>
+        <tr><td>Sales</td><td class="right">₱${s.toLocaleString()}</td></tr>
+        <tr class="bold"><td>Total Cash Available</td><td class="right">₱${totalCashAvailable.toLocaleString()}</td></tr>
+        <tr><td>Petty Cash</td><td class="right">₱${totalPettyCash.toLocaleString()}</td></tr>
+        <tr class="bold"><td>Expected Ending Cash</td><td class="right">₱${expected.toLocaleString()}</td></tr>
+        <tr><td>Actual Cash</td><td class="right">₱${totalActualCash.toLocaleString()}</td></tr>
+        <tr class="bold"><td>Cash Over/Short</td><td class="right ${overShort < 0 ? 'negative' : ''}">₱${overShort.toLocaleString()}</td></tr>
+      </table>
+      <h3>B. PETTY CASH EXPENSE DETAILS</h3>
+      <table>
+        <tr><th>Date</th><th>Particulars</th><th>Receipt No.</th><th class="right">Amount</th></tr>
+        ${pettyItems.map(p => `<tr><td>${p.date}</td><td>${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${(parseFloat(p.amount)||0).toLocaleString()}</td></tr>`).join('')}
+        <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${totalPettyCash.toLocaleString()}</td></tr>
+      </table>
+      <h3>C. CASH DENOMINATION</h3>
+      <table>
+        <tr><th>Denomination</th><th class="right">Quantity</th><th class="right">Amount</th></tr>
+        ${denoms.map(d => {
+          const qty = parseFloat(d.quantity) || 0;
+          const amt = d.value * qty;
+          return `<tr><td>${d.label}</td><td class="right">${qty}</td><td class="right">₱${amt.toLocaleString()}</td></tr>`;
+        }).join('')}
+        <tr class="bold"><td colspan="2" class="right">Total</td><td class="right">₱${totalActualCash.toLocaleString()}</td></tr>
+      </table>
+    `;
+  };
+
+  const handlePreview = () => setShowPreview(true);
+
+  const handlePrint = () => {
+    const w = window.open("", "_blank", "width=800,height=1000");
+    if (!w) return;
+    w.document.write(`<html><head><title>Cashier Report</title></head><body>${buildReportHTML()}<script>window.print();</script></body></html>`);
+    w.document.close();
+  };
+
   const exportReport = () => {
     const date = new Date();
-    const fmt = `${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getDate().toString().padStart(2,'0')}/${date.getFullYear()}`;
+    const fmt = getReportDate();
     const rows: string[][] = [
       ["DAILY CASHIER REPORT", fmt],
       [],
@@ -108,8 +160,8 @@ export default function CashierModule() {
       ["C. CASH DENOMINATION"],
       ["Denomination", "Quantity", "Amount"],
       ...denoms.map(d => {
-        const amt = d.value === null ? (parseFloat(d.manualAmount) || 0) : d.value * (parseInt(d.quantity) || 0);
-        return [d.label, d.value === null ? "-" : (parseInt(d.quantity) || 0).toString(), amt.toLocaleString()];
+        const qty = parseFloat(d.quantity) || 0;
+        return [d.label, qty.toString(), (d.value * qty).toLocaleString()];
       }),
       ["", "Total", totalActualCash.toLocaleString()],
     ];
@@ -128,116 +180,135 @@ export default function CashierModule() {
   const computedClass = "pos-input w-full bg-muted cursor-not-allowed opacity-80";
 
   return (
-    <ModuleShell title="Daily Cashier Report" icon={<Banknote size={20} />} onSave={handleSave} saveLabel="Generate Daily Report" saving={saving}>
-      {/* A. CASH SUMMARY */}
-      <div className="pos-card space-y-3">
-        <h3 className="text-sm font-bold text-foreground tracking-wide">A. CASH SUMMARY</h3>
-        <div>
-          <label className="text-sm font-medium block mb-1">Beginning Cash</label>
-          <input ref={firstRef} type="number" className={inputClass} value={beginningCash} onChange={e => setBeginningCash(e.target.value)} placeholder="0.00" />
+    <>
+      <ModuleShell title="Daily Cashier Report" icon={<Banknote size={20} />} onSave={handleSave} saveLabel="Generate Daily Report" saving={saving}>
+        {/* A. CASH SUMMARY */}
+        <div className="pos-card space-y-3">
+          <h3 className="text-sm font-bold text-foreground tracking-wide">A. CASH SUMMARY</h3>
+          <div>
+            <label className="text-sm font-medium block mb-1">Beginning Cash</label>
+            <input ref={firstRef} type="number" className={inputClass} value={beginningCash} onChange={e => setBeginningCash(e.target.value)} placeholder="0.00" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Sales</label>
+            <input type="number" className={inputClass} value={sales} onChange={e => setSales(e.target.value)} placeholder="0.00" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Total Cash Available</label>
+            <input type="text" className={computedClass} value={`₱${totalCashAvailable.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Petty Cash</label>
+            <input type="text" className={computedClass} value={`₱${totalPettyCash.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Expected Ending Cash</label>
+            <input type="text" className={computedClass} value={`₱${expected.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Actual Cash</label>
+            <input type="text" className={computedClass} value={`₱${totalActualCash.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-muted-foreground">Cash Over/Short</span>
+            <span className={`font-bold tabular-nums text-lg ${overShort < 0 ? "text-destructive" : overShort > 0 ? "text-success" : ""}`}>
+              ₱{overShort.toLocaleString()}
+            </span>
+          </div>
         </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Sales</label>
-          <input type="number" className={inputClass} value={sales} onChange={e => setSales(e.target.value)} placeholder="0.00" />
-        </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Total Cash Available</label>
-          <input type="text" className={computedClass} value={`₱${totalCashAvailable.toLocaleString()}`} readOnly tabIndex={-1} />
-        </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Petty Cash</label>
-          <input type="text" className={computedClass} value={`₱${totalPettyCash.toLocaleString()}`} readOnly tabIndex={-1} />
-        </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Expected Ending Cash</label>
-          <input type="text" className={computedClass} value={`₱${expected.toLocaleString()}`} readOnly tabIndex={-1} />
-        </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Actual Cash</label>
-          <input type="text" className={computedClass} value={`₱${totalActualCash.toLocaleString()}`} readOnly tabIndex={-1} />
-        </div>
-        <div className="flex justify-between items-center pt-2 border-t border-border">
-          <span className="text-sm font-medium text-muted-foreground">Cash Over/Short</span>
-          <span className={`font-bold tabular-nums text-lg ${overShort < 0 ? "text-destructive" : overShort > 0 ? "text-success" : ""}`}>
-            ₱{overShort.toLocaleString()}
-          </span>
-        </div>
-      </div>
 
-      {/* B. PETTY CASH EXPENSE DETAILS */}
-      <div className="pos-card space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-foreground tracking-wide">B. PETTY CASH EXPENSE DETAILS</h3>
-          <button onClick={addPettyRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
-            <Plus size={16} />
+        {/* B. PETTY CASH */}
+        <div className="pos-card space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-foreground tracking-wide">B. PETTY CASH EXPENSE DETAILS</h3>
+            <button onClick={addPettyRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
+              <Plus size={16} />
+            </button>
+          </div>
+          <div className="space-y-2">
+            {pettyItems.map((item, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>}
+                  <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
+                </div>
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
+                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" />
+                </div>
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}
+                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" />
+                </div>
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Amount</label>}
+                  <input type="number" className={`${inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" />
+                </div>
+                <button onClick={() => removePettyRow(i)} className="w-8 h-10 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all" disabled={pettyItems.length === 1}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-muted-foreground">Total Petty Cash</span>
+            <span className="font-bold tabular-nums">₱{totalPettyCash.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* C. CASH DENOMINATION */}
+        <div className="pos-card space-y-3">
+          <h3 className="text-sm font-bold text-foreground tracking-wide">C. CASH DENOMINATION</h3>
+          <div className="grid grid-cols-3 gap-2 text-[10px] font-medium text-muted-foreground pb-1">
+            <span>Denomination</span><span>Quantity</span><span className="text-right">Amount</span>
+          </div>
+          {denoms.map((d, i) => {
+            const qty = parseFloat(d.quantity) || 0;
+            const amt = d.value * qty;
+            return (
+              <div key={d.label} className="grid grid-cols-3 gap-2 items-center">
+                <span className="text-sm font-medium">{d.label}</span>
+                <input type="number" className={`${inputClass} text-sm h-10`} value={d.quantity} onChange={e => updateDenom(i, e.target.value)} placeholder="0" />
+                <span className="text-sm font-medium tabular-nums text-right">₱{amt.toLocaleString()}</span>
+              </div>
+            );
+          })}
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-muted-foreground">Total Actual Cash</span>
+            <span className="font-bold tabular-nums">₱{totalActualCash.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="space-y-2">
+          <button onClick={handlePreview} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
+            <Eye size={16} /> Preview Report
+          </button>
+          <button onClick={handlePrint} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
+            <Printer size={16} /> Print Report
+          </button>
+          <button onClick={exportReport} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+            <Download size={16} /> Export to Excel
           </button>
         </div>
-        <div className="space-y-2">
-          {pettyItems.map((item, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
-              <div>
-                {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>}
-                <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
-              </div>
-              <div>
-                {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
-                <input type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" />
-              </div>
-              <div>
-                {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}
-                <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" />
-              </div>
-              <div>
-                {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Amount</label>}
-                <input type="number" className={`${inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" />
-              </div>
-              <button onClick={() => removePettyRow(i)} className="w-8 h-10 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all" disabled={pettyItems.length === 1}>
-                <Trash2 size={14} />
+      </ModuleShell>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowPreview(false)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div dangerouslySetInnerHTML={{ __html: buildReportHTML() }} />
+            <div className="flex gap-2 mt-4">
+              <button onClick={handlePrint} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all">
+                Print
+              </button>
+              <button onClick={() => setShowPreview(false)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 active:scale-95 transition-all">
+                Close
               </button>
             </div>
-          ))}
+          </div>
         </div>
-        <div className="flex justify-between items-center pt-2 border-t border-border">
-          <span className="text-sm font-medium text-muted-foreground">Total Petty Cash</span>
-          <span className="font-bold tabular-nums">₱{totalPettyCash.toLocaleString()}</span>
-        </div>
-      </div>
-
-      {/* C. CASH DENOMINATION */}
-      <div className="pos-card space-y-3">
-        <h3 className="text-sm font-bold text-foreground tracking-wide">C. CASH DENOMINATION</h3>
-        <div className="grid grid-cols-3 gap-2 text-[10px] font-medium text-muted-foreground pb-1">
-          <span>Denomination</span><span>Quantity</span><span className="text-right">Amount</span>
-        </div>
-        {denoms.map((d, i) => {
-          const amt = d.value === null ? (parseFloat(d.manualAmount) || 0) : d.value * (parseInt(d.quantity) || 0);
-          return (
-            <div key={d.label} className="grid grid-cols-3 gap-2 items-center">
-              <span className="text-sm font-medium">{d.label}</span>
-              {d.value !== null ? (
-                <>
-                  <input type="number" className={`${inputClass} text-sm h-10`} value={d.quantity} onChange={e => updateDenom(i, "quantity", e.target.value)} placeholder="0" />
-                  <span className="text-sm font-medium tabular-nums text-right">₱{amt.toLocaleString()}</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-sm text-muted-foreground text-center">—</span>
-                  <input type="number" className={`${inputClass} text-sm h-10`} value={d.manualAmount} onChange={e => updateDenom(i, "manualAmount", e.target.value)} placeholder="0.00" />
-                </>
-              )}
-            </div>
-          );
-        })}
-        <div className="flex justify-between items-center pt-2 border-t border-border">
-          <span className="text-sm font-medium text-muted-foreground">Total Actual Cash</span>
-          <span className="font-bold tabular-nums">₱{totalActualCash.toLocaleString()}</span>
-        </div>
-      </div>
-
-      {/* Export */}
-      <button onClick={exportReport} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
-        <Download size={16} /> Export to Excel
-      </button>
-    </ModuleShell>
+      )}
+    </>
   );
 }
