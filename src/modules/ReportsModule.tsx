@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Printer, Banknote, Eye } from "lucide-react";
+import { FileText, Download, Printer, Banknote, Eye, CalendarDays } from "lucide-react";
 import { getTransactions, getCashierReports, type Transaction, type CashierReport } from "@/lib/db";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
+import ReservationBoard from "@/modules/ReservationBoard";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
@@ -23,7 +24,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier";
+type Tab = "transactions" | "cashier" | "reservation";
 
 export default function ReportsModule() {
   const [tab, setTab] = useState<Tab>("transactions");
@@ -33,7 +34,6 @@ export default function ReportsModule() {
   const [dateTo, setDateTo] = useState("");
   const [gameFilter, setGameFilter] = useState("");
 
-  // Cashier reports state
   const [cashierReports, setCashierReports] = useState<CashierReport[]>([]);
   const [cashierFilter, setCashierFilter] = useState<"Daily" | "Monthly">("Daily");
   const [cashierDate, setCashierDate] = useState("");
@@ -115,13 +115,18 @@ export default function ReportsModule() {
           onClick={() => setTab("cashier")}
           className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${tab === "cashier" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
         >
-          <Banknote size={16} /> Cashier Reports
+          <Banknote size={16} /> Cashier
+        </button>
+        <button
+          onClick={() => setTab("reservation")}
+          className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${tab === "reservation" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+        >
+          <CalendarDays size={16} /> Reservations
         </button>
       </div>
 
       {tab === "transactions" && (
         <>
-          {/* Filters */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <select className="pos-input text-sm" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
               {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -136,7 +141,6 @@ export default function ReportsModule() {
             )}
           </div>
 
-          {/* Summary */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="pos-card text-center">
               <p className="text-xs text-muted-foreground">Transactions</p>
@@ -197,7 +201,6 @@ export default function ReportsModule() {
 
       {tab === "cashier" && (
         <>
-          {/* Cashier Filters */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <select className="pos-input text-sm" value={cashierFilter} onChange={e => setCashierFilter(e.target.value as "Daily" | "Monthly")}>
               <option value="Daily">Daily</option>
@@ -211,7 +214,6 @@ export default function ReportsModule() {
             />
           </div>
 
-          {/* Cashier Reports List */}
           <div className="space-y-3">
             {cashierReports.length === 0 && (
               <div className="pos-card text-center py-8 text-muted-foreground text-sm">No cashier reports found</div>
@@ -226,24 +228,13 @@ export default function ReportsModule() {
                     </p>
                   </div>
                   <div className="flex gap-1">
-                    <button
-                      onClick={() => setPreviewReport(report)}
-                      className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all"
-                      title="Preview"
-                    >
+                    <button onClick={() => setPreviewReport(report)} className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all" title="Preview">
                       <Eye size={16} />
                     </button>
-                    <button
-                      onClick={() => printCashierReport(report)}
-                      className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all"
-                      title="Print"
-                    >
+                    <button onClick={() => printCashierReport(report)} className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all" title="Print">
                       <Printer size={16} />
                     </button>
-                    <button
-                      onClick={() => setEditingReport(report)}
-                      className="h-9 px-3 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 active:scale-95 transition-all"
-                    >
+                    <button onClick={() => setEditingReport(report)} className="h-9 px-3 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 active:scale-95 transition-all">
                       Edit
                     </button>
                   </div>
@@ -270,7 +261,6 @@ export default function ReportsModule() {
             ))}
           </div>
 
-          {/* Preview Modal */}
           {previewReport && (
             <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setPreviewReport(null)}>
               <div className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
@@ -288,6 +278,8 @@ export default function ReportsModule() {
           )}
         </>
       )}
+
+      {tab === "reservation" && <ReservationBoard />}
     </div>
   );
 }

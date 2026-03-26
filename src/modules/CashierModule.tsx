@@ -98,6 +98,7 @@ export function printCashierReport(report: Parameters<typeof buildCashierReportH
 }
 
 export default function CashierModule({ editReport, onBack }: CashierModuleProps) {
+  const [reportDate, setReportDate] = useState(editReport ? editReport.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
   const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginning_cash.toString() : "");
   const [sales, setSales] = useState(editReport ? editReport.sales.toString() : "");
   const [saving, setSaving] = useState(false);
@@ -135,7 +136,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
     setDenoms(prev => prev.map((d, idx) => idx === i ? { ...d, quantity: val } : d));
 
   const buildReportData = () => ({
-    date: editReport?.date || new Date().toISOString(),
+    date: reportDate ? new Date(reportDate + "T00:00:00").toISOString() : (editReport?.date || new Date().toISOString()),
     beginning_cash: bc,
     sales: s,
     petty_cash: totalPettyCash,
@@ -229,6 +230,12 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
       </div>
 
       <div className="space-y-4">
+        {/* Report Date */}
+        <div>
+          <label className="text-sm font-medium block mb-1">Report Date</label>
+          <input type="date" className="pos-input w-full ring-2 ring-warning/50 bg-warning/5" value={reportDate} onChange={e => setReportDate(e.target.value)} />
+        </div>
+
         {/* A. CASH SUMMARY */}
         <div className="pos-card space-y-3">
           <h3 className="text-sm font-bold text-foreground tracking-wide">A. CASH SUMMARY</h3>
