@@ -9,7 +9,7 @@ function formatDateLabel(d: Date) {
 function getMonthDays(year: number, month: number) {
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
-  const startDay = first.getDay(); // 0=Sun
+  const startDay = first.getDay();
   const totalDays = last.getDate();
   return { startDay, totalDays };
 }
@@ -29,18 +29,30 @@ function getColor(i: number) {
   return COLORS[i % COLORS.length];
 }
 
+/** Return array of day-of-month numbers a booking spans within [monthStart, monthEnd] */
+function getBookingDays(b: Transaction, year: number, month: number, totalDays: number): number[] {
+  const start = b.check_in ? new Date(b.check_in) : new Date(b.date_time);
+  const end = b.check_out ? new Date(b.check_out) : start;
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month, totalDays, 23, 59, 59);
+
+  const from = start < monthStart ? 1 : start.getDate();
+  const to = end > monthEnd ? totalDays : end.getDate();
+
+  const days: number[] = [];
+  for (let d = from; d <= to; d++) days.push(d);
+  return days;
+}
+
 export default function ReservationBoard() {
   const now = new Date();
-  const [fromDate, setFromDate] = useState(() => {
-    const d = new Date(now.getFullYear(), now.getMonth(), 1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [toDate, setToDate] = useState(() => {
-    const d = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return d.toISOString().slice(0, 10);
-  });
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [selected, setSelected] = useState<Transaction | null>(null);
+
+  const fromDate = new Date(year, month, 1).toISOString().slice(0, 10);
+  const toDate = new Date(year, month + 1, 0).toISOString().slice(0, 10);
 
   const loadBookings = () => {
     getTransactions({ module: "Booking", dateFrom: fromDate, dateTo: toDate }).then(setBookings);
@@ -48,22 +60,30 @@ export default function ReservationBoard() {
 
   useEffect(() => { loadBookings(); }, [fromDate, toDate]);
 
-  const fromD = new Date(fromDate + "T00:00:00");
-  const toD = new Date(toDate + "T00:00:00");
-  const year = fromD.getFullYear();
-  const month = fromD.getMonth();
   const { startDay, totalDays } = getMonthDays(year, month);
 
+  // Build color map
+  let colorIdx = 0;
+  const colorMap = new Map<number, string>();
+  bookings.forEach(b => {
+    if (b.id && !colorMap.has(b.id)) {
+      colorMap.set(b.id, getColor(colorIdx++));
+    }
+  });
+
+  // Map bookings to days (supports multi-day spans)
   const bookingsByDay = useMemo(() => {
     const map: Record<number, Transaction[]> = {};
     bookings.forEach((b) => {
-      const d = new Date(b.date_time);
-      const day = d.getDate();
-      if (!map[day]) map[day] = [];
-      map[day].push(b);
+      const days = getBookingDays(b, year, month, totalDays);
+      days.forEach(d => {
+        if (!map[d]) map[d] = [];
+        // avoid duplicates per day
+        if (!map[d].some(x => x.id === b.id)) map[d].push(b);
+      });
     });
     return map;
-  }, [bookings]);
+  }, [bookings, year, month, totalDays]);
 
   const cells: (number | null)[] = [];
   for (let i = 0; i < startDay; i++) cells.push(null);
@@ -73,8 +93,11 @@ export default function ReservationBoard() {
   const weeks: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
-  const monthLabel = fromD.toLocaleString("en-US", { month: "long", year: "numeric" });
-  const rangeLabel = `${formatDateLabel(fromD)} - ${formatDateLabel(toD)}`;
+  const monthLabel = new Date(year, month).toLocaleString("en-US", { month: "long", year: "numeric" });
+  const rangeLabel = `${formatDateLabel(new Date(year, month, 1))} - ${formatDateLabel(new Date(year, month + 1, 0))}`;
+
+  const prevMonth = () => { if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1); };
+  const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1); };
 
   const handlePrint = () => {
     const w = window.open("", "_blank", "width=1000,height=800");
@@ -98,13 +121,11 @@ export default function ReservationBoard() {
     w.document.close();
   };
 
-  let colorIdx = 0;
-  const colorMap = new Map<number, string>();
-  bookings.forEach(b => {
-    if (b.id && !colorMap.has(b.id)) {
-      colorMap.set(b.id, getColor(colorIdx++));
-    }
-  });
+  const fmtDT = (iso?: string) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  };
 
   return (
     <div className="space-y-4">
@@ -119,20 +140,12 @@ export default function ReservationBoard() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <label className="text-xs font-medium text-muted-foreground block mb-1">From Date</label>
-          <input type="date" className="pos-input text-sm" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground block mb-1">To Date</label>
-          <input type="date" className="pos-input text-sm" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-        </div>
-        <button onClick={loadBookings} className="mt-5 h-9 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">
-          Apply Filter
-        </button>
-        <span className="mt-5 text-sm text-muted-foreground">{bookings.length} reservations found</span>
+      {/* Month Nav */}
+      <div className="flex items-center gap-3">
+        <button onClick={prevMonth} className="px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">← Prev</button>
+        <span className="text-sm font-semibold text-foreground">{monthLabel}</span>
+        <button onClick={nextMonth} className="px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">Next →</button>
+        <span className="text-sm text-muted-foreground ml-auto">{bookings.length} reservations</span>
       </div>
 
       {/* Calendar Grid */}
@@ -168,8 +181,6 @@ export default function ReservationBoard() {
                               >
                                 <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
                                 <p className="opacity-70">{b.booking_type || "Booking"}</p>
-                                <p className="opacity-60">{b.adults}A, {b.children}C</p>
-                                {b.room_type && <p className="opacity-60">{b.room_type}</p>}
                               </button>
                             ))}
                           </div>
@@ -196,13 +207,16 @@ export default function ReservationBoard() {
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span className="font-medium">{selected.customer_name || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Date/Time</span><span className="font-medium">{formatDateLabel(new Date(selected.date_time))}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="font-medium">{selected.booking_type || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Check-in</span><span className="font-medium">{fmtDT(selected.check_in)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Check-out</span><span className="font-medium">{fmtDT(selected.check_out)}</span></div>
+              {selected.tour_type && <div className="flex justify-between"><span className="text-muted-foreground">Tour</span><span className="font-medium">{selected.tour_type}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Adults</span><span className="font-medium">{selected.adults}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Children</span><span className="font-medium">{selected.children}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Headcount</span><span className="font-medium">{selected.total_headcount}</span></div>
               {selected.room_type && <div className="flex justify-between"><span className="text-muted-foreground">Room</span><span className="font-medium">{selected.room_type}</span></div>}
               {selected.number_of_tables && <div className="flex justify-between"><span className="text-muted-foreground">Tables</span><span className="font-medium">{selected.number_of_tables}</span></div>}
+              {selected.corkage_fee && <div className="flex justify-between"><span className="text-muted-foreground">Corkage</span><span className="font-medium">₱{selected.corkage_fee.toLocaleString()}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="font-bold text-primary">₱{selected.amount_paid.toLocaleString()}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{selected.payment_method}</span></div>
             </div>

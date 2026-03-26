@@ -18,6 +18,10 @@ export interface Transaction {
   payment_method: "Cash" | "GCash";
   customer_name?: string;
   number_of_tables?: number;
+  check_in?: string;
+  check_out?: string;
+  tour_type?: string;
+  corkage_fee?: number;
 }
 
 export interface Settings {
@@ -30,6 +34,8 @@ export interface Settings {
   barkada_room_rate: number;
   kubo_room_rate: number;
   table_rent_rate: number;
+  day_tour_rate: number;
+  night_tour_rate: number;
 }
 
 export interface CashierReportPettyItem {
@@ -68,6 +74,8 @@ const DEFAULT_SETTINGS: Settings = {
   barkada_room_rate: 1500,
   kubo_room_rate: 1000,
   table_rent_rate: 200,
+  day_tour_rate: 500,
+  night_tour_rate: 700,
 };
 
 function openDB(): Promise<IDBDatabase> {

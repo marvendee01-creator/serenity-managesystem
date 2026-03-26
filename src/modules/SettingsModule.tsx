@@ -10,6 +10,8 @@ const FIELDS: { key: keyof Omit<SettingsType, "id">; label: string; group: strin
   { key: "adult_rate_night", label: "Adult Rate (Night)", group: "Entrance Fee Settings" },
   { key: "child_rate_night", label: "Child Rate (Night)", group: "Entrance Fee Settings" },
   { key: "exclusive_fee", label: "Exclusive Fee", group: "Entrance Fee Settings" },
+  { key: "day_tour_rate", label: "Day Tour Rate", group: "Tour Settings" },
+  { key: "night_tour_rate", label: "Night Tour Rate", group: "Tour Settings" },
   { key: "barkada_room_rate", label: "Barkada Room Rate", group: "Room Settings" },
   { key: "kubo_room_rate", label: "Kubo Room Rate", group: "Room Settings" },
   { key: "table_rent_rate", label: "Table Rent Rate", group: "Table Rent Settings" },

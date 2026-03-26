@@ -7,20 +7,29 @@ import { toast } from "sonner";
 
 const TYPES = ["Exclusive", "Non-Exclusive"] as const;
 const ROOM_OPTIONS = ["None", "Kubo Room", "Barkada Room"] as const;
+const TOUR_OPTIONS = ["None", "Day Tour", "Night Tour"] as const;
 
 export default function BookingModule() {
   const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+  const [tourType, setTourType] = useState<string>("None");
+  const [corkageFee, setCorkageFee] = useState("");
   const [adults, setAdults] = useState("");
   const [children, setChildren] = useState("");
   const [addOnRoom, setAddOnRoom] = useState<string>("None");
   const [addOnTables, setAddOnTables] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amount, setAmount] = useState("");
+
   const [exclusiveFee, setExclusiveFee] = useState(5000);
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
+  const [dayTourRate, setDayTourRate] = useState(500);
+  const [nightTourRate, setNightTourRate] = useState(700);
+
   const [saving, setSaving] = useState(false);
   const firstRef = useRef<HTMLInputElement>(null);
 
@@ -31,6 +40,8 @@ export default function BookingModule() {
       setKuboRate(s.kubo_room_rate);
       setBarkadaRate(s.barkada_room_rate);
       setTableRate(s.table_rent_rate);
+      setDayTourRate(s.day_tour_rate);
+      setNightTourRate(s.night_tour_rate);
     });
   }, []);
 
@@ -39,12 +50,14 @@ export default function BookingModule() {
   const headcount = a + c;
   const isExclusive = bookingType === "Exclusive";
   const numTables = parseInt(addOnTables) || 0;
+  const corkage = parseFloat(corkageFee) || 0;
 
   // Compute total
   const roomAddOn = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableAddOn = numTables * tableRate;
+  const tourAddOn = tourType === "Day Tour" ? dayTourRate : tourType === "Night Tour" ? nightTourRate : 0;
   const baseAmount = isExclusive ? exclusiveFee : (parseFloat(amount) || 0);
-  const total = baseAmount + roomAddOn + tableAddOn;
+  const total = baseAmount + roomAddOn + tableAddOn + tourAddOn + corkage;
 
   const handleSave = useCallback(async () => {
     if (total === 0) { toast.error("Enter amount"); return; }
@@ -56,6 +69,10 @@ export default function BookingModule() {
         module: "Booking",
         customer_name: customerName || undefined,
         booking_type: bookingType,
+        check_in: checkIn || undefined,
+        check_out: checkOut || undefined,
+        tour_type: tourType !== "None" ? tourType : undefined,
+        corkage_fee: corkage > 0 ? corkage : undefined,
         room_type: addOnRoom !== "None" ? addOnRoom : undefined,
         number_of_tables: numTables > 0 ? numTables : undefined,
         adults: a, children: c,
@@ -66,10 +83,11 @@ export default function BookingModule() {
       toast.success("Booking saved!");
       setCustomerName(""); setAdults(""); setChildren(""); setAmount("");
       setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
+      setCheckIn(""); setCheckOut(""); setTourType("None"); setCorkageFee("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, a, c, headcount, amount, total, payment, addOnRoom, numTables]);
+  }, [customerName, bookingType, checkIn, checkOut, tourType, corkage, a, c, headcount, amount, total, payment, addOnRoom, numTables]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -91,6 +109,32 @@ export default function BookingModule() {
           ))}
         </div>
       </div>
+
+      {/* Check-in / Check-out */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-sm font-medium block mb-1">Check-in</label>
+          <input type="datetime-local" className="pos-input w-full" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Check-out</label>
+          <input type="datetime-local" className="pos-input w-full" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+        </div>
+      </div>
+
+      {/* Tour Type */}
+      <div>
+        <label className="text-sm font-medium block mb-1">Tour Type</label>
+        <select className="pos-input w-full" value={tourType} onChange={(e) => setTourType(e.target.value)}>
+          {TOUR_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {tourType !== "None" && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Rate: ₱{tourAddOn.toLocaleString()}
+          </p>
+        )}
+      </div>
+
       <div>
         <label className="text-sm font-medium block mb-1">Adults</label>
         <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
@@ -102,6 +146,12 @@ export default function BookingModule() {
       <div className="pos-card">
         <p className="text-sm text-muted-foreground mb-1">Total Headcount</p>
         <p className="text-2xl font-bold tabular-nums">{headcount}</p>
+      </div>
+
+      {/* Corkage Fee */}
+      <div>
+        <label className="text-sm font-medium block mb-1">Corkage Fee (Optional)</label>
+        <input type="number" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
       </div>
 
       {/* Add-on Room */}
@@ -143,9 +193,11 @@ export default function BookingModule() {
       <div className="pos-card border-primary/30">
         <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
         <p className="text-2xl font-bold text-primary tabular-nums">₱{total.toLocaleString()}</p>
-        {(roomAddOn > 0 || tableAddOn > 0) && (
+        {(roomAddOn > 0 || tableAddOn > 0 || tourAddOn > 0 || corkage > 0) && (
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
             <p>Base: ₱{baseAmount.toLocaleString()}</p>
+            {tourAddOn > 0 && <p>+ {tourType}: ₱{tourAddOn.toLocaleString()}</p>}
+            {corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
             {roomAddOn > 0 && <p>+ {addOnRoom}: ₱{roomAddOn.toLocaleString()}</p>}
             {tableAddOn > 0 && <p>+ {numTables} table(s): ₱{tableAddOn.toLocaleString()}</p>}
           </div>
