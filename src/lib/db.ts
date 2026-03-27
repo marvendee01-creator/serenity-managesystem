@@ -22,6 +22,20 @@ export interface Transaction {
   check_out?: string;
   tour_type?: string;
   corkage_fee?: number;
+  deposit_amount?: number;
+  balance?: number;
+  payment_status?: string;
+  comments?: string;
+}
+
+export interface BookingCashierEntry {
+  id?: number;
+  date: string;
+  customer_name: string;
+  amount: number;
+  amount_on_hand: number;
+  expenses: number;
+  comments: string;
 }
 
 export interface Settings {
