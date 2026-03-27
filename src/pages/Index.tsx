@@ -10,6 +10,8 @@ import reportsIcon from "@/assets/icons/reports.png";
 import cashierIcon from "@/assets/icons/cashier.png";
 import settingsIcon from "@/assets/icons/settings.png";
 import maintenanceIcon from "@/assets/icons/maintenance.png";
+import bookingMgmtIcon from "@/assets/icons/booking-mgmt.png";
+import bookingCashierIcon from "@/assets/icons/booking-cashier.png";
 import SplashScreen from "@/components/SplashScreen";
 import EntranceModule from "@/modules/EntranceModule";
 import RoomModule from "@/modules/RoomModule";
@@ -20,15 +22,19 @@ import ReportsModule from "@/modules/ReportsModule";
 import CashierModule from "@/modules/CashierModule";
 import SettingsModule from "@/modules/SettingsModule";
 import MaintenanceModule from "@/modules/MaintenanceModule";
+import BookingManagement from "@/modules/BookingManagement";
+import BookingCashierModule from "@/modules/BookingCashierModule";
 
 const MODULES = [
   { id: "entrance", label: "Entrance", icon: entranceIcon },
   { id: "room", label: "Room", icon: roomIcon },
   { id: "booking", label: "Booking", icon: bookingIcon },
+  { id: "booking-mgmt", label: "Booking Mgmt", icon: bookingMgmtIcon },
   { id: "games", label: "Games", icon: gamesIcon },
   { id: "tables", label: "Tables", icon: tablesIcon },
   { id: "reports", label: "Reports", icon: reportsIcon },
-  { id: "cashier", label: "Cashier", icon: cashierIcon },
+  { id: "cashier", label: "Cashier Store", icon: cashierIcon },
+  { id: "cashier-booking", label: "Cashier Booking", icon: bookingCashierIcon },
   { id: "settings", label: "Settings", icon: settingsIcon },
   { id: "maintenance", label: "Maintenance", icon: maintenanceIcon },
 ] as const;
@@ -39,10 +45,12 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   entrance: EntranceModule,
   room: RoomModule,
   booking: BookingModule,
+  "booking-mgmt": BookingManagement,
   games: GamesModule,
   tables: TableRentModule,
   reports: ReportsModule,
   cashier: CashierModule,
+  "cashier-booking": BookingCashierModule,
   settings: SettingsModule,
   maintenance: MaintenanceModule,
 };

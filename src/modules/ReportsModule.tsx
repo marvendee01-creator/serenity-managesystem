@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FileText, Download, Printer, Banknote, Eye, CalendarDays } from "lucide-react";
 import { getTransactions, getCashierReports, type Transaction, type CashierReport } from "@/lib/db";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
+import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
@@ -24,7 +25,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "reservation";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation";
 
 export default function ReportsModule() {
   const [tab, setTab] = useState<Tab>("transactions");
@@ -40,6 +41,13 @@ export default function ReportsModule() {
   const [editingReport, setEditingReport] = useState<CashierReport | null>(null);
   const [previewReport, setPreviewReport] = useState<CashierReport | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Booking cashier reports
+  const [bookingCashierReports, setBookingCashierReports] = useState<BookingCashierReport[]>([]);
+  const [bcFilter, setBcFilter] = useState<"Daily" | "Monthly">("Daily");
+  const [bcDate, setBcDate] = useState("");
+  const [editingBcReport, setEditingBcReport] = useState<BookingCashierReport | null>(null);
+  const [previewBcReport, setPreviewBcReport] = useState<BookingCashierReport | null>(null);
 
   useEffect(() => {
     getTransactions({
@@ -65,6 +73,21 @@ export default function ReportsModule() {
       setCashierReports(filtered);
     });
   }, [tab, cashierFilter, cashierDate, refreshKey]);
+
+  useEffect(() => {
+    const reports = loadBookingCashierReports();
+    let filtered = reports;
+    if (bcDate) {
+      if (bcFilter === "Daily") {
+        filtered = reports.filter(r => r.reportDate === bcDate);
+      } else {
+        const ym = bcDate.slice(0, 7);
+        filtered = reports.filter(r => r.reportDate.slice(0, 7) === ym);
+      }
+    }
+    filtered.sort((a, b) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime());
+    setBookingCashierReports(filtered);
+  }, [tab, bcFilter, bcDate, refreshKey]);
 
   const totalAmount = data.reduce((s, t) => s + t.amount_paid, 0);
   const totalAdults = data.reduce((s, t) => s + t.adults, 0);
@@ -94,6 +117,22 @@ export default function ReportsModule() {
     );
   }
 
+  if (editingBcReport) {
+    return (
+      <BookingCashierModule
+        editReport={editingBcReport}
+        onBack={() => { setEditingBcReport(null); setRefreshKey(k => k + 1); }}
+      />
+    );
+  }
+
+  const printBcReport = (report: BookingCashierReport) => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(`<html><head><title>Booking Cashier Report</title></head><body>${buildBookingCashierHTML(report)}<script>window.print();</script></body></html>`);
+    w.document.close();
+  };
+
   return (
     <div className="reveal-up max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
@@ -104,25 +143,21 @@ export default function ReportsModule() {
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setTab("transactions")}
-          className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all ${tab === "transactions" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-        >
-          Transactions
-        </button>
-        <button
-          onClick={() => setTab("cashier")}
-          className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${tab === "cashier" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-        >
-          <Banknote size={16} /> Cashier
-        </button>
-        <button
-          onClick={() => setTab("reservation")}
-          className={`flex-1 h-10 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${tab === "reservation" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-        >
-          <CalendarDays size={16} /> Reservations
-        </button>
+      <div className="flex gap-1 mb-4 overflow-x-auto">
+        {([
+          { key: "transactions" as Tab, label: "Transactions", icon: null as React.ReactNode },
+          { key: "cashier" as Tab, label: "Cashier Store", icon: <Banknote size={14} /> as React.ReactNode },
+          { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
+          { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex-1 h-10 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 whitespace-nowrap px-2 ${tab === t.key ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
       </div>
 
       {tab === "transactions" && (
@@ -270,6 +305,72 @@ export default function ReportsModule() {
                     Print
                   </button>
                   <button onClick={() => setPreviewReport(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 active:scale-95 transition-all">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === "cashier-booking" && (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <select className="pos-input text-sm" value={bcFilter} onChange={e => setBcFilter(e.target.value as "Daily" | "Monthly")}>
+              <option value="Daily">Daily</option>
+              <option value="Monthly">Monthly</option>
+            </select>
+            <input
+              type={bcFilter === "Monthly" ? "month" : "date"}
+              className="pos-input text-sm"
+              value={bcDate}
+              onChange={e => setBcDate(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-3">
+            {bookingCashierReports.length === 0 && (
+              <div className="pos-card text-center py-8 text-muted-foreground text-sm">No booking cashier reports found</div>
+            )}
+            {bookingCashierReports.map(report => {
+              const totalAmt = report.entries.reduce((s, e) => s + (e.amount || 0), 0);
+              const totalExp = report.entries.reduce((s, e) => s + (e.expenses || 0), 0);
+              return (
+                <div key={report.id} className="pos-card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-bold">{formatDate(report.reportDate + "T00:00:00")}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {report.entries.length} entries | Amount: ₱{totalAmt.toLocaleString()} | Expenses: ₱{totalExp.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => setPreviewBcReport(report)} className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all" title="Preview">
+                        <Eye size={16} />
+                      </button>
+                      <button onClick={() => printBcReport(report)} className="w-9 h-9 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-accent active:scale-95 transition-all" title="Print">
+                        <Printer size={16} />
+                      </button>
+                      <button onClick={() => setEditingBcReport(report)} className="h-9 px-3 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 active:scale-95 transition-all">
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {previewBcReport && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setPreviewBcReport(null)}>
+              <div className="bg-card rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+                <div dangerouslySetInnerHTML={{ __html: buildBookingCashierHTML(previewBcReport) }} />
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => printBcReport(previewBcReport)} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all">
+                    Print
+                  </button>
+                  <button onClick={() => setPreviewBcReport(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 active:scale-95 transition-all">
                     Close
                   </button>
                 </div>
