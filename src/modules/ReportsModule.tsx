@@ -145,11 +145,11 @@ export default function ReportsModule() {
       {/* Tab switcher */}
       <div className="flex gap-1 mb-4 overflow-x-auto">
         {([
-          { key: "transactions", label: "Transactions" },
-          { key: "cashier", label: "Cashier Store", icon: <Banknote size={14} /> },
-          { key: "cashier-booking", label: "Cashier Booking", icon: <Banknote size={14} /> },
-          { key: "reservation", label: "Reservations", icon: <CalendarDays size={14} /> },
-        ] as const).map(t => (
+          { key: "transactions" as Tab, label: "Transactions", icon: null as React.ReactNode },
+          { key: "cashier" as Tab, label: "Cashier Store", icon: <Banknote size={14} /> as React.ReactNode },
+          { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
+          { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
+        ]).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
