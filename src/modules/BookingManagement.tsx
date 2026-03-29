@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export default function BookingManagement() {
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [filter, setFilter] = useState<"all" | "With Balance" | "Fully Paid">("all");
+  const [paymentInputs, setPaymentInputs] = useState<Record<number, string>>({});
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
   const loadBookings = useCallback(() => {
@@ -19,13 +20,15 @@ export default function BookingManagement() {
 
   const filtered = filter === "all" ? bookings : bookings.filter(b => b.payment_status === filter);
 
-  const handleFullPayment = useCallback(async (booking: Transaction) => {
-    if (confirmId !== booking.id) {
-      setConfirmId(booking.id!);
-      return;
-    }
+  const handleSettlePayment = useCallback(async (booking: Transaction) => {
+    const paymentAmount = parseFloat(paymentInputs[booking.id!] || "0");
+    if (paymentAmount <= 0) { toast.error("Enter a valid payment amount"); return; }
+
+    const newDeposit = (booking.deposit_amount || 0) + paymentAmount;
+    const newBalance = booking.amount_paid - newDeposit;
+    const newStatus = newBalance <= 0 ? "Fully Paid" : "With Balance";
+
     try {
-      // Record a new payment transaction for the balance
       await addTransaction({
         transaction_no: `SR-${Date.now()}`,
         date_time: new Date().toISOString(),
@@ -34,8 +37,44 @@ export default function BookingManagement() {
         booking_type: booking.booking_type,
         check_in: booking.check_in,
         check_out: booking.check_out,
-        tour_type: booking.tour_type,
         corkage_fee: booking.corkage_fee,
+        function_hall_fee: booking.function_hall_fee,
+        room_type: booking.room_type,
+        number_of_tables: booking.number_of_tables,
+        adults: booking.adults,
+        children: booking.children,
+        total_headcount: booking.total_headcount,
+        amount_paid: booking.amount_paid,
+        deposit_amount: newDeposit,
+        balance: Math.max(0, newBalance),
+        payment_status: newStatus,
+        payment_method: booking.payment_method,
+        comments: `Payment of ₱${paymentAmount.toLocaleString()} received. ${newStatus === "Fully Paid" ? "Fully settled." : `Remaining: ₱${Math.max(0, newBalance).toLocaleString()}`}`,
+      });
+      toast.success(`₱${paymentAmount.toLocaleString()} payment recorded for ${booking.customer_name || "booking"}!`);
+      setPaymentInputs(prev => { const n = { ...prev }; delete n[booking.id!]; return n; });
+      loadBookings();
+    } catch {
+      toast.error("Failed to update");
+    }
+  }, [paymentInputs, loadBookings]);
+
+  const handleFullPayment = useCallback(async (booking: Transaction) => {
+    if (confirmId !== booking.id) {
+      setConfirmId(booking.id!);
+      return;
+    }
+    try {
+      await addTransaction({
+        transaction_no: `SR-${Date.now()}`,
+        date_time: new Date().toISOString(),
+        module: "Booking",
+        customer_name: booking.customer_name,
+        booking_type: booking.booking_type,
+        check_in: booking.check_in,
+        check_out: booking.check_out,
+        corkage_fee: booking.corkage_fee,
+        function_hall_fee: booking.function_hall_fee,
         room_type: booking.room_type,
         number_of_tables: booking.number_of_tables,
         adults: booking.adults,
@@ -124,16 +163,36 @@ export default function BookingManagement() {
               </div>
             </div>
             {b.payment_status === "With Balance" && (
-              <button
-                onClick={() => handleFullPayment(b)}
-                className={`w-full h-10 rounded-lg text-sm font-medium active:scale-[0.97] transition-all ${
-                  confirmId === b.id
-                    ? "bg-success text-success-foreground"
-                    : "bg-primary/10 text-primary hover:bg-primary/20"
-                }`}
-              >
-                {confirmId === b.id ? "Confirm Full Payment" : "Mark as Fully Paid"}
-              </button>
+              <div className="space-y-2">
+                {/* Partial Payment Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    className="pos-input flex-1 h-10 text-sm"
+                    placeholder="Enter payment amount"
+                    value={paymentInputs[b.id!] || ""}
+                    onChange={e => setPaymentInputs(prev => ({ ...prev, [b.id!]: e.target.value }))}
+                    min="0"
+                  />
+                  <button
+                    onClick={() => handleSettlePayment(b)}
+                    className="h-10 px-4 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
+                  >
+                    Settle
+                  </button>
+                </div>
+                {/* Full Payment */}
+                <button
+                  onClick={() => handleFullPayment(b)}
+                  className={`w-full h-10 rounded-lg text-sm font-medium active:scale-[0.97] transition-all ${
+                    confirmId === b.id
+                      ? "bg-success text-success-foreground"
+                      : "bg-primary/10 text-primary hover:bg-primary/20"
+                  }`}
+                >
+                  {confirmId === b.id ? "Confirm Full Payment" : "Mark as Fully Paid"}
+                </button>
+              </div>
             )}
             {b.comments && <p className="text-xs text-muted-foreground mt-2 italic">{b.comments}</p>}
           </div>
