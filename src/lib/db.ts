@@ -22,6 +22,7 @@ export interface Transaction {
   check_out?: string;
   tour_type?: string;
   corkage_fee?: number;
+  function_hall_fee?: number;
   deposit_amount?: number;
   balance?: number;
   payment_status?: string;

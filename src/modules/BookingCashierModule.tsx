@@ -1,26 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Banknote, Plus, Trash2, Save, Printer, Download, ArrowLeft } from "lucide-react";
-import { getTransactions, type Transaction } from "@/lib/db";
+import { getTransactions } from "@/lib/db";
 import { toast } from "sonner";
 
-interface BookingCashierEntry {
+interface PettyItem {
   date: string;
-  customerName: string;
-  amount: number;
-  amountOnHand: number;
-  expenses: number;
-  comments: string;
+  particulars: string;
+  receipt_no: string;
+  amount: string;
 }
 
-interface BookingCashierReport {
+interface DenomRow {
+  label: string;
+  value: number;
+  quantity: string;
+}
+
+const DEFAULT_DENOMS: DenomRow[] = [
+  { label: "₱1,000", value: 1000, quantity: "" },
+  { label: "₱500", value: 500, quantity: "" },
+  { label: "₱100", value: 100, quantity: "" },
+  { label: "₱50", value: 50, quantity: "" },
+  { label: "₱20", value: 20, quantity: "" },
+  { label: "₱10", value: 10, quantity: "" },
+  { label: "₱5", value: 5, quantity: "" },
+  { label: "₱1", value: 1, quantity: "" },
+  { label: "₱0.25", value: 0.25, quantity: "" },
+];
+
+export interface BookingCashierReport {
   id?: number;
   reportDate: string;
-  entries: BookingCashierEntry[];
+  beginningCash: number;
+  entranceSales: number;
+  pettyItems: { date: string; particulars: string; receipt_no: string; amount: number }[];
+  denoms: { label: string; value: number; quantity: number }[];
+  actualCash: number;
 }
 
 const STORAGE_KEY = "serenity_booking_cashier_reports";
 
-function loadReports(): BookingCashierReport[] {
+export function loadBookingCashierReports(): BookingCashierReport[] {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   } catch { return []; }
@@ -30,48 +50,48 @@ function saveReports(reports: BookingCashierReport[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
 }
 
-function formatDateShort(iso: string) {
-  const d = new Date(iso);
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-}
+export function buildBookingCashierHTML(report: BookingCashierReport) {
+  const totalPetty = report.pettyItems.reduce((s, p) => s + p.amount, 0);
+  const totalCashAvailable = report.beginningCash + report.entranceSales;
+  const expected = totalCashAvailable - totalPetty;
+  const overShort = report.actualCash - expected;
 
-function buildPrintHTML(report: BookingCashierReport) {
-  const totalAmount = report.entries.reduce((s, e) => s + e.amount, 0);
-  const totalExpenses = report.entries.reduce((s, e) => s + e.expenses, 0);
   return `
     <style>
       body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
       h2 { text-align: center; font-size: 14px; margin: 4px 0; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-      td, th { border: 1px solid #999; padding: 4px 8px; font-size: 11px; }
+      h3 { font-size: 12px; margin: 12px 0 4px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+      td, th { border: 1px solid #999; padding: 3px 6px; font-size: 11px; }
       th { background: #f0f0f0; text-align: left; }
       .right { text-align: right; }
       .bold { font-weight: bold; }
+      .negative { color: red; }
     </style>
-    <h2>THE SERENITY BOOKING DAILY CASHIER REPORT</h2>
+    <h2>SERENITY INLAND RESORT</h2>
+    <h2>DAILY CASHIER REPORT – BOOKING</h2>
+    <p style="text-align:center">${report.reportDate}</p>
+    <h3>A. CASH SUMMARY</h3>
     <table>
-      <tr>
-        <th>Date</th><th>Guests Name</th><th class="right">Amount</th>
-        <th class="right">Amount on Hand</th><th class="right">Expenses</th><th>Comments</th>
-      </tr>
-      ${report.entries.map(e => `
-        <tr>
-          <td>${e.date ? formatDateShort(e.date) : ""}</td>
-          <td>${e.customerName}</td>
-          <td class="right">${e.amount ? e.amount.toLocaleString() : ""}</td>
-          <td class="right">${e.amountOnHand ? e.amountOnHand.toLocaleString() : ""}</td>
-          <td class="right">${e.expenses ? e.expenses.toLocaleString() : ""}</td>
-          <td>${e.comments}</td>
-        </tr>
-      `).join("")}
-      <tr class="bold">
-        <td colspan="2" class="right">Total</td>
-        <td class="right">${totalAmount.toLocaleString()}</td>
-        <td></td>
-        <td class="right">${totalExpenses.toLocaleString()}</td>
-        <td></td>
-      </tr>
+      <tr><td>Beginning Cash</td><td class="right">₱${report.beginningCash.toLocaleString()}</td></tr>
+      <tr><td>Entrance / Booking Sales</td><td class="right">₱${report.entranceSales.toLocaleString()}</td></tr>
+      <tr class="bold"><td>Total Cash Available</td><td class="right">₱${totalCashAvailable.toLocaleString()}</td></tr>
+      <tr><td>Petty Cash</td><td class="right">₱${totalPetty.toLocaleString()}</td></tr>
+      <tr class="bold"><td>Expected Ending Cash</td><td class="right">₱${expected.toLocaleString()}</td></tr>
+      <tr><td>Actual Cash</td><td class="right">₱${report.actualCash.toLocaleString()}</td></tr>
+      <tr class="bold"><td>Cash Over/Short</td><td class="right ${overShort < 0 ? 'negative' : ''}">₱${overShort.toLocaleString()}</td></tr>
+    </table>
+    <h3>B. PETTY CASH EXPENSE DETAILS</h3>
+    <table>
+      <tr><th>Date</th><th>Particulars</th><th>Receipt No.</th><th class="right">Amount</th></tr>
+      ${report.pettyItems.map(p => `<tr><td>${p.date}</td><td>${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${totalPetty.toLocaleString()}</td></tr>
+    </table>
+    <h3>C. CASH DENOMINATION</h3>
+    <table>
+      <tr><th>Denomination</th><th class="right">Quantity</th><th class="right">Amount</th></tr>
+      ${report.denoms.map(d => `<tr><td>${d.label}</td><td class="right">${d.quantity}</td><td class="right">₱${(d.value * d.quantity).toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="2" class="right">Total</td><td class="right">₱${report.actualCash.toLocaleString()}</td></tr>
     </table>
   `;
 }
@@ -83,51 +103,70 @@ interface Props {
 
 export default function BookingCashierModule({ editReport, onBack }: Props) {
   const [reportDate, setReportDate] = useState(editReport?.reportDate || new Date().toISOString().slice(0, 10));
-  const [entries, setEntries] = useState<BookingCashierEntry[]>(
-    editReport?.entries?.length ? editReport.entries : [{ date: "", customerName: "", amount: 0, amountOnHand: 0, expenses: 0, comments: "" }]
-  );
+  const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginningCash.toString() : "");
+  const [entranceSales, setEntranceSales] = useState(editReport ? editReport.entranceSales.toString() : "");
   const [saving, setSaving] = useState(false);
   const firstRef = useRef<HTMLInputElement>(null);
 
+  const [pettyItems, setPettyItems] = useState<PettyItem[]>(
+    editReport?.pettyItems?.length
+      ? editReport.pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: p.amount.toString() }))
+      : [{ date: "", particulars: "", receipt_no: "", amount: "" }]
+  );
+
+  const [denoms, setDenoms] = useState<DenomRow[]>(
+    editReport?.denoms?.length
+      ? editReport.denoms.map(d => ({ label: d.label, value: d.value, quantity: d.quantity ? d.quantity.toString() : "" }))
+      : DEFAULT_DENOMS.map(d => ({ ...d }))
+  );
+
   useEffect(() => { firstRef.current?.focus(); }, []);
 
-  // Auto-populate from booking transactions for today
+  // Auto-populate sales from today's entrance + booking deposits
   useEffect(() => {
     if (editReport) return;
-    getTransactions({ module: "Booking" }).then(txns => {
-      const today = new Date().toISOString().slice(0, 10);
-      const todayBookings = txns.filter(t => t.date_time.slice(0, 10) === today);
-      if (todayBookings.length > 0) {
-        const autoEntries: BookingCashierEntry[] = todayBookings.map(t => ({
-          date: t.date_time.slice(0, 10),
-          customerName: t.customer_name || "Walk-in",
-          amount: t.amount_paid,
-          amountOnHand: t.deposit_amount || t.amount_paid,
-          expenses: 0,
-          comments: t.payment_status === "Fully Paid" ? "Fully Paid" : t.balance ? `Balance: ₱${t.balance.toLocaleString()}` : "",
-        }));
-        setEntries(prev => prev[0]?.customerName ? prev : autoEntries);
+    const today = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      getTransactions({ module: "Entrance" }),
+      getTransactions({ module: "Booking" }),
+    ]).then(([entranceTxns, bookingTxns]) => {
+      const entranceToday = entranceTxns.filter(t => t.date_time.slice(0, 10) === today);
+      const bookingToday = bookingTxns.filter(t => t.date_time.slice(0, 10) === today);
+      const entranceTotal = entranceToday.reduce((s, t) => s + t.amount_paid, 0);
+      const bookingTotal = bookingToday.reduce((s, t) => s + (t.deposit_amount || 0), 0);
+      const totalSales = entranceTotal + bookingTotal;
+      if (totalSales > 0) {
+        setEntranceSales(totalSales.toString());
       }
     });
   }, [editReport]);
 
-  const updateEntry = (i: number, field: keyof BookingCashierEntry, val: string | number) => {
-    setEntries(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e));
-  };
+  const bc = parseFloat(beginningCash) || 0;
+  const sales = parseFloat(entranceSales) || 0;
+  const totalCashAvailable = bc + sales;
+  const totalPettyCash = pettyItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const totalActualCash = denoms.reduce((sum, d) => sum + d.value * (parseFloat(d.quantity) || 0), 0);
+  const expected = totalCashAvailable - totalPettyCash;
+  const overShort = totalActualCash - expected;
 
-  const addRow = () => setEntries(prev => [...prev, { date: "", customerName: "", amount: 0, amountOnHand: 0, expenses: 0, comments: "" }]);
-  const removeRow = (i: number) => setEntries(prev => prev.filter((_, idx) => idx !== i));
-
-  const totalAmount = entries.reduce((s, e) => s + (e.amount || 0), 0);
-  const totalExpenses = entries.reduce((s, e) => s + (e.expenses || 0), 0);
+  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", receipt_no: "", amount: "" }]);
+  const removePettyRow = (i: number) => setPettyItems(prev => prev.filter((_, idx) => idx !== i));
+  const updatePetty = (i: number, field: keyof PettyItem, val: string) =>
+    setPettyItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
+  const updateDenom = (i: number, val: string) =>
+    setDenoms(prev => prev.map((d, idx) => idx === i ? { ...d, quantity: val } : d));
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    const reports = loadReports();
+    const reports = loadBookingCashierReports();
     const report: BookingCashierReport = {
       id: editReport?.id || Date.now(),
       reportDate,
-      entries,
+      beginningCash: bc,
+      entranceSales: sales,
+      pettyItems: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+      denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
+      actualCash: totalActualCash,
     };
     if (editReport?.id) {
       const idx = reports.findIndex(r => r.id === editReport.id);
@@ -140,27 +179,50 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
     toast.success("Booking cashier report saved!");
     setSaving(false);
     if (onBack) onBack();
-  }, [reportDate, entries, editReport, onBack]);
+  }, [reportDate, bc, sales, pettyItems, denoms, totalActualCash, editReport, onBack]);
 
   const handlePrint = () => {
-    const report: BookingCashierReport = { reportDate, entries };
-    const w = window.open("", "_blank", "width=900,height=700");
+    const report: BookingCashierReport = {
+      reportDate,
+      beginningCash: bc,
+      entranceSales: sales,
+      pettyItems: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+      denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
+      actualCash: totalActualCash,
+    };
+    const w = window.open("", "_blank", "width=800,height=1000");
     if (!w) return;
-    w.document.write(`<html><head><title>Booking Cashier Report</title></head><body>${buildPrintHTML(report)}<script>window.print();</script></body></html>`);
+    w.document.write(`<html><head><title>Booking Cashier Report</title></head><body>${buildBookingCashierHTML(report)}<script>window.print();</script></body></html>`);
     w.document.close();
   };
 
   const handleExport = () => {
-    const headers = ["Date", "Guests Name", "Amount", "Amount on Hand", "Expenses", "Comments"];
-    const rows = entries.map(e => [
-      e.date ? formatDateShort(e.date) : "",
-      e.customerName,
-      e.amount || "",
-      e.amountOnHand || "",
-      e.expenses || "",
-      e.comments,
-    ]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const rows: string[][] = [
+      ["DAILY CASHIER REPORT – BOOKING", reportDate],
+      [],
+      ["A. CASH SUMMARY"],
+      ["Beginning Cash", bc.toLocaleString()],
+      ["Entrance / Booking Sales", sales.toLocaleString()],
+      ["Total Cash Available", totalCashAvailable.toLocaleString()],
+      ["Petty Cash", totalPettyCash.toLocaleString()],
+      ["Expected Ending Cash", expected.toLocaleString()],
+      ["Actual Cash", totalActualCash.toLocaleString()],
+      ["Cash Over/Short", overShort.toLocaleString()],
+      [],
+      ["B. PETTY CASH EXPENSE DETAILS"],
+      ["Date", "Particulars", "Receipt No.", "Amount"],
+      ...pettyItems.map(p => [p.date, p.particulars, p.receipt_no, (parseFloat(p.amount) || 0).toLocaleString()]),
+      ["", "", "Total", totalPettyCash.toLocaleString()],
+      [],
+      ["C. CASH DENOMINATION"],
+      ["Denomination", "Quantity", "Amount"],
+      ...denoms.map(dd => {
+        const qty = parseFloat(dd.quantity) || 0;
+        return [dd.label, qty.toString(), (dd.value * qty).toLocaleString()];
+      }),
+      ["", "Total", totalActualCash.toLocaleString()],
+    ];
+    const csv = rows.map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -169,13 +231,16 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
     toast.success("Exported!");
   };
 
+  const inputClass = "pos-input w-full ring-2 ring-warning/50 bg-warning/5";
+  const computedClass = "pos-input w-full bg-muted cursor-not-allowed opacity-80";
+
   return (
-    <div className="reveal-up max-w-3xl mx-auto">
+    <div className="reveal-up max-w-lg mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
           <Banknote size={20} />
         </div>
-        <h2 className="text-xl font-bold" style={{ lineHeight: "1.2" }}>
+        <h2 className="text-xl font-bold text-foreground" style={{ lineHeight: "1.2" }}>
           {editReport ? "Edit" : "Daily Cashier Report"} – BOOKING
         </h2>
       </div>
@@ -183,70 +248,104 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
       <div className="space-y-4">
         <div>
           <label className="text-sm font-medium block mb-1">Report Date</label>
-          <input ref={firstRef} type="date" className="pos-input w-full" value={reportDate} onChange={e => setReportDate(e.target.value)} />
+          <input ref={firstRef} type="date" className="pos-input w-full ring-2 ring-warning/50 bg-warning/5" value={reportDate} onChange={e => setReportDate(e.target.value)} />
         </div>
 
-        {/* Entries table */}
+        {/* A. CASH SUMMARY */}
+        <div className="pos-card space-y-3">
+          <h3 className="text-sm font-bold text-foreground tracking-wide">A. CASH SUMMARY</h3>
+          <div>
+            <label className="text-sm font-medium block mb-1">Beginning Cash</label>
+            <input type="number" className={inputClass} value={beginningCash} onChange={e => setBeginningCash(e.target.value)} placeholder="0.00" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Entrance / Booking Sales</label>
+            <input type="number" className={inputClass} value={entranceSales} onChange={e => setEntranceSales(e.target.value)} placeholder="0.00" />
+            <p className="text-[10px] text-muted-foreground mt-1">Auto-populated from today's entrance + booking deposits</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Total Cash Available</label>
+            <input type="text" className={computedClass} value={`₱${totalCashAvailable.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Petty Cash</label>
+            <input type="text" className={computedClass} value={`₱${totalPettyCash.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Expected Ending Cash</label>
+            <input type="text" className={computedClass} value={`₱${expected.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Actual Cash</label>
+            <input type="text" className={computedClass} value={`₱${totalActualCash.toLocaleString()}`} readOnly tabIndex={-1} />
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-muted-foreground">Cash Over/Short</span>
+            <span className={`font-bold tabular-nums text-lg ${overShort < 0 ? "text-destructive" : overShort > 0 ? "text-success" : ""}`}>
+              ₱{overShort.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        {/* B. PETTY CASH */}
         <div className="pos-card space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-foreground tracking-wide">Entries</h3>
-            <button onClick={addRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
+            <h3 className="text-sm font-bold text-foreground tracking-wide">B. PETTY CASH EXPENSE DETAILS</h3>
+            <button onClick={addPettyRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
               <Plus size={16} />
             </button>
           </div>
+          <div className="space-y-2">
+            {pettyItems.map((item, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>}
+                  <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
+                </div>
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
+                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" />
+                </div>
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}
+                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" />
+                </div>
+                <div>
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Amount</label>}
+                  <input type="number" className={`${inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" />
+                </div>
+                <button onClick={() => removePettyRow(i)} className="w-8 h-10 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all" disabled={pettyItems.length === 1}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-muted-foreground">Total Petty Cash</span>
+            <span className="font-bold tabular-nums">₱{totalPettyCash.toLocaleString()}</span>
+          </div>
+        </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="px-2 py-2 text-left text-xs font-medium">Date</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium">Guests Name</th>
-                  <th className="px-2 py-2 text-right text-xs font-medium">Amount</th>
-                  <th className="px-2 py-2 text-right text-xs font-medium">On Hand</th>
-                  <th className="px-2 py-2 text-right text-xs font-medium">Expenses</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium">Comments</th>
-                  <th className="w-8"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((e, i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-1 py-1">
-                      <input type="date" className="pos-input h-9 text-xs w-full" value={e.date} onChange={ev => updateEntry(i, "date", ev.target.value)} />
-                    </td>
-                    <td className="px-1 py-1">
-                      <input type="text" className="pos-input h-9 text-xs w-full" value={e.customerName} onChange={ev => updateEntry(i, "customerName", ev.target.value)} placeholder="Name" />
-                    </td>
-                    <td className="px-1 py-1">
-                      <input type="number" className="pos-input h-9 text-xs w-full text-right" value={e.amount || ""} onChange={ev => updateEntry(i, "amount", parseFloat(ev.target.value) || 0)} placeholder="0" />
-                    </td>
-                    <td className="px-1 py-1">
-                      <input type="number" className="pos-input h-9 text-xs w-full text-right" value={e.amountOnHand || ""} onChange={ev => updateEntry(i, "amountOnHand", parseFloat(ev.target.value) || 0)} placeholder="0" />
-                    </td>
-                    <td className="px-1 py-1">
-                      <input type="number" className="pos-input h-9 text-xs w-full text-right" value={e.expenses || ""} onChange={ev => updateEntry(i, "expenses", parseFloat(ev.target.value) || 0)} placeholder="0" />
-                    </td>
-                    <td className="px-1 py-1">
-                      <input type="text" className="pos-input h-9 text-xs w-full" value={e.comments} onChange={ev => updateEntry(i, "comments", ev.target.value)} placeholder="—" />
-                    </td>
-                    <td className="px-1 py-1">
-                      <button onClick={() => removeRow(i)} className="w-8 h-9 rounded text-destructive/60 hover:text-destructive flex items-center justify-center" disabled={entries.length === 1}>
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-border font-bold">
-                  <td className="px-2 py-2" colSpan={2}>Total</td>
-                  <td className="px-2 py-2 text-right tabular-nums">₱{totalAmount.toLocaleString()}</td>
-                  <td></td>
-                  <td className="px-2 py-2 text-right tabular-nums">₱{totalExpenses.toLocaleString()}</td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            </table>
+        {/* C. CASH DENOMINATION */}
+        <div className="pos-card space-y-3">
+          <h3 className="text-sm font-bold text-foreground tracking-wide">C. CASH DENOMINATION</h3>
+          <div className="grid grid-cols-3 gap-2 text-[10px] font-medium text-muted-foreground pb-1">
+            <span>Denomination</span><span>Quantity</span><span className="text-right">Amount</span>
+          </div>
+          {denoms.map((d, i) => {
+            const qty = parseFloat(d.quantity) || 0;
+            const amt = d.value * qty;
+            return (
+              <div key={d.label} className="grid grid-cols-3 gap-2 items-center">
+                <span className="text-sm font-medium">{d.label}</span>
+                <input type="number" className={`${inputClass} text-sm h-10`} value={d.quantity} onChange={e => updateDenom(i, e.target.value)} placeholder="0" />
+                <span className="text-sm font-medium tabular-nums text-right">₱{amt.toLocaleString()}</span>
+              </div>
+            );
+          })}
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <span className="text-sm font-medium text-muted-foreground">Total Actual Cash</span>
+            <span className="font-bold tabular-nums">₱{totalActualCash.toLocaleString()}</span>
           </div>
         </div>
 
@@ -271,6 +370,3 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
     </div>
   );
 }
-
-export { buildPrintHTML as buildBookingCashierHTML, loadReports as loadBookingCashierReports };
-export type { BookingCashierReport };
