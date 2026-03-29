@@ -334,15 +334,17 @@ export default function ReportsModule() {
               <div className="pos-card text-center py-8 text-muted-foreground text-sm">No booking cashier reports found</div>
             )}
             {bookingCashierReports.map(report => {
-              const totalAmt = report.entries.reduce((s, e) => s + (e.amount || 0), 0);
-              const totalExp = report.entries.reduce((s, e) => s + (e.expenses || 0), 0);
+              const totalPetty = report.pettyItems?.reduce((s, p) => s + (p.amount || 0), 0) || 0;
+              const totalCashAvail = (report.beginningCash || 0) + (report.entranceSales || 0);
+              const expectedCash = totalCashAvail - totalPetty;
+              const overShort = (report.actualCash || 0) - expectedCash;
               return (
                 <div key={report.id} className="pos-card">
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-sm font-bold">{formatDate(report.reportDate + "T00:00:00")}</p>
                       <p className="text-xs text-muted-foreground">
-                        {report.entries.length} entries | Amount: ₱{totalAmt.toLocaleString()} | Expenses: ₱{totalExp.toLocaleString()}
+                        Sales: ₱{(report.entranceSales || 0).toLocaleString()} | Over/Short: ₱{overShort.toLocaleString()}
                       </p>
                     </div>
                     <div className="flex gap-1">
