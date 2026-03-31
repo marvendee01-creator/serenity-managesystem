@@ -27,6 +27,10 @@ export interface Transaction {
   balance?: number;
   payment_status?: string;
   comments?: string;
+  entry_time?: string;
+  checkout_time?: string;
+  pax?: number;
+  extension_fee?: number;
 }
 
 export interface BookingCashierEntry {
@@ -144,6 +148,22 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
     const store = tx.objectStore("transactions");
     const req = store.add(t);
     req.onsuccess = () => resolve(req.result as number);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function updateTransaction(id: number, updates: Partial<Transaction>): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("transactions", "readwrite");
+    const store = tx.objectStore("transactions");
+    const getReq = store.get(id);
+    getReq.onsuccess = () => {
+      const existing = getReq.result;
+      if (!existing) { reject(new Error("Not found")); return; }
+      store.put({ ...existing, ...updates });
+    };
+    tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
