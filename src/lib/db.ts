@@ -27,6 +27,10 @@ export interface Transaction {
   balance?: number;
   payment_status?: string;
   comments?: string;
+  entry_time?: string;
+  checkout_time?: string;
+  pax?: number;
+  extension_fee?: number;
 }
 
 export interface BookingCashierEntry {
