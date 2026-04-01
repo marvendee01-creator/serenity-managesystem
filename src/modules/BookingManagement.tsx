@@ -18,7 +18,7 @@ export default function BookingManagement() {
 
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
-  const filtered = filter === "all" ? bookings : bookings.filter(b => b.payment_status === filter);
+  const filtered = filter === "all" ? bookings : filter === "Fully Paid" ? [] : bookings.filter(b => b.payment_status === filter);
 
   const handleSettlePayment = useCallback(async (booking: Transaction) => {
     const paymentAmount = parseFloat(paymentInputs[booking.id!] || "0");
