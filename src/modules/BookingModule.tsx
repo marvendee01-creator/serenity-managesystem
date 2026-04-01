@@ -278,15 +278,15 @@ export default function BookingModule() {
         </div>
 
         {/* Balance */}
-        <div className={`pos-card ${balance > 0 ? "border-destructive/30 bg-destructive/5" : "border-success/30 bg-success/5"}`}>
+        <div className={`pos-card ${paymentStatus === "Fully Paid" ? "border-success/30 bg-success/5" : paymentStatus === "Partially Paid" ? "border-warning/30 bg-warning/5" : "border-destructive/30 bg-destructive/5"}`}>
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-muted-foreground">Balance</p>
-              <p className={`text-2xl font-bold tabular-nums ${balance > 0 ? "text-destructive" : "text-success"}`}>
+              <p className={`text-2xl font-bold tabular-nums ${paymentStatus === "Fully Paid" ? "text-success" : paymentStatus === "Partially Paid" ? "text-warning" : "text-destructive"}`}>
                 ₱{Math.max(0, balance).toLocaleString()}
               </p>
             </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${balance <= 0 ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${paymentStatus === "Fully Paid" ? "bg-success/20 text-success" : paymentStatus === "Partially Paid" ? "bg-warning/20 text-warning" : "bg-destructive/20 text-destructive"}`}>
               {paymentStatus}
             </span>
           </div>
