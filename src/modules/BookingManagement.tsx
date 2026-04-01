@@ -158,33 +158,12 @@ export default function BookingManagement() {
             </div>
             {b.payment_status === "With Balance" && (
               <div className="space-y-2">
-                {/* Partial Payment Input */}
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    className="pos-input flex-1 h-10 text-sm"
-                    placeholder="Enter payment amount"
-                    value={paymentInputs[b.id!] || ""}
-                    onChange={e => setPaymentInputs(prev => ({ ...prev, [b.id!]: e.target.value }))}
-                    min="0"
-                  />
-                  <button
-                    onClick={() => handleSettlePayment(b)}
-                    className="h-10 px-4 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
-                  >
-                    Settle
-                  </button>
-                </div>
-                {/* Full Payment */}
+                {/* Settle = Full Payment */}
                 <button
-                  onClick={() => handleFullPayment(b)}
-                  className={`w-full h-10 rounded-lg text-sm font-medium active:scale-[0.97] transition-all ${
-                    confirmId === b.id
-                      ? "bg-success text-success-foreground"
-                      : "bg-primary/10 text-primary hover:bg-primary/20"
-                  }`}
+                  onClick={() => handleSettlePayment(b)}
+                  className="w-full h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
                 >
-                  {confirmId === b.id ? "Confirm Full Payment" : "Mark as Fully Paid"}
+                  Settle Payment (Mark Fully Paid)
                 </button>
               </div>
             )}

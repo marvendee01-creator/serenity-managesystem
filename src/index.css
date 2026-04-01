@@ -130,12 +130,58 @@
   to { opacity: 0; }
 }
 
+@keyframes splash-rotate-pulse {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(90deg) scale(1.08); }
+  50% { transform: rotate(180deg) scale(1); }
+  75% { transform: rotate(270deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes splash-wave {
+  0% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-12px); }
+  100% { transform: translateX(-50%) translateY(0); }
+}
+
 .splash-enter {
   animation: splash-fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .splash-exit {
   animation: splash-fade-out 0.5s ease-out forwards;
+}
+
+.splash-logo {
+  animation: splash-rotate-pulse 3s ease-in-out infinite;
+}
+
+.splash-wave {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 200%;
+  height: 100px;
+  border-radius: 45%;
+  opacity: 0.15;
+}
+
+.splash-wave-1 {
+  background: #00897b;
+  animation: splash-wave 3s ease-in-out infinite;
+  bottom: -40px;
+}
+
+.splash-wave-2 {
+  background: #26a69a;
+  animation: splash-wave 3.5s ease-in-out infinite 0.3s;
+  bottom: -50px;
+}
+
+.splash-wave-3 {
+  background: #4db6ac;
+  animation: splash-wave 4s ease-in-out infinite 0.6s;
+  bottom: -60px;
 }
 
 /* Scroll reveal */
