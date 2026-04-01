@@ -35,7 +35,7 @@ function BalanceWarningDialog({ balance, onClose }: { balance: number; onClose: 
         <h3 className="text-xl font-bold text-foreground mb-2">⚠️ PARTIAL PAYMENT</h3>
         <p className="text-3xl font-bold text-destructive tabular-nums mb-3">₱{balance.toLocaleString()}</p>
         <p className="text-sm text-muted-foreground mb-6">
-          Remaining Balance: ₱{balance.toLocaleString()}. Please settle and check <strong>Booking Management</strong>.
+          Customer has remaining balance: ₱{balance.toLocaleString()}. Please settle in <strong>Booking Management</strong>.
         </p>
         <button onClick={onClose} className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all">
           OK, Got It
