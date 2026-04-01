@@ -52,6 +52,10 @@ export interface Settings {
   child_rate_day: number;
   adult_rate_night: number;
   child_rate_night: number;
+  kids_8_above_rate_day?: number;
+  kids_5_7_rate_day?: number;
+  kids_8_above_rate_night?: number;
+  kids_5_7_rate_night?: number;
   exclusive_fee: number;
   barkada_room_rate: number;
   kubo_room_rate: number;
