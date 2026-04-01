@@ -113,11 +113,11 @@ export default function BookingModule() {
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
 
-  const baseFee = isExclusive ? exclusiveFee : 0;
   const personFee = a * adultRate + c * childRate;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  const total = personFee + baseFee + roomFee + tableFee + funcHall + corkage;
+  // Exclusive: total = exclusive_fee only
+  const total = isExclusive ? exclusiveFee : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = balance <= 0 ? "Fully Paid" : "With Balance";
 
@@ -260,12 +260,12 @@ export default function BookingModule() {
           <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
           <p className="text-2xl font-bold text-primary tabular-nums">₱{total.toLocaleString()}</p>
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
-            {personFee > 0 && <p>Entrance ({a} adult + {c} child): ₱{personFee.toLocaleString()}</p>}
-            {isExclusive && <p>+ Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>}
-            {roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
-            {funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
-            {tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
-            {corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
+            {isExclusive && <p>Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>}
+            {!isExclusive && personFee > 0 && <p>Entrance ({a} adult + {c} child): ₱{personFee.toLocaleString()}</p>}
+            {!isExclusive && roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
+            {!isExclusive && funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
+            {!isExclusive && tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
+            {!isExclusive && corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
           </div>
         </div>
 

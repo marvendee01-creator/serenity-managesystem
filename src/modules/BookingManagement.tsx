@@ -18,16 +18,10 @@ export default function BookingManagement() {
 
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
-  const filtered = filter === "all" ? bookings : bookings.filter(b => b.payment_status === filter);
+  const filtered = filter === "all" ? bookings : filter === "Fully Paid" ? [] : bookings.filter(b => b.payment_status === filter);
 
   const handleSettlePayment = useCallback(async (booking: Transaction) => {
-    const paymentAmount = parseFloat(paymentInputs[booking.id!] || "0");
-    if (paymentAmount <= 0) { toast.error("Enter a valid payment amount"); return; }
-
-    const newDeposit = (booking.deposit_amount || 0) + paymentAmount;
-    const newBalance = booking.amount_paid - newDeposit;
-    const newStatus = newBalance <= 0 ? "Fully Paid" : "With Balance";
-
+    // Settle = mark as fully paid (deposit = total)
     try {
       await addTransaction({
         transaction_no: `SR-${Date.now()}`,
@@ -45,19 +39,19 @@ export default function BookingManagement() {
         children: booking.children,
         total_headcount: booking.total_headcount,
         amount_paid: booking.amount_paid,
-        deposit_amount: newDeposit,
-        balance: Math.max(0, newBalance),
-        payment_status: newStatus,
+        deposit_amount: booking.amount_paid,
+        balance: 0,
+        payment_status: "Fully Paid",
         payment_method: booking.payment_method,
-        comments: `Payment of ₱${paymentAmount.toLocaleString()} received. ${newStatus === "Fully Paid" ? "Fully settled." : `Remaining: ₱${Math.max(0, newBalance).toLocaleString()}`}`,
+        comments: `Full payment settled. Previous balance: ₱${(booking.balance || 0).toLocaleString()}`,
       });
-      toast.success(`₱${paymentAmount.toLocaleString()} payment recorded for ${booking.customer_name || "booking"}!`);
+      toast.success(`${booking.customer_name || "Booking"} marked as Fully Paid!`);
       setPaymentInputs(prev => { const n = { ...prev }; delete n[booking.id!]; return n; });
       loadBookings();
     } catch {
       toast.error("Failed to update");
     }
-  }, [paymentInputs, loadBookings]);
+  }, [loadBookings]);
 
   const handleFullPayment = useCallback(async (booking: Transaction) => {
     if (confirmId !== booking.id) {
@@ -164,33 +158,12 @@ export default function BookingManagement() {
             </div>
             {b.payment_status === "With Balance" && (
               <div className="space-y-2">
-                {/* Partial Payment Input */}
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    className="pos-input flex-1 h-10 text-sm"
-                    placeholder="Enter payment amount"
-                    value={paymentInputs[b.id!] || ""}
-                    onChange={e => setPaymentInputs(prev => ({ ...prev, [b.id!]: e.target.value }))}
-                    min="0"
-                  />
-                  <button
-                    onClick={() => handleSettlePayment(b)}
-                    className="h-10 px-4 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
-                  >
-                    Settle
-                  </button>
-                </div>
-                {/* Full Payment */}
+                {/* Settle = Full Payment */}
                 <button
-                  onClick={() => handleFullPayment(b)}
-                  className={`w-full h-10 rounded-lg text-sm font-medium active:scale-[0.97] transition-all ${
-                    confirmId === b.id
-                      ? "bg-success text-success-foreground"
-                      : "bg-primary/10 text-primary hover:bg-primary/20"
-                  }`}
+                  onClick={() => handleSettlePayment(b)}
+                  className="w-full h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
                 >
-                  {confirmId === b.id ? "Confirm Full Payment" : "Mark as Fully Paid"}
+                  Settle Payment (Mark Fully Paid)
                 </button>
               </div>
             )}

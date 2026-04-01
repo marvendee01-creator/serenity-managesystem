@@ -5,11 +5,13 @@ import { getSettings, saveSettings, type Settings as SettingsType } from "@/lib/
 import { toast } from "sonner";
 
 const FIELDS: { key: keyof Omit<SettingsType, "id">; label: string; group: string }[] = [
-  { key: "adult_rate_day", label: "Adult Rate (Day)", group: "Entrance Fee Settings" },
-  { key: "child_rate_day", label: "Child Rate (Day)", group: "Entrance Fee Settings" },
-  { key: "adult_rate_night", label: "Adult Rate (Night)", group: "Entrance Fee Settings" },
-  { key: "child_rate_night", label: "Child Rate (Night)", group: "Entrance Fee Settings" },
-  { key: "exclusive_fee", label: "Exclusive Fee", group: "Entrance Fee Settings" },
+  { key: "adult_rate_day", label: "Adult Rate (Day)", group: "Entrance — Day Tour" },
+  { key: "kids_8_above_rate_day", label: "Kids 8 & Above (Day)", group: "Entrance — Day Tour" },
+  { key: "kids_5_7_rate_day", label: "Kids 5-7 yrs (Day)", group: "Entrance — Day Tour" },
+  { key: "adult_rate_night", label: "Adult Rate (Overnight)", group: "Entrance — Overnight" },
+  { key: "kids_8_above_rate_night", label: "Kids 8 & Above (Overnight)", group: "Entrance — Overnight" },
+  { key: "kids_5_7_rate_night", label: "Kids 5-7 yrs (Overnight)", group: "Entrance — Overnight" },
+  { key: "exclusive_fee", label: "Exclusive Fee", group: "Booking Settings" },
   { key: "day_tour_rate", label: "Day Tour Rate", group: "Tour Settings" },
   { key: "night_tour_rate", label: "Night Tour Rate", group: "Tour Settings" },
   { key: "barkada_room_rate", label: "Barkada Room Rate", group: "Room Settings" },
@@ -48,13 +50,14 @@ export default function SettingsModule() {
               <input
                 type="number"
                 className="pos-input w-32 text-right"
-                value={settings[f.key]}
+                value={settings[f.key] ?? 0}
                 onChange={(e) => setSettings({ ...settings, [f.key]: parseFloat(e.target.value) || 0 })}
               />
             </div>
           ))}
         </div>
       ))}
+      <p className="text-xs text-muted-foreground italic">Note: Kids 4 & below are always FREE.</p>
     </ModuleShell>
   );
 }

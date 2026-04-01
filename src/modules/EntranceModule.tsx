@@ -3,7 +3,7 @@ import { DoorOpen, Sun, Moon } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
 import BarcodeTicket from "@/components/BarcodeTicket";
-import { addTransaction } from "@/lib/db";
+import { addTransaction, getSettings } from "@/lib/db";
 import { toast } from "sonner";
 
 const TOUR_TYPES = ["Day Tour", "Overnight"] as const;
@@ -15,23 +15,42 @@ function getAutoTourType(): "Day Tour" | "Overnight" {
 export default function EntranceModule() {
   const [customerName, setCustomerName] = useState("");
   const [adults, setAdults] = useState("");
-  const [children, setChildren] = useState("");
+  const [kids8Above, setKids8Above] = useState("");
+  const [kids5to7, setKids5to7] = useState("");
+  const [kids4Below, setKids4Below] = useState("");
   const [tourType, setTourType] = useState<string>(getAutoTourType());
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
-  const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
   const [ticket, setTicket] = useState<{ txNo: string; date: string; amount: number; name?: string } | null>(null);
   const firstRef = useRef<HTMLInputElement>(null);
   const shownAutoDetect = useRef(false);
 
+  // Rates from settings
+  const [dayAdultRate, setDayAdultRate] = useState(100);
+  const [dayKids8Rate, setDayKids8Rate] = useState(50);
+  const [dayKids5Rate, setDayKids5Rate] = useState(30);
+  const [overnightAdultRate, setOvernightAdultRate] = useState(150);
+  const [overnightKids8Rate, setOvernightKids8Rate] = useState(75);
+  const [overnightKids5Rate, setOvernightKids5Rate] = useState(50);
+
   useEffect(() => { firstRef.current?.focus(); }, []);
 
-  // Auto-detect tour type on mount and show toast
+  useEffect(() => {
+    getSettings().then((s) => {
+      setDayAdultRate(s.adult_rate_day);
+      setDayKids8Rate(s.kids_8_above_rate_day ?? s.child_rate_day);
+      setDayKids5Rate(s.kids_5_7_rate_day ?? Math.round(s.child_rate_day * 0.6));
+      setOvernightAdultRate(s.adult_rate_night);
+      setOvernightKids8Rate(s.kids_8_above_rate_night ?? s.child_rate_night);
+      setOvernightKids5Rate(s.kids_5_7_rate_night ?? Math.round(s.child_rate_night * 0.6));
+    });
+  }, []);
+
+  // Auto-detect tour type on mount
   useEffect(() => {
     if (!shownAutoDetect.current) {
       shownAutoDetect.current = true;
       const auto = getAutoTourType();
-      const hour = new Date().getHours();
       if (auto === "Day Tour") {
         toast.info("AUTO DETECT: Day Tour (Before 3PM)", { icon: <Sun size={18} /> });
       } else {
@@ -54,12 +73,19 @@ export default function EntranceModule() {
   }, [tourType]);
 
   const a = parseInt(adults) || 0;
-  const c = parseInt(children) || 0;
-  const headcount = a + c;
+  const k8 = parseInt(kids8Above) || 0;
+  const k5 = parseInt(kids5to7) || 0;
+  const k4 = parseInt(kids4Below) || 0;
+  const headcount = a + k8 + k5 + k4;
+
+  const isDayTour = tourType === "Day Tour";
+  const totalAmount = isDayTour
+    ? (a * dayAdultRate) + (k8 * dayKids8Rate) + (k5 * dayKids5Rate)
+    : (a * overnightAdultRate) + (k8 * overnightKids8Rate) + (k5 * overnightKids5Rate);
+  // kids 4 & below = FREE
 
   const handleSave = useCallback(async () => {
-    const amt = parseFloat(amount) || 0;
-    if (headcount === 0 && amt === 0) { toast.error("Please enter guest details"); return; }
+    if (headcount === 0) { toast.error("Please enter guest details"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
     const now = new Date().toISOString();
@@ -69,21 +95,24 @@ export default function EntranceModule() {
         date_time: now,
         module: "Entrance",
         customer_name: customerName || undefined,
-        adults: a, children: c,
+        adults: a, children: k8 + k5 + k4,
         total_headcount: headcount,
-        amount_paid: amt,
+        amount_paid: totalAmount,
         payment_method: payment,
         tour_type: tourType,
         entry_time: now,
+        kids_8_above: k8,
+        kids_5_7: k5,
+        kids_4_below: k4,
       });
       toast.success("Entrance recorded!");
-      setTicket({ txNo, date: now, amount: amt, name: customerName || undefined });
-      setCustomerName(""); setAdults(""); setChildren(""); setAmount("");
+      setTicket({ txNo, date: now, amount: totalAmount, name: customerName || undefined });
+      setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setTourType(getAutoTourType());
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, c, headcount, amount, payment, tourType]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -92,6 +121,9 @@ export default function EntranceModule() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [handleSave]);
+
+  const rateLabel = (count: number, rate: number) =>
+    count > 0 ? `${count} × ₱${rate.toLocaleString()} = ₱${(count * rate).toLocaleString()}` : null;
 
   return (
     <>
@@ -123,19 +155,43 @@ export default function EntranceModule() {
         <div>
           <label className="text-sm font-medium block mb-1">Adults</label>
           <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
+          {a > 0 && <p className="text-xs text-muted-foreground mt-1">{rateLabel(a, isDayTour ? dayAdultRate : overnightAdultRate)}</p>}
         </div>
+
         <div>
-          <label className="text-sm font-medium block mb-1">Children</label>
-          <input type="number" className="pos-input w-full" value={children} onChange={(e) => setChildren(e.target.value)} placeholder="0" min="0" />
+          <label className="text-sm font-medium block mb-1">Kids (8 & Above)</label>
+          <input type="number" className="pos-input w-full" value={kids8Above} onChange={(e) => setKids8Above(e.target.value)} placeholder="0" min="0" />
+          {k8 > 0 && <p className="text-xs text-muted-foreground mt-1">{rateLabel(k8, isDayTour ? dayKids8Rate : overnightKids8Rate)}</p>}
         </div>
+
+        <div>
+          <label className="text-sm font-medium block mb-1">Kids (5-7 yrs)</label>
+          <input type="number" className="pos-input w-full" value={kids5to7} onChange={(e) => setKids5to7(e.target.value)} placeholder="0" min="0" />
+          {k5 > 0 && <p className="text-xs text-muted-foreground mt-1">{rateLabel(k5, isDayTour ? dayKids5Rate : overnightKids5Rate)}</p>}
+        </div>
+
+        <div>
+          <label className="text-sm font-medium block mb-1">Kids (4 & Below) — FREE</label>
+          <input type="number" className="pos-input w-full" value={kids4Below} onChange={(e) => setKids4Below(e.target.value)} placeholder="0" min="0" />
+          {k4 > 0 && <p className="text-xs text-success mt-1">FREE — {k4} kid(s)</p>}
+        </div>
+
         <div className="pos-card">
           <p className="text-sm text-muted-foreground mb-1">Total Headcount</p>
           <p className="text-2xl font-bold tabular-nums">{headcount}</p>
         </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Amount Paid</label>
-          <input type="number" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" min="0" step="0.01" />
+
+        <div className="pos-card border-primary/30">
+          <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+          <p className="text-2xl font-bold text-primary tabular-nums">₱{totalAmount.toLocaleString()}</p>
+          <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
+            {a > 0 && <p>Adults: {rateLabel(a, isDayTour ? dayAdultRate : overnightAdultRate)}</p>}
+            {k8 > 0 && <p>Kids 8+: {rateLabel(k8, isDayTour ? dayKids8Rate : overnightKids8Rate)}</p>}
+            {k5 > 0 && <p>Kids 5-7: {rateLabel(k5, isDayTour ? dayKids5Rate : overnightKids5Rate)}</p>}
+            {k4 > 0 && <p>Kids 4 & below: FREE</p>}
+          </div>
         </div>
+
         <div>
           <label className="text-sm font-medium block mb-2">Payment Method</label>
           <PaymentToggle value={payment} onChange={setPayment} />

@@ -31,6 +31,9 @@ export interface Transaction {
   checkout_time?: string;
   pax?: number;
   extension_fee?: number;
+  kids_8_above?: number;
+  kids_5_7?: number;
+  kids_4_below?: number;
 }
 
 export interface BookingCashierEntry {
@@ -49,6 +52,10 @@ export interface Settings {
   child_rate_day: number;
   adult_rate_night: number;
   child_rate_night: number;
+  kids_8_above_rate_day?: number;
+  kids_5_7_rate_day?: number;
+  kids_8_above_rate_night?: number;
+  kids_5_7_rate_night?: number;
   exclusive_fee: number;
   barkada_room_rate: number;
   kubo_room_rate: number;
@@ -89,6 +96,10 @@ const DEFAULT_SETTINGS: Settings = {
   child_rate_day: 50,
   adult_rate_night: 150,
   child_rate_night: 75,
+  kids_8_above_rate_day: 50,
+  kids_5_7_rate_day: 30,
+  kids_8_above_rate_night: 75,
+  kids_5_7_rate_night: 50,
   exclusive_fee: 5000,
   barkada_room_rate: 1500,
   kubo_room_rate: 1000,
