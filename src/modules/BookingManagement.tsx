@@ -21,13 +21,7 @@ export default function BookingManagement() {
   const filtered = filter === "all" ? bookings : filter === "Fully Paid" ? [] : bookings.filter(b => b.payment_status === filter);
 
   const handleSettlePayment = useCallback(async (booking: Transaction) => {
-    const paymentAmount = parseFloat(paymentInputs[booking.id!] || "0");
-    if (paymentAmount <= 0) { toast.error("Enter a valid payment amount"); return; }
-
-    const newDeposit = (booking.deposit_amount || 0) + paymentAmount;
-    const newBalance = booking.amount_paid - newDeposit;
-    const newStatus = newBalance <= 0 ? "Fully Paid" : "With Balance";
-
+    // Settle = mark as fully paid (deposit = total)
     try {
       await addTransaction({
         transaction_no: `SR-${Date.now()}`,
@@ -45,19 +39,19 @@ export default function BookingManagement() {
         children: booking.children,
         total_headcount: booking.total_headcount,
         amount_paid: booking.amount_paid,
-        deposit_amount: newDeposit,
-        balance: Math.max(0, newBalance),
-        payment_status: newStatus,
+        deposit_amount: booking.amount_paid,
+        balance: 0,
+        payment_status: "Fully Paid",
         payment_method: booking.payment_method,
-        comments: `Payment of ₱${paymentAmount.toLocaleString()} received. ${newStatus === "Fully Paid" ? "Fully settled." : `Remaining: ₱${Math.max(0, newBalance).toLocaleString()}`}`,
+        comments: `Full payment settled. Previous balance: ₱${(booking.balance || 0).toLocaleString()}`,
       });
-      toast.success(`₱${paymentAmount.toLocaleString()} payment recorded for ${booking.customer_name || "booking"}!`);
+      toast.success(`${booking.customer_name || "Booking"} marked as Fully Paid!`);
       setPaymentInputs(prev => { const n = { ...prev }; delete n[booking.id!]; return n; });
       loadBookings();
     } catch {
       toast.error("Failed to update");
     }
-  }, [paymentInputs, loadBookings]);
+  }, [loadBookings]);
 
   const handleFullPayment = useCallback(async (booking: Transaction) => {
     if (confirmId !== booking.id) {
