@@ -119,7 +119,7 @@ export default function BookingModule() {
   // Exclusive: total = exclusive_fee only
   const total = isExclusive ? exclusiveFee : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
-  const paymentStatus = balance <= 0 ? "Fully Paid" : "With Balance";
+  const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
   // Date conflict check
   const hasDateConflict = useCallback(() => {
