@@ -113,11 +113,11 @@ export default function BookingModule() {
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
 
-  const baseFee = isExclusive ? exclusiveFee : 0;
   const personFee = a * adultRate + c * childRate;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  const total = personFee + baseFee + roomFee + tableFee + funcHall + corkage;
+  // Exclusive: total = exclusive_fee only
+  const total = isExclusive ? exclusiveFee : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = balance <= 0 ? "Fully Paid" : "With Balance";
 
