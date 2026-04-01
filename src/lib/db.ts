@@ -31,6 +31,9 @@ export interface Transaction {
   checkout_time?: string;
   pax?: number;
   extension_fee?: number;
+  kids_8_above?: number;
+  kids_5_7?: number;
+  kids_4_below?: number;
 }
 
 export interface BookingCashierEntry {
