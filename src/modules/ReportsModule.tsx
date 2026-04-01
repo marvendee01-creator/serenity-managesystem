@@ -208,26 +208,31 @@ export default function ReportsModule() {
                   <th className="text-right px-3 py-2 font-medium">Children</th>
                   <th className="text-right px-3 py-2 font-medium">Headcount</th>
                   <th className="text-right px-3 py-2 font-medium">Amount</th>
+                  <th className="text-left px-3 py-2 font-medium">Status</th>
                   <th className="text-left px-3 py-2 font-medium">Payment</th>
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 && (
-                  <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+                  <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
                 )}
-                {data.map((t) => (
-                  <tr key={t.id} className="border-t border-border hover:bg-muted/50">
-                    <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
-                    <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(t.date_time)}</td>
-                    <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
-                    <td className="px-3 py-2">{t.customer_name || "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{t.adults}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{t.children}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
-                    <td className="px-3 py-2">{t.payment_method}</td>
-                  </tr>
-                ))}
+                {data.map((t) => {
+                  const statusColor = t.payment_status === "Fully Paid" ? "green" : t.payment_status === "Partially Paid" ? "orange" : t.payment_status === "Unpaid" ? "red" : undefined;
+                  return (
+                    <tr key={t.id} className="border-t border-border hover:bg-muted/50">
+                      <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
+                      <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(t.date_time)}</td>
+                      <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
+                      <td className="px-3 py-2">{t.customer_name || "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.adults}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.children}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
+                      <td className="px-3 py-2 font-bold text-xs" style={{ color: statusColor }}>{t.payment_status || "—"}</td>
+                      <td className="px-3 py-2">{t.payment_method}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
