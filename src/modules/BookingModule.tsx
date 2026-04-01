@@ -32,10 +32,10 @@ function BalanceWarningDialog({ balance, onClose }: { balance: number; onClose: 
         <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle size={32} className="text-warning" />
         </div>
-        <h3 className="text-xl font-bold text-foreground mb-2">⚠️ REMAINING BALANCE</h3>
+        <h3 className="text-xl font-bold text-foreground mb-2">⚠️ PARTIAL PAYMENT</h3>
         <p className="text-3xl font-bold text-destructive tabular-nums mb-3">₱{balance.toLocaleString()}</p>
         <p className="text-sm text-muted-foreground mb-6">
-          Remaining Balance: ₱{balance.toLocaleString()}. Please settle and check <strong>Booking Management</strong>.
+          Customer has remaining balance: ₱{balance.toLocaleString()}. Please settle in <strong>Booking Management</strong>.
         </p>
         <button onClick={onClose} className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all">
           OK, Got It
@@ -119,7 +119,7 @@ export default function BookingModule() {
   // Exclusive: total = exclusive_fee only
   const total = isExclusive ? exclusiveFee : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
-  const paymentStatus = balance <= 0 ? "Fully Paid" : "With Balance";
+  const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
   // Date conflict check
   const hasDateConflict = useCallback(() => {
@@ -164,7 +164,9 @@ export default function BookingModule() {
       });
       toast.success("Booking saved!");
 
-      if (balance > 0) {
+      if (paymentStatus === "Partially Paid") {
+        setShowBalanceWarning(true);
+      } else if (paymentStatus === "Unpaid" && total > 0) {
         setShowBalanceWarning(true);
       }
 
@@ -276,15 +278,15 @@ export default function BookingModule() {
         </div>
 
         {/* Balance */}
-        <div className={`pos-card ${balance > 0 ? "border-destructive/30 bg-destructive/5" : "border-success/30 bg-success/5"}`}>
+        <div className={`pos-card ${paymentStatus === "Fully Paid" ? "border-success/30 bg-success/5" : paymentStatus === "Partially Paid" ? "border-warning/30 bg-warning/5" : "border-destructive/30 bg-destructive/5"}`}>
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-muted-foreground">Balance</p>
-              <p className={`text-2xl font-bold tabular-nums ${balance > 0 ? "text-destructive" : "text-success"}`}>
+              <p className={`text-2xl font-bold tabular-nums ${paymentStatus === "Fully Paid" ? "text-success" : paymentStatus === "Partially Paid" ? "text-warning" : "text-destructive"}`}>
                 ₱{Math.max(0, balance).toLocaleString()}
               </p>
             </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${balance <= 0 ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${paymentStatus === "Fully Paid" ? "bg-success/20 text-success" : paymentStatus === "Partially Paid" ? "bg-warning/20 text-warning" : "bg-destructive/20 text-destructive"}`}>
               {paymentStatus}
             </span>
           </div>
