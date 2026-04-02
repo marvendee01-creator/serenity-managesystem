@@ -191,7 +191,7 @@ export default function RoomModule() {
           <p className="text-sm text-muted-foreground">Headcount Fee: <span className="font-bold text-foreground">₱{headcountFee.toLocaleString()}</span></p>
           <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-primary">₱{totalRoomAmount.toLocaleString()}</span></p>
         </div>
-      )
+      )}
       <div>
         <label className="text-sm font-medium block mb-2">Payment Method</label>
         <PaymentToggle value={payment} onChange={setPayment} />
