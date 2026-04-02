@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { ClipboardList, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
-import { getTransactions, addTransaction, type Transaction } from "@/lib/db";
+import { getTransactions, updateTransaction, type Transaction } from "@/lib/db";
 import { toast } from "sonner";
 
 type PaymentFilter = "all" | "Unpaid" | "Partially Paid" | "Fully Paid";
@@ -34,6 +34,8 @@ function getStatusBadge(status?: string) {
 export default function BookingManagement() {
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [filter, setFilter] = useState<PaymentFilter>("all");
+  const [settlingId, setSettlingId] = useState<number | null>(null);
+  const [settleAmount, setSettleAmount] = useState("");
 
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
@@ -45,39 +47,44 @@ export default function BookingManagement() {
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
   const filtered = filter === "all"
-    ? bookings
+    ? bookings.filter(b => b.payment_status !== "Fully Paid")
     : bookings.filter(b => b.payment_status === filter);
 
   const handleSettlePayment = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    const amount = parseFloat(settleAmount) || 0;
+    if (amount <= 0) { toast.error("Enter a valid amount"); return; }
+
+    const totalAmount = booking.amount_paid || 0;
+    const currentDeposit = booking.deposit_amount || 0;
+    const newDeposit = Math.min(totalAmount, currentDeposit + amount);
+    const newBalance = Math.max(0, totalAmount - newDeposit);
+    const newStatus = newDeposit >= totalAmount ? "Fully Paid" : newDeposit > 0 ? "Partially Paid" : "Unpaid";
+
     try {
-      await addTransaction({
-        transaction_no: `SR-${Date.now()}`,
-        date_time: new Date().toISOString(),
-        module: "Booking",
-        customer_name: booking.customer_name,
-        booking_type: booking.booking_type,
-        check_in: booking.check_in,
-        check_out: booking.check_out,
-        corkage_fee: booking.corkage_fee,
-        function_hall_fee: booking.function_hall_fee,
-        room_type: booking.room_type,
-        number_of_tables: booking.number_of_tables,
-        adults: booking.adults,
-        children: booking.children,
-        total_headcount: booking.total_headcount,
-        amount_paid: booking.amount_paid,
-        deposit_amount: booking.amount_paid,
-        balance: 0,
-        payment_status: "Fully Paid",
-        payment_method: booking.payment_method,
-        comments: `Full payment settled. Previous balance: ₱${(booking.balance || 0).toLocaleString()}`,
+      await updateTransaction(booking.id, {
+        deposit_amount: newDeposit,
+        balance: newBalance,
+        payment_status: newStatus,
+        comments: newStatus === "Fully Paid"
+          ? `Full payment settled. Amount received: ₱${amount.toLocaleString()}`
+          : `Partial payment of ₱${amount.toLocaleString()} received. Remaining: ₱${newBalance.toLocaleString()}`,
       });
-      toast.success(`${booking.customer_name || "Booking"} marked as Fully Paid!`);
+      toast.success(
+        newStatus === "Fully Paid"
+          ? `${booking.customer_name || "Booking"} marked as Fully Paid!`
+          : `₱${amount.toLocaleString()} payment recorded for ${booking.customer_name || "Booking"}`
+      );
+      setSettlingId(null);
+      setSettleAmount("");
+      if (newStatus === "Fully Paid") {
+        setFilter("Fully Paid");
+      }
       loadBookings();
     } catch {
       toast.error("Failed to update");
     }
-  }, [loadBookings]);
+  }, [settleAmount, loadBookings]);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -112,7 +119,7 @@ export default function BookingManagement() {
             onClick={() => setFilter(f)}
             className={`flex-1 h-10 rounded-t-lg text-xs font-medium transition-all ${filter === f ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
           >
-            {f === "all" ? `All (${bookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
+            {f === "all" ? `All (${bookings.filter(b => b.payment_status !== "Fully Paid").length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
           </button>
         ))}
       </div>
@@ -124,6 +131,8 @@ export default function BookingManagement() {
         {filtered.map(b => {
           const cardStyle = getCardStyle(b.payment_status);
           const badge = getStatusBadge(b.payment_status);
+          const currentBalance = Math.max(0, (b.amount_paid || 0) - (b.deposit_amount || 0));
+          const isSettling = settlingId === b.id;
           return (
             <div key={b.id} className="pos-card" style={cardStyle}>
               <div className="flex items-start justify-between mb-2">
@@ -140,7 +149,7 @@ export default function BookingManagement() {
               <div className="grid grid-cols-3 gap-2 text-xs mb-3">
                 <div>
                   <p className="opacity-70">Total</p>
-                  <p className="font-bold tabular-nums">₱{b.amount_paid.toLocaleString()}</p>
+                  <p className="font-bold tabular-nums">₱{(b.amount_paid || 0).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="opacity-70">Deposit</p>
@@ -148,19 +157,50 @@ export default function BookingManagement() {
                 </div>
                 <div>
                   <p className="opacity-70">Balance</p>
-                  <p className="font-bold tabular-nums">
-                    ₱{(b.balance || 0).toLocaleString()}
-                  </p>
+                  <p className="font-bold tabular-nums">₱{currentBalance.toLocaleString()}</p>
                 </div>
               </div>
-              {(b.payment_status === "Unpaid" || b.payment_status === "Partially Paid" || b.payment_status === "With Balance") && (
+
+              {(b.payment_status === "Unpaid" || b.payment_status === "Partially Paid") && !isSettling && (
                 <button
-                  onClick={() => handleSettlePayment(b)}
+                  onClick={() => { setSettlingId(b.id!); setSettleAmount(currentBalance.toString()); }}
                   className="w-full h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
                 >
-                  Settle Payment (Mark Fully Paid)
+                  Settle Payment
                 </button>
               )}
+
+              {isSettling && (
+                <div className="mt-2 space-y-2">
+                  <label className="text-xs font-medium block" style={{ color: cardStyle.color || "inherit" }}>
+                    Enter amount to settle (Balance: ₱{currentBalance.toLocaleString()})
+                  </label>
+                  <input
+                    type="number"
+                    className="pos-input w-full"
+                    value={settleAmount}
+                    onChange={e => setSettleAmount(e.target.value)}
+                    placeholder="0.00"
+                    min="0"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleSettlePayment(b)}
+                      className="flex-1 h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
+                    >
+                      Confirm Payment
+                    </button>
+                    <button
+                      onClick={() => { setSettlingId(null); setSettleAmount(""); }}
+                      className="h-10 px-4 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-accent transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {b.comments && <p className="text-xs opacity-60 mt-2 italic">{b.comments}</p>}
             </div>
           );

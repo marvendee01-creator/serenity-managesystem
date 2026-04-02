@@ -87,6 +87,7 @@ export default function BookingModule() {
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
+  const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string }[]>([]);
   const firstRef = useRef<HTMLInputElement>(null);
@@ -164,9 +165,8 @@ export default function BookingModule() {
       });
       toast.success("Booking saved!");
 
-      if (paymentStatus === "Partially Paid") {
-        setShowBalanceWarning(true);
-      } else if (paymentStatus === "Unpaid" && total > 0) {
+      if (paymentStatus !== "Fully Paid" && balance > 0) {
+        setSavedBalance(balance);
         setShowBalanceWarning(true);
       }
 
@@ -188,7 +188,7 @@ export default function BookingModule() {
 
   return (
     <>
-      {showBalanceWarning && <BalanceWarningDialog balance={balance > 0 ? balance : 0} onClose={() => setShowBalanceWarning(false)} />}
+      {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <DateConflictDialog onClose={() => setShowDateConflict(false)} />}
       <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
         <div>
