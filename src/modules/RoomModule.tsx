@@ -91,9 +91,11 @@ export default function RoomModule() {
     return paxCount * hours * EXTENSION_RATE;
   };
 
+  const totalRoomAmount = roomRate + headcountFee;
+
   const handleSave = useCallback(async () => {
-    if (paxNum === 0) { toast.error("Enter number of pax"); return; }
-    if (paxNum > paxLimit) {
+    if (totalPax === 0) { toast.error("Enter number of pax"); return; }
+    if (totalPax > paxLimit) {
       toast.error(`PAX LIMIT: Max ${paxLimit} pax only for ${roomType}`);
       return;
     }
@@ -106,20 +108,22 @@ export default function RoomModule() {
         module: "Room",
         customer_name: customerName || undefined,
         room_type: roomType,
-        pax: paxNum,
-        adults: 0, children: 0,
-        total_headcount: paxNum,
-        amount_paid: roomRate,
+        pax: totalPax,
+        adults: adultsNum, children: kids8Num + kids5Num,
+        kids_8_above: kids8Num,
+        kids_5_7: kids5Num,
+        total_headcount: totalPax,
+        amount_paid: totalRoomAmount,
         payment_method: payment,
         entry_time: entryTime,
       });
       toast.success("Room check-in recorded!");
-      setCustomerName(""); setPax("");
+      setCustomerName(""); setPax(""); setAdults(""); setKids8Above(""); setKids5to7("");
       loadActiveRooms();
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, paxNum, paxLimit, roomRate, payment, loadActiveRooms]);
+  }, [customerName, roomType, totalPax, paxLimit, totalRoomAmount, payment, loadActiveRooms, adultsNum, kids8Num, kids5Num]);
 
   const handleCheckout = useCallback(async (room: ActiveRoom) => {
     const checkoutTime = new Date().toISOString();
