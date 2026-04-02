@@ -12,8 +12,6 @@ const FIELDS: { key: keyof Omit<SettingsType, "id">; label: string; group: strin
   { key: "kids_8_above_rate_night", label: "Kids 8 & Above (Overnight)", group: "Entrance — Overnight" },
   { key: "kids_5_7_rate_night", label: "Kids 5-7 yrs (Overnight)", group: "Entrance — Overnight" },
   { key: "exclusive_fee", label: "Exclusive Fee", group: "Booking Settings" },
-  { key: "day_tour_rate", label: "Day Tour Rate", group: "Tour Settings" },
-  { key: "night_tour_rate", label: "Night Tour Rate", group: "Tour Settings" },
   { key: "barkada_room_rate", label: "Barkada Room Rate", group: "Room Settings" },
   { key: "kubo_room_rate", label: "Kubo Room Rate", group: "Room Settings" },
   { key: "table_rent_rate", label: "Table Rent Rate", group: "Table Rent Settings" },

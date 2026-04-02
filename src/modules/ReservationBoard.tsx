@@ -208,8 +208,8 @@ export default function ReservationBoard() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span className="font-medium">{selected.customer_name || "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="font-medium">{selected.booking_type || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Check-in</span><span className="font-medium">{fmtDT(selected.check_in)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Check-out</span><span className="font-medium">{fmtDT(selected.check_out)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Check-in</span><span className="font-medium">{fmtDT(selected.check_in)}{selected.check_in && <span className="text-[10px] ml-1 opacity-60">{new Date(selected.check_in).toLocaleTimeString()}</span>}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Check-out</span><span className="font-medium">{fmtDT(selected.check_out)}{selected.check_out && <span className="text-[10px] ml-1 opacity-60">{new Date(selected.check_out).toLocaleTimeString()}</span>}</span></div>
               {selected.tour_type && <div className="flex justify-between"><span className="text-muted-foreground">Tour</span><span className="font-medium">{selected.tour_type}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Adults</span><span className="font-medium">{selected.adults}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Children</span><span className="font-medium">{selected.children}</span></div>

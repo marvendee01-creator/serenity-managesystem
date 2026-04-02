@@ -116,8 +116,8 @@ export default function BookingModule() {
   const personFee = a * adultRate + c * childRate;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  // Exclusive: total = exclusive_fee only
-  const total = isExclusive ? exclusiveFee : (personFee + roomFee + tableFee + funcHall + corkage);
+  // Exclusive: exclusive_fee + room + tables + function hall + corkage
+  const total = isExclusive ? (exclusiveFee + roomFee + tableFee + funcHall + corkage) : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
@@ -264,10 +264,10 @@ export default function BookingModule() {
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
             {isExclusive && <p>Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>}
             {!isExclusive && personFee > 0 && <p>Entrance ({a} adult + {c} child): ₱{personFee.toLocaleString()}</p>}
-            {!isExclusive && roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
-            {!isExclusive && funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
-            {!isExclusive && tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
-            {!isExclusive && corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
+            {roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
+            {funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
+            {tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
+            {corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
           </div>
         </div>
 

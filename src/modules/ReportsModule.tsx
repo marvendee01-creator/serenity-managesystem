@@ -55,7 +55,10 @@ export default function ReportsModule() {
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       game_type: gameFilter || undefined,
-    }).then(setData);
+    }).then(txns => {
+      // Only show Fully Paid transactions in reports
+      setData(txns.filter(t => t.payment_status === "Fully Paid" || !t.payment_status));
+    });
   }, [moduleFilter, dateFrom, dateTo, gameFilter]);
 
   useEffect(() => {
