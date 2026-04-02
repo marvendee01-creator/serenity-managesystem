@@ -188,7 +188,7 @@ export default function BookingModule() {
 
   return (
     <>
-      {showBalanceWarning && <BalanceWarningDialog balance={balance > 0 ? balance : 0} onClose={() => setShowBalanceWarning(false)} />}
+      {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <DateConflictDialog onClose={() => setShowDateConflict(false)} />}
       <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
         <div>
