@@ -264,10 +264,10 @@ export default function BookingModule() {
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
             {isExclusive && <p>Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>}
             {!isExclusive && personFee > 0 && <p>Entrance ({a} adult + {c} child): ₱{personFee.toLocaleString()}</p>}
-            {!isExclusive && roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
-            {!isExclusive && funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
-            {!isExclusive && tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
-            {!isExclusive && corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
+            {roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
+            {funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
+            {tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
+            {corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
           </div>
         </div>
 

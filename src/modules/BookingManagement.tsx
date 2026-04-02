@@ -104,15 +104,15 @@ export default function BookingManagement() {
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-4">
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 border-b border-border pb-1">
         {(["all", "Unpaid", "Partially Paid", "Fully Paid"] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`flex-1 h-10 rounded-lg text-xs font-medium transition-all ${filter === f ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+            className={`flex-1 h-10 rounded-t-lg text-xs font-medium transition-all ${filter === f ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
           >
-            {f === "all" ? "All" : f}
+            {f === "all" ? `All (${bookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
           </button>
         ))}
       </div>

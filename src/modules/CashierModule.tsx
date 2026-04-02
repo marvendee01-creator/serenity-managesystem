@@ -26,6 +26,7 @@ const DEFAULT_DENOMS: DenomRow[] = [
   { label: "₱5", value: 5, quantity: "" },
   { label: "₱1", value: 1, quantity: "" },
   { label: "₱0.25", value: 0.25, quantity: "" },
+  { label: "GCASH", value: 1, quantity: "" },
 ];
 
 interface CashierModuleProps {

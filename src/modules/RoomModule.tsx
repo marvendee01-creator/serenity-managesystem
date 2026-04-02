@@ -164,22 +164,34 @@ export default function RoomModule() {
         <p className="text-sm text-muted-foreground">Room Rate: ₱{roomRate.toLocaleString()}</p>
         <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: ₱{EXTENSION_RATE}/pax/hr</p>
       </div>
-      <div>
-        <label className="text-sm font-medium block mb-1">Number of Pax</label>
-        <input
-          type="number"
-          className={`pos-input w-full ${paxNum > paxLimit ? "border-destructive" : ""}`}
-          value={pax}
-          onChange={(e) => setPax(e.target.value)}
-          placeholder="0"
-          min="0"
-        />
-        {paxNum > paxLimit && (
-          <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-            <AlertTriangle size={12} /> Max {paxLimit} pax only for {roomType}
-          </p>
-        )}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="text-sm font-medium block mb-1">Adults</label>
+          <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
+          {adultsNum > 0 && <p className="text-xs text-muted-foreground mt-1">{adultsNum} × ₱{adultRate}</p>}
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Kids 8+</label>
+          <input type="number" className="pos-input w-full" value={kids8Above} onChange={(e) => setKids8Above(e.target.value)} placeholder="0" min="0" />
+          {kids8Num > 0 && <p className="text-xs text-muted-foreground mt-1">{kids8Num} × ₱{kids8Rate}</p>}
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Kids 5-7</label>
+          <input type="number" className="pos-input w-full" value={kids5to7} onChange={(e) => setKids5to7(e.target.value)} placeholder="0" min="0" />
+          {kids5Num > 0 && <p className="text-xs text-muted-foreground mt-1">{kids5Num} × ₱{kids5Rate}</p>}
+        </div>
       </div>
+      {totalPax > paxLimit && (
+        <p className="text-xs text-destructive flex items-center gap-1">
+          <AlertTriangle size={12} /> Max {paxLimit} pax only for {roomType}
+        </p>
+      )}
+      {headcountFee > 0 && (
+        <div className="pos-card border-primary/20">
+          <p className="text-sm text-muted-foreground">Headcount Fee: <span className="font-bold text-foreground">₱{headcountFee.toLocaleString()}</span></p>
+          <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-primary">₱{totalRoomAmount.toLocaleString()}</span></p>
+        </div>
+      )
       <div>
         <label className="text-sm font-medium block mb-2">Payment Method</label>
         <PaymentToggle value={payment} onChange={setPayment} />
