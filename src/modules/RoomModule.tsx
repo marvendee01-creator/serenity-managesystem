@@ -23,8 +23,14 @@ export default function RoomModule() {
   const [customerName, setCustomerName] = useState("");
   const [roomType, setRoomType] = useState<string>(ROOM_TYPES[0]);
   const [pax, setPax] = useState("");
+  const [adults, setAdults] = useState("");
+  const [kids8Above, setKids8Above] = useState("");
+  const [kids5to7, setKids5to7] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [roomRate, setRoomRate] = useState(0);
+  const [adultRate, setAdultRate] = useState(100);
+  const [kids8Rate, setKids8Rate] = useState(50);
+  const [kids5Rate, setKids5Rate] = useState(30);
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -35,6 +41,9 @@ export default function RoomModule() {
   useEffect(() => {
     getSettings().then((s) => {
       setRoomRate(roomType === "Barkada Room" ? s.barkada_room_rate : s.kubo_room_rate);
+      setAdultRate(s.adult_rate_day || 100);
+      setKids8Rate(s.kids_8_above_rate_day || 50);
+      setKids5Rate(s.kids_5_7_rate_day || 30);
     });
   }, [roomType]);
 
