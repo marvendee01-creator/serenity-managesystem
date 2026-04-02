@@ -87,6 +87,7 @@ export default function BookingModule() {
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
+  const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string }[]>([]);
   const firstRef = useRef<HTMLInputElement>(null);
