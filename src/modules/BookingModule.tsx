@@ -116,8 +116,8 @@ export default function BookingModule() {
   const personFee = a * adultRate + c * childRate;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  // Exclusive: total = exclusive_fee only
-  const total = isExclusive ? exclusiveFee : (personFee + roomFee + tableFee + funcHall + corkage);
+  // Exclusive: exclusive_fee + room + tables + function hall + corkage
+  const total = isExclusive ? (exclusiveFee + roomFee + tableFee + funcHall + corkage) : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
