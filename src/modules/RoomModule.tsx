@@ -73,8 +73,13 @@ export default function RoomModule() {
     return () => clearInterval(interval);
   }, []);
 
+  const adultsNum = parseInt(adults) || 0;
+  const kids8Num = parseInt(kids8Above) || 0;
+  const kids5Num = parseInt(kids5to7) || 0;
   const paxNum = parseInt(pax) || 0;
+  const totalPax = paxNum || (adultsNum + kids8Num + kids5Num);
   const paxLimit = PAX_LIMITS[roomType] || 20;
+  const headcountFee = (adultsNum * adultRate) + (kids8Num * kids8Rate) + (kids5Num * kids5Rate);
 
   const getHoursStayed = (entryTime: string) => {
     const diff = now - new Date(entryTime).getTime();
