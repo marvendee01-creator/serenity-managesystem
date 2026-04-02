@@ -165,9 +165,8 @@ export default function BookingModule() {
       });
       toast.success("Booking saved!");
 
-      if (paymentStatus === "Partially Paid") {
-        setShowBalanceWarning(true);
-      } else if (paymentStatus === "Unpaid" && total > 0) {
+      if (paymentStatus !== "Fully Paid" && balance > 0) {
+        setSavedBalance(balance);
         setShowBalanceWarning(true);
       }
 
