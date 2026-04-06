@@ -102,6 +102,8 @@ interface Props {
   onBack?: () => void;
 }
 
+const PREV_ENDING_CASH_BOOKING_KEY = "serenity_prev_ending_cash_booking";
+
 export default function BookingCashierModule({ editReport, onBack }: Props) {
   const [reportDate, setReportDate] = useState(editReport?.reportDate || new Date().toISOString().slice(0, 10));
   const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginningCash.toString() : "");
