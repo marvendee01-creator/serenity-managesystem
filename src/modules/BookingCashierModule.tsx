@@ -366,6 +366,9 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
           <button onClick={handleSave} disabled={saving} className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all disabled:opacity-50">
             <Save size={18} /> {saving ? "Saving..." : "Save"}
           </button>
+          <button onClick={() => { localStorage.setItem(PREV_ENDING_CASH_BOOKING_KEY, expected.toString()); toast.success("Day closed! Beginning cash set for next day: ₱" + expected.toLocaleString()); }} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-success/10 text-success font-semibold text-sm hover:bg-success/20 active:scale-[0.97] transition-all border border-success/30">
+            ✅ Close Day
+          </button>
           <button onClick={handlePrint} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
             <Printer size={16} /> Print
           </button>
