@@ -125,6 +125,15 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
+  // Auto-fill beginning cash from previous day
+  useEffect(() => {
+    if (editReport) return;
+    const prev = localStorage.getItem(PREV_ENDING_CASH_BOOKING_KEY);
+    if (prev && !beginningCash) {
+      setBeginningCash(prev);
+    }
+  }, []);
+
   // Auto-populate sales from today's entrance + booking deposits
   useEffect(() => {
     if (editReport) return;
