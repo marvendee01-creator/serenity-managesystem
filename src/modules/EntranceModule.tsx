@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { DoorOpen, Sun, Moon } from "lucide-react";
+import { DoorOpen, Sun, Moon, Printer } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
-import BarcodeTicket from "@/components/BarcodeTicket";
+import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
+import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getSettings } from "@/lib/db";
 import { toast } from "sonner";
 
@@ -20,12 +21,13 @@ export default function EntranceModule() {
   const [kids4Below, setKids4Below] = useState("");
   const [tourType, setTourType] = useState<string>(getAutoTourType());
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
+  const [amountReceived, setAmountReceived] = useState("");
   const [saving, setSaving] = useState(false);
-  const [ticket, setTicket] = useState<{ txNo: string; date: string; amount: number; name?: string } | null>(null);
+  const [successChange, setSuccessChange] = useState<number | null>(null);
+  const [receiptData, setReceiptData] = useState<any>(null);
   const firstRef = useRef<HTMLInputElement>(null);
   const shownAutoDetect = useRef(false);
 
-  // Rates from settings
   const [dayAdultRate, setDayAdultRate] = useState(100);
   const [dayKids8Rate, setDayKids8Rate] = useState(50);
   const [dayKids5Rate, setDayKids5Rate] = useState(30);
@@ -46,7 +48,6 @@ export default function EntranceModule() {
     });
   }, []);
 
-  // Auto-detect tour type on mount
   useEffect(() => {
     if (!shownAutoDetect.current) {
       shownAutoDetect.current = true;
@@ -59,7 +60,6 @@ export default function EntranceModule() {
     }
   }, []);
 
-  // Time limit check — Day Tour exceeded 10PM
   useEffect(() => {
     if (tourType !== "Day Tour") return;
     const check = () => {
@@ -77,15 +77,18 @@ export default function EntranceModule() {
   const k5 = parseInt(kids5to7) || 0;
   const k4 = parseInt(kids4Below) || 0;
   const headcount = a + k8 + k5 + k4;
+  const received = parseFloat(amountReceived) || 0;
 
   const isDayTour = tourType === "Day Tour";
   const totalAmount = isDayTour
     ? (a * dayAdultRate) + (k8 * dayKids8Rate) + (k5 * dayKids5Rate)
     : (a * overnightAdultRate) + (k8 * overnightKids8Rate) + (k5 * overnightKids5Rate);
-  // kids 4 & below = FREE
+
+  const change = received - totalAmount;
 
   const handleSave = useCallback(async () => {
     if (headcount === 0) { toast.error("Please enter guest details"); return; }
+    if (received < totalAmount && received > 0) { toast.error("Insufficient amount received"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
     const now = new Date().toISOString();
@@ -106,13 +109,27 @@ export default function EntranceModule() {
         kids_4_below: k4,
       });
       toast.success("Entrance recorded!");
-      setTicket({ txNo, date: now, amount: totalAmount, name: customerName || undefined });
+
+      const rData = {
+        transactionNo: txNo, dateTime: now, module: `Entrance - ${tourType}`,
+        customerName: customerName || undefined,
+        adults: a, children: k8 + k5 + k4, headcount,
+        totalAmount, amountReceived: received > 0 ? received : undefined,
+        change: received >= totalAmount && received > 0 ? change : undefined,
+        paymentMethod: payment,
+      };
+
+      if (received >= totalAmount && received > 0) {
+        setSuccessChange(change);
+      }
+      setReceiptData(rData);
+
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
-      setTourType(getAutoTourType());
+      setAmountReceived(""); setTourType(getAutoTourType());
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -127,6 +144,8 @@ export default function EntranceModule() {
 
   return (
     <>
+      {successChange !== null && <PaymentSuccessDialog change={successChange} onClose={() => setSuccessChange(null)} />}
+      {receiptData && !successChange && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
       <ModuleShell title="Entrance" icon={<DoorOpen size={20} />} onSave={handleSave} saveLabel="Record Entry" saving={saving}>
         <div>
           <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
@@ -196,17 +215,21 @@ export default function EntranceModule() {
           <label className="text-sm font-medium block mb-2">Payment Method</label>
           <PaymentToggle value={payment} onChange={setPayment} />
         </div>
+
+        <div>
+          <label className="text-sm font-medium block mb-1">Amount Received</label>
+          <input type="number" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
+        </div>
+
+        {received > 0 && totalAmount > 0 && (
+          <div className={`pos-card ${received >= totalAmount ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
+            <p className="text-sm text-muted-foreground mb-1">Change</p>
+            <p className={`text-2xl font-bold tabular-nums ${received >= totalAmount ? "text-success" : "text-destructive"}`}>
+              ₱{change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        )}
       </ModuleShell>
-      {ticket && (
-        <BarcodeTicket
-          transactionNo={ticket.txNo}
-          module="Entrance"
-          dateTime={ticket.date}
-          amount={ticket.amount}
-          customerName={ticket.name}
-          onClose={() => setTicket(null)}
-        />
-      )}
     </>
   );
 }

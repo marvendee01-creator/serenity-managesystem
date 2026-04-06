@@ -4,6 +4,13 @@ import ModuleShell from "@/components/ModuleShell";
 import { getSettings, saveSettings, type Settings as SettingsType } from "@/lib/db";
 import { toast } from "sonner";
 
+const COMPANY_FIELDS: { key: keyof SettingsType; label: string; placeholder: string }[] = [
+  { key: "company_name", label: "Company Name", placeholder: "e.g. SERENITY INLAND RESORT" },
+  { key: "company_address", label: "Address", placeholder: "e.g. Brgy. Somewhere, City" },
+  { key: "contact_number", label: "Contact Number", placeholder: "e.g. 09XX-XXX-XXXX" },
+  { key: "tin_number", label: "TIN Number", placeholder: "e.g. 000-000-000-000" },
+];
+
 const FIELDS: { key: keyof Omit<SettingsType, "id">; label: string; group: string }[] = [
   { key: "adult_rate_day", label: "Adult Rate (Day)", group: "Entrance — Day Tour" },
   { key: "kids_8_above_rate_day", label: "Kids 8 & Above (Day)", group: "Entrance — Day Tour" },
@@ -39,6 +46,23 @@ export default function SettingsModule() {
 
   return (
     <ModuleShell title="System Settings" icon={<Settings size={20} />} onSave={handleSave} saveLabel="Save Settings" saving={saving}>
+      {/* Company Profile */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Company Profile</h3>
+        {COMPANY_FIELDS.map((f) => (
+          <div key={f.key} className="space-y-1">
+            <label className="text-sm font-medium">{f.label}</label>
+            <input
+              type="text"
+              className="pos-input w-full"
+              value={(settings[f.key] as string) ?? ""}
+              onChange={(e) => setSettings({ ...settings, [f.key]: e.target.value })}
+              placeholder={f.placeholder}
+            />
+          </div>
+        ))}
+      </div>
+
       {groups.map((group) => (
         <div key={group} className="space-y-3">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{group}</h3>
