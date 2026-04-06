@@ -98,6 +98,8 @@ export function printCashierReport(report: Parameters<typeof buildCashierReportH
   w.document.close();
 }
 
+const PREV_ENDING_CASH_KEY = "serenity_prev_ending_cash";
+
 export default function CashierModule({ editReport, onBack }: CashierModuleProps) {
   const [reportDate, setReportDate] = useState(editReport ? editReport.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
   const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginning_cash.toString() : "");
