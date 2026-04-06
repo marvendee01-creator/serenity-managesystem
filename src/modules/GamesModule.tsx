@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Gamepad2 } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
-import BarcodeTicket from "@/components/BarcodeTicket";
+import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
+import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction } from "@/lib/db";
 import { toast } from "sonner";
 
@@ -12,16 +13,22 @@ export default function GamesModule() {
   const [game, setGame] = useState<string>(GAMES[0]);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const [amountReceived, setAmountReceived] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [saving, setSaving] = useState(false);
-  const [ticket, setTicket] = useState<{ txNo: string; date: string; amount: number; name?: string } | null>(null);
+  const [successChange, setSuccessChange] = useState<number | null>(null);
+  const [receiptData, setReceiptData] = useState<any>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { nameRef.current?.focus(); }, []);
 
+  const amt = parseFloat(amount) || 0;
+  const received = parseFloat(amountReceived) || 0;
+  const change = received - amt;
+
   const handleSave = useCallback(async () => {
-    const amt = parseFloat(amount) || 0;
     if (amt === 0) { toast.error("Enter amount"); return; }
+    if (received < amt && received > 0) { toast.error("Insufficient amount received"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
     const now = new Date().toISOString();
@@ -37,12 +44,26 @@ export default function GamesModule() {
         payment_method: payment,
       });
       toast.success(`${game} rental saved!`);
-      setTicket({ txNo, date: now, amount: amt, name: name || undefined });
-      setName(""); setAmount("");
+
+      const rData = {
+        transactionNo: txNo, dateTime: now, module: `Games - ${game}`,
+        customerName: name || undefined,
+        totalAmount: amt, amountReceived: received > 0 ? received : undefined,
+        change: received >= amt && received > 0 ? change : undefined,
+        paymentMethod: payment,
+        details: [{ label: "Game Type", value: game }],
+      };
+
+      if (received >= amt && received > 0) {
+        setSuccessChange(change);
+      }
+      setReceiptData(rData);
+
+      setName(""); setAmount(""); setAmountReceived("");
       nameRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [game, name, amount, payment]);
+  }, [game, name, amt, payment, received, change]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -52,6 +73,8 @@ export default function GamesModule() {
 
   return (
     <>
+      {successChange !== null && <PaymentSuccessDialog change={successChange} onClose={() => setSuccessChange(null)} />}
+      {receiptData && !successChange && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
       <ModuleShell title="Games Rental" icon={<Gamepad2 size={20} />} onSave={handleSave} saveLabel="Record Rental" saving={saving}>
         <div>
           <label className="text-sm font-medium block mb-2">Game Type</label>
@@ -66,24 +89,26 @@ export default function GamesModule() {
           <input ref={nameRef} type="text" className="pos-input w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional" />
         </div>
         <div>
-          <label className="text-sm font-medium block mb-1">Amount Paid</label>
+          <label className="text-sm font-medium block mb-1">Amount</label>
           <input type="number" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
         </div>
         <div>
           <label className="text-sm font-medium block mb-2">Payment Method</label>
           <PaymentToggle value={payment} onChange={setPayment} />
         </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Amount Received</label>
+          <input type="number" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
+        </div>
+        {received > 0 && amt > 0 && (
+          <div className={`pos-card ${received >= amt ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
+            <p className="text-sm text-muted-foreground mb-1">Change</p>
+            <p className={`text-2xl font-bold tabular-nums ${received >= amt ? "text-success" : "text-destructive"}`}>
+              ₱{change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        )}
       </ModuleShell>
-      {ticket && (
-        <BarcodeTicket
-          transactionNo={ticket.txNo}
-          module={`Games - ${game}`}
-          dateTime={ticket.date}
-          amount={ticket.amount}
-          customerName={ticket.name}
-          onClose={() => setTicket(null)}
-        />
-      )}
     </>
   );
 }

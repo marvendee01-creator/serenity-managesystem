@@ -102,6 +102,8 @@ interface Props {
   onBack?: () => void;
 }
 
+const PREV_ENDING_CASH_BOOKING_KEY = "serenity_prev_ending_cash_booking";
+
 export default function BookingCashierModule({ editReport, onBack }: Props) {
   const [reportDate, setReportDate] = useState(editReport?.reportDate || new Date().toISOString().slice(0, 10));
   const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginningCash.toString() : "");
@@ -122,6 +124,15 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
   );
 
   useEffect(() => { firstRef.current?.focus(); }, []);
+
+  // Auto-fill beginning cash from previous day
+  useEffect(() => {
+    if (editReport) return;
+    const prev = localStorage.getItem(PREV_ENDING_CASH_BOOKING_KEY);
+    if (prev && !beginningCash) {
+      setBeginningCash(prev);
+    }
+  }, []);
 
   // Auto-populate sales from today's entrance + booking deposits
   useEffect(() => {
@@ -354,6 +365,9 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
         <div className="space-y-2">
           <button onClick={handleSave} disabled={saving} className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all disabled:opacity-50">
             <Save size={18} /> {saving ? "Saving..." : "Save"}
+          </button>
+          <button onClick={() => { localStorage.setItem(PREV_ENDING_CASH_BOOKING_KEY, expected.toString()); toast.success("Day closed! Beginning cash set for next day: ₱" + expected.toLocaleString()); }} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-success/10 text-success font-semibold text-sm hover:bg-success/20 active:scale-[0.97] transition-all border border-success/30">
+            ✅ Close Day
           </button>
           <button onClick={handlePrint} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
             <Printer size={16} /> Print

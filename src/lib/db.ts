@@ -62,6 +62,10 @@ export interface Settings {
   table_rent_rate: number;
   day_tour_rate: number;
   night_tour_rate: number;
+  company_name?: string;
+  company_address?: string;
+  contact_number?: string;
+  tin_number?: string;
 }
 
 export interface CashierReportPettyItem {
@@ -106,6 +110,10 @@ const DEFAULT_SETTINGS: Settings = {
   table_rent_rate: 200,
   day_tour_rate: 500,
   night_tour_rate: 700,
+  company_name: "SERENITY INLAND RESORT",
+  company_address: "",
+  contact_number: "",
+  tin_number: "",
 };
 
 function openDB(): Promise<IDBDatabase> {
