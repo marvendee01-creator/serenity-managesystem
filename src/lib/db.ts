@@ -110,6 +110,10 @@ const DEFAULT_SETTINGS: Settings = {
   table_rent_rate: 200,
   day_tour_rate: 500,
   night_tour_rate: 700,
+  company_name: "SERENITY INLAND RESORT",
+  company_address: "",
+  contact_number: "",
+  tin_number: "",
 };
 
 function openDB(): Promise<IDBDatabase> {
