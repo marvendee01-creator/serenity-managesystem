@@ -62,6 +62,10 @@ export interface Settings {
   table_rent_rate: number;
   day_tour_rate: number;
   night_tour_rate: number;
+  company_name?: string;
+  company_address?: string;
+  contact_number?: string;
+  tin_number?: string;
 }
 
 export interface CashierReportPettyItem {
