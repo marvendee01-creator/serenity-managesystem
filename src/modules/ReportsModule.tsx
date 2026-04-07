@@ -393,6 +393,8 @@ export default function ReportsModule() {
       )}
 
       {tab === "reservation" && <ReservationBoard />}
+
+      {tab === "petty-monitoring" && <PettyCashMonitoring />}
     </div>
   );
 }
