@@ -302,8 +302,8 @@ export async function getCashierReports(): Promise<CashierReport[]> {
     expected_ending_cash: Number(row.expected_ending_cash),
     actual_cash: Number(row.actual_cash),
     cash_over_short: Number(row.cash_over_short),
-    petty_items: (row.petty_items as CashierReportPettyItem[]) || [],
-    denoms: (row.denoms as CashierReportDenom[]) || [],
+    petty_items: (row.petty_items as unknown as CashierReportPettyItem[]) || [],
+    denoms: (row.denoms as unknown as CashierReportDenom[]) || [],
   }));
 }
 
