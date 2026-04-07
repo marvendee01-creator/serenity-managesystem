@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Printer, Banknote, Eye, CalendarDays } from "lucide-react";
-import { getTransactions, getCashierReports, type Transaction, type CashierReport } from "@/lib/db";
+import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList } from "lucide-react";
+import { getTransactions, getCashierReports, getBookingCashierReports, type Transaction, type CashierReport } from "@/lib/db";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
