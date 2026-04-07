@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Printer, Banknote, Eye, CalendarDays } from "lucide-react";
-import { getTransactions, getCashierReports, type Transaction, type CashierReport } from "@/lib/db";
+import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList } from "lucide-react";
+import { getTransactions, getCashierReports, getBookingCashierReports, type Transaction, type CashierReport } from "@/lib/db";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
@@ -25,7 +25,177 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring";
+
+interface PettyMonitorRow {
+  date: string;
+  customer: string;
+  amount: number;
+  expenses: number;
+  cashOnHand: number;
+  runningBalance: number;
+}
+
+function PettyCashMonitoring() {
+  const [rows, setRows] = useState<PettyMonitorRow[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      getTransactions({ module: "Booking" }),
+      getTransactions({ module: "Entrance" }),
+      getBookingCashierReports(),
+    ]).then(([bookings, entrances, bcReports]) => {
+      // Combine fully paid bookings and entrance transactions
+      const paidBookings = bookings.filter(t => t.payment_status === "Fully Paid" || !t.payment_status);
+      const allIncome: { date: string; customer: string; amount: number; expenses: number }[] = [];
+
+      for (const t of [...paidBookings, ...entrances]) {
+        allIncome.push({
+          date: t.date_time,
+          customer: t.customer_name || t.module,
+          amount: t.amount_paid,
+          expenses: 0,
+        });
+      }
+
+      // Add expenses from booking cashier petty items
+      for (const report of bcReports) {
+        for (const item of report.petty_items || []) {
+          if (item.amount > 0) {
+            allIncome.push({
+              date: item.date || report.report_date,
+              customer: item.particulars || "Petty Cash Expense",
+              amount: 0,
+              expenses: item.amount,
+            });
+          }
+        }
+      }
+
+      // Sort by date
+      allIncome.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Apply date filter
+      let filtered = allIncome;
+      if (dateFrom) filtered = filtered.filter(r => r.date >= dateFrom);
+      if (dateTo) filtered = filtered.filter(r => r.date <= dateTo + "T23:59:59");
+
+      // Compute running balance
+      let balance = 0;
+      const result: PettyMonitorRow[] = filtered.map(r => {
+        const cashOnHand = r.amount - r.expenses;
+        balance += cashOnHand;
+        return {
+          date: r.date,
+          customer: r.customer,
+          amount: r.amount,
+          expenses: r.expenses,
+          cashOnHand,
+          runningBalance: balance,
+        };
+      });
+
+      setRows(result);
+    });
+  }, [dateFrom, dateTo]);
+
+  const exportExcel = () => {
+    const headers = ["Date", "Customer", "Amount", "Expenses", "Cash on Hand", "Running Balance"];
+    const csvRows = rows.map(r => [
+      formatDateTime(r.date), r.customer, r.amount, r.expenses, r.cashOnHand, r.runningBalance
+    ]);
+    const csv = [headers, ...csvRows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `petty_cash_monitoring_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(`<html><head><title>Booking Petty Cash Monitoring</title>
+      <style>body{font-family:Arial;font-size:11px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:4px 6px;font-size:11px}th{background:#f0f0f0}.right{text-align:right}</style>
+    </head><body>
+      <h2>BOOKING PETTY CASH MONITORING</h2>
+      <table>
+        <tr><th>Date</th><th>Customer</th><th class="right">Amount</th><th class="right">Expenses</th><th class="right">Cash on Hand</th><th class="right">Running Balance</th></tr>
+        ${rows.map(r => `<tr><td>${formatDateTime(r.date)}</td><td>${r.customer}</td><td class="right">₱${r.amount.toLocaleString()}</td><td class="right">₱${r.expenses.toLocaleString()}</td><td class="right">₱${r.cashOnHand.toLocaleString()}</td><td class="right">₱${r.runningBalance.toLocaleString()}</td></tr>`).join("")}
+      </table>
+    </body></html>`);
+    w.document.close();
+    w.print();
+  };
+
+  const totalAmount = rows.reduce((s, r) => s + r.amount, 0);
+  const totalExpenses = rows.reduce((s, r) => s + r.expenses, 0);
+  const finalBalance = rows.length > 0 ? rows[rows.length - 1].runningBalance : 0;
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <input type="date" className="pos-input text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} placeholder="From" />
+        <input type="date" className="pos-input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} placeholder="To" />
+        <button onClick={exportExcel} className="flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+          <Download size={16} /> Export CSV
+        </button>
+        <button onClick={handlePrint} className="flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+          <Printer size={16} /> Print
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="pos-card text-center">
+          <p className="text-xs text-muted-foreground">Total Income</p>
+          <p className="text-lg font-bold tabular-nums text-success">₱{totalAmount.toLocaleString()}</p>
+        </div>
+        <div className="pos-card text-center">
+          <p className="text-xs text-muted-foreground">Total Expenses</p>
+          <p className="text-lg font-bold tabular-nums text-destructive">₱{totalExpenses.toLocaleString()}</p>
+        </div>
+        <div className="pos-card text-center">
+          <p className="text-xs text-muted-foreground">Running Balance</p>
+          <p className="text-lg font-bold tabular-nums">₱{finalBalance.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-left px-3 py-2 font-medium">Customer</th>
+              <th className="text-right px-3 py-2 font-medium">Amount</th>
+              <th className="text-right px-3 py-2 font-medium">Expenses</th>
+              <th className="text-right px-3 py-2 font-medium">Cash on Hand</th>
+              <th className="text-right px-3 py-2 font-medium">Running Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No data found</td></tr>
+            )}
+            {rows.map((r, i) => (
+              <tr key={i} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(r.date)}</td>
+                <td className="px-3 py-2">{r.customer}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-success font-medium">{r.amount > 0 ? `₱${r.amount.toLocaleString()}` : "—"}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{r.expenses > 0 ? `₱${r.expenses.toLocaleString()}` : "—"}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">₱{r.cashOnHand.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-bold">₱{r.runningBalance.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default function ReportsModule() {
   const [tab, setTab] = useState<Tab>("transactions");
@@ -78,18 +248,19 @@ export default function ReportsModule() {
   }, [tab, cashierFilter, cashierDate, refreshKey]);
 
   useEffect(() => {
-    const reports = loadBookingCashierReports();
-    let filtered = reports;
-    if (bcDate) {
-      if (bcFilter === "Daily") {
-        filtered = reports.filter(r => r.reportDate === bcDate);
-      } else {
-        const ym = bcDate.slice(0, 7);
-        filtered = reports.filter(r => r.reportDate.slice(0, 7) === ym);
+    loadBookingCashierReports().then(reports => {
+      let filtered = reports;
+      if (bcDate) {
+        if (bcFilter === "Daily") {
+          filtered = reports.filter(r => r.reportDate === bcDate);
+        } else {
+          const ym = bcDate.slice(0, 7);
+          filtered = reports.filter(r => r.reportDate.slice(0, 7) === ym);
+        }
       }
-    }
-    filtered.sort((a, b) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime());
-    setBookingCashierReports(filtered);
+      filtered.sort((a, b) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime());
+      setBookingCashierReports(filtered);
+    });
   }, [tab, bcFilter, bcDate, refreshKey]);
 
   const totalAmount = data.reduce((s, t) => s + t.amount_paid, 0);
@@ -151,6 +322,7 @@ export default function ReportsModule() {
           { key: "transactions" as Tab, label: "Transactions", icon: null as React.ReactNode },
           { key: "cashier" as Tab, label: "Cashier Store", icon: <Banknote size={14} /> as React.ReactNode },
           { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
+          { key: "petty-monitoring" as Tab, label: "Petty Cash Monitor", icon: <ClipboardList size={14} /> as React.ReactNode },
           { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
         ]).map(t => (
           <button
@@ -391,6 +563,8 @@ export default function ReportsModule() {
       )}
 
       {tab === "reservation" && <ReservationBoard />}
+
+      {tab === "petty-monitoring" && <PettyCashMonitoring />}
     </div>
   );
 }

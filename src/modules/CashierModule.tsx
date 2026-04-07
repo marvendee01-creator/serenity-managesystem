@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Banknote, Download, Plus, Trash2, Printer, Save, ArrowLeft } from "lucide-react";
-import { saveCashierReport, deleteCashierReport, type CashierReport } from "@/lib/db";
+import { saveCashierReport, deleteCashierReport, getSystemConfig, setSystemConfig, type CashierReport } from "@/lib/db";
 import { toast } from "sonner";
 
 interface PettyItem {
@@ -125,10 +125,9 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
   // Auto-fill beginning cash from previous day's expected ending cash
   useEffect(() => {
     if (editReport) return;
-    const prev = localStorage.getItem(PREV_ENDING_CASH_KEY);
-    if (prev && !beginningCash) {
-      setBeginningCash(prev);
-    }
+    getSystemConfig("prev_ending_cash").then(val => {
+      if (val && !beginningCash) setBeginningCash(val);
+    });
   }, []);
 
   const bc = parseFloat(beginningCash) || 0;
@@ -350,7 +349,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
           <button onClick={handleSave} disabled={saving} className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all disabled:opacity-50">
             <Save size={18} /> {saving ? "Saving..." : "Save"}
           </button>
-          <button onClick={() => { localStorage.setItem(PREV_ENDING_CASH_KEY, expected.toString()); toast.success("Day closed! Beginning cash set for next day: ₱" + expected.toLocaleString()); }} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-success/10 text-success font-semibold text-sm hover:bg-success/20 active:scale-[0.97] transition-all border border-success/30">
+          <button onClick={async () => { await setSystemConfig("prev_ending_cash", expected.toString()); toast.success("Day closed! Beginning cash set for next day: ₱" + expected.toLocaleString()); }} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-success/10 text-success font-semibold text-sm hover:bg-success/20 active:scale-[0.97] transition-all border border-success/30">
             ✅ Close Day
           </button>
           <button onClick={handlePrint} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">

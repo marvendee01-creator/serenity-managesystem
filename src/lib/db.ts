@@ -1,7 +1,5 @@
-// IndexedDB wrapper for offline-first resort management
-
-const DB_NAME = "serenity_resort_db";
-const DB_VERSION = 1;
+// Cloud-synced database layer using Supabase
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Transaction {
   id?: number;
@@ -60,8 +58,6 @@ export interface Settings {
   barkada_room_rate: number;
   kubo_room_rate: number;
   table_rent_rate: number;
-  day_tour_rate: number;
-  night_tour_rate: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
@@ -108,83 +104,120 @@ const DEFAULT_SETTINGS: Settings = {
   barkada_room_rate: 1500,
   kubo_room_rate: 1000,
   table_rent_rate: 200,
-  day_tour_rate: 500,
-  night_tour_rate: 700,
   company_name: "SERENITY INLAND RESORT",
   company_address: "",
   contact_number: "",
   tin_number: "",
 };
 
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains("transactions")) {
-        const txStore = db.createObjectStore("transactions", { keyPath: "id", autoIncrement: true });
-        txStore.createIndex("module", "module");
-        txStore.createIndex("date_time", "date_time");
-      }
-      if (!db.objectStoreNames.contains("settings")) {
-        db.createObjectStore("settings", { keyPath: "id" });
-      }
-      if (!db.objectStoreNames.contains("cashier_reports")) {
-        db.createObjectStore("cashier_reports", { keyPath: "id", autoIncrement: true });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
+// ─── Settings ───
 
 export async function getSettings(): Promise<Settings> {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction("settings", "readonly");
-    const store = tx.objectStore("settings");
-    const req = store.get("default");
-    req.onsuccess = () => resolve(req.result || DEFAULT_SETTINGS);
-    req.onerror = () => resolve(DEFAULT_SETTINGS);
-  });
+  const { data, error } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("id", "default")
+    .single();
+  if (error || !data) return DEFAULT_SETTINGS;
+  return {
+    id: data.id,
+    adult_rate_day: Number(data.adult_rate_day),
+    child_rate_day: Number(data.child_rate_day),
+    adult_rate_night: Number(data.adult_rate_night),
+    child_rate_night: Number(data.child_rate_night),
+    kids_8_above_rate_day: data.kids_8_above_rate_day != null ? Number(data.kids_8_above_rate_day) : undefined,
+    kids_5_7_rate_day: data.kids_5_7_rate_day != null ? Number(data.kids_5_7_rate_day) : undefined,
+    kids_8_above_rate_night: data.kids_8_above_rate_night != null ? Number(data.kids_8_above_rate_night) : undefined,
+    kids_5_7_rate_night: data.kids_5_7_rate_night != null ? Number(data.kids_5_7_rate_night) : undefined,
+    exclusive_fee: Number(data.exclusive_fee),
+    barkada_room_rate: Number(data.barkada_room_rate),
+    kubo_room_rate: Number(data.kubo_room_rate),
+    table_rent_rate: Number(data.table_rent_rate),
+    company_name: data.company_name ?? "",
+    company_address: data.company_address ?? "",
+    contact_number: data.contact_number ?? "",
+    tin_number: data.tin_number ?? "",
+  };
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("settings", "readwrite");
-    const store = tx.objectStore("settings");
-    store.put({ ...settings, id: "default" });
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const { error } = await supabase
+    .from("settings")
+    .upsert({
+      id: "default",
+      adult_rate_day: settings.adult_rate_day,
+      child_rate_day: settings.child_rate_day,
+      adult_rate_night: settings.adult_rate_night,
+      child_rate_night: settings.child_rate_night,
+      kids_8_above_rate_day: settings.kids_8_above_rate_day ?? null,
+      kids_5_7_rate_day: settings.kids_5_7_rate_day ?? null,
+      kids_8_above_rate_night: settings.kids_8_above_rate_night ?? null,
+      kids_5_7_rate_night: settings.kids_5_7_rate_night ?? null,
+      exclusive_fee: settings.exclusive_fee,
+      barkada_room_rate: settings.barkada_room_rate,
+      kubo_room_rate: settings.kubo_room_rate,
+      table_rent_rate: settings.table_rent_rate,
+      company_name: settings.company_name ?? null,
+      company_address: settings.company_address ?? null,
+      contact_number: settings.contact_number ?? null,
+      tin_number: settings.tin_number ?? null,
+    });
+  if (error) throw error;
 }
 
+// ─── Transactions ───
+
 export async function addTransaction(t: Omit<Transaction, "id">): Promise<number> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("transactions", "readwrite");
-    const store = tx.objectStore("transactions");
-    const req = store.add(t);
-    req.onsuccess = () => resolve(req.result as number);
-    tx.onerror = () => reject(tx.error);
-  });
+  const { data, error } = await supabase
+    .from("transactions")
+    .insert({
+      transaction_no: t.transaction_no,
+      date_time: t.date_time,
+      module: t.module,
+      game_type: t.game_type ?? null,
+      room_type: t.room_type ?? null,
+      booking_type: t.booking_type ?? null,
+      adults: t.adults,
+      children: t.children,
+      total_headcount: t.total_headcount,
+      amount_paid: t.amount_paid,
+      payment_method: t.payment_method,
+      customer_name: t.customer_name ?? null,
+      number_of_tables: t.number_of_tables ?? null,
+      check_in: t.check_in ?? null,
+      check_out: t.check_out ?? null,
+      tour_type: t.tour_type ?? null,
+      corkage_fee: t.corkage_fee ?? 0,
+      function_hall_fee: t.function_hall_fee ?? 0,
+      deposit_amount: t.deposit_amount ?? 0,
+      balance: t.balance ?? 0,
+      payment_status: t.payment_status ?? null,
+      comments: t.comments ?? null,
+      entry_time: t.entry_time ?? null,
+      checkout_time: t.checkout_time ?? null,
+      pax: t.pax ?? null,
+      extension_fee: t.extension_fee ?? 0,
+      kids_8_above: t.kids_8_above ?? 0,
+      kids_5_7: t.kids_5_7 ?? 0,
+      kids_4_below: t.kids_4_below ?? 0,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data!.id;
 }
 
 export async function updateTransaction(id: number, updates: Partial<Transaction>): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("transactions", "readwrite");
-    const store = tx.objectStore("transactions");
-    const getReq = store.get(id);
-    getReq.onsuccess = () => {
-      const existing = getReq.result;
-      if (!existing) { reject(new Error("Not found")); return; }
-      store.put({ ...existing, ...updates });
-    };
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const updateData: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (key === "id") continue;
+    updateData[key] = value ?? null;
+  }
+  const { error } = await supabase
+    .from("transactions")
+    .update(updateData)
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function getTransactions(filter?: {
@@ -193,94 +226,244 @@ export async function getTransactions(filter?: {
   dateTo?: string;
   game_type?: string;
 }): Promise<Transaction[]> {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction("transactions", "readonly");
-    const store = tx.objectStore("transactions");
-    const req = store.getAll();
-    req.onsuccess = () => {
-      let results: Transaction[] = req.result || [];
-      if (filter?.module) results = results.filter((t) => t.module === filter.module);
-      if (filter?.game_type) results = results.filter((t) => t.game_type === filter.game_type);
-      if (filter?.dateFrom) results = results.filter((t) => t.date_time >= filter.dateFrom!);
-      if (filter?.dateTo) results = results.filter((t) => t.date_time <= filter.dateTo! + "T23:59:59");
-      resolve(results);
-    };
-    req.onerror = () => resolve([]);
-  });
+  let query = supabase.from("transactions").select("*").order("date_time", { ascending: false });
+  if (filter?.module) query = query.eq("module", filter.module);
+  if (filter?.game_type) query = query.eq("game_type", filter.game_type);
+  if (filter?.dateFrom) query = query.gte("date_time", filter.dateFrom);
+  if (filter?.dateTo) query = query.lte("date_time", filter.dateTo + "T23:59:59");
+
+  const { data, error } = await query;
+  if (error) return [];
+  return (data || []).map(row => ({
+    id: row.id,
+    transaction_no: row.transaction_no,
+    date_time: row.date_time,
+    module: row.module,
+    game_type: row.game_type ?? undefined,
+    room_type: row.room_type ?? undefined,
+    booking_type: row.booking_type ?? undefined,
+    adults: row.adults,
+    children: row.children,
+    total_headcount: row.total_headcount,
+    amount_paid: Number(row.amount_paid),
+    payment_method: row.payment_method as "Cash" | "GCash",
+    customer_name: row.customer_name ?? undefined,
+    number_of_tables: row.number_of_tables ?? undefined,
+    check_in: row.check_in ?? undefined,
+    check_out: row.check_out ?? undefined,
+    tour_type: row.tour_type ?? undefined,
+    corkage_fee: row.corkage_fee != null ? Number(row.corkage_fee) : undefined,
+    function_hall_fee: row.function_hall_fee != null ? Number(row.function_hall_fee) : undefined,
+    deposit_amount: row.deposit_amount != null ? Number(row.deposit_amount) : undefined,
+    balance: row.balance != null ? Number(row.balance) : undefined,
+    payment_status: row.payment_status ?? undefined,
+    comments: row.comments ?? undefined,
+    entry_time: row.entry_time ?? undefined,
+    checkout_time: row.checkout_time ?? undefined,
+    pax: row.pax ?? undefined,
+    extension_fee: row.extension_fee != null ? Number(row.extension_fee) : undefined,
+    kids_8_above: row.kids_8_above ?? undefined,
+    kids_5_7: row.kids_5_7 ?? undefined,
+    kids_4_below: row.kids_4_below ?? undefined,
+  }));
 }
 
+// ─── Cashier Reports ───
+
 export async function saveCashierReport(report: Omit<CashierReport, "id">): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("cashier_reports", "readwrite");
-    const store = tx.objectStore("cashier_reports");
-    store.add(report);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const { error } = await supabase
+    .from("cashier_reports")
+    .insert({
+      date: report.date,
+      beginning_cash: report.beginning_cash,
+      sales: report.sales,
+      petty_cash: report.petty_cash,
+      expected_ending_cash: report.expected_ending_cash,
+      actual_cash: report.actual_cash,
+      cash_over_short: report.cash_over_short,
+      petty_items: report.petty_items as unknown as null,
+      denoms: report.denoms as unknown as null,
+    });
+  if (error) throw error;
 }
 
 export async function getCashierReports(): Promise<CashierReport[]> {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction("cashier_reports", "readonly");
-    const store = tx.objectStore("cashier_reports");
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => resolve([]);
-  });
+  const { data, error } = await supabase
+    .from("cashier_reports")
+    .select("*")
+    .order("date", { ascending: false });
+  if (error) return [];
+  return (data || []).map(row => ({
+    id: row.id,
+    date: row.date,
+    beginning_cash: Number(row.beginning_cash),
+    sales: Number(row.sales),
+    petty_cash: Number(row.petty_cash),
+    expected_ending_cash: Number(row.expected_ending_cash),
+    actual_cash: Number(row.actual_cash),
+    cash_over_short: Number(row.cash_over_short),
+    petty_items: (row.petty_items as unknown as CashierReportPettyItem[]) || [],
+    denoms: (row.denoms as unknown as CashierReportDenom[]) || [],
+  }));
 }
 
 export async function deleteCashierReport(id: number): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("cashier_reports", "readwrite");
-    const store = tx.objectStore("cashier_reports");
-    store.delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const { error } = await supabase
+    .from("cashier_reports")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
 }
 
-export async function exportAllData(): Promise<string> {
-  const db = await openDB();
-  const data: Record<string, unknown[]> = {};
-  const storeNames = ["transactions", "settings", "cashier_reports"];
-  for (const name of storeNames) {
-    data[name] = await new Promise((resolve) => {
-      const tx = db.transaction(name, "readonly");
-      const req = tx.objectStore(name).getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => resolve([]);
-    });
+// ─── Booking Cashier Reports (cloud) ───
+
+export interface BookingCashierReportDB {
+  id?: number;
+  report_date: string;
+  beginning_cash: number;
+  entrance_sales: number;
+  petty_items: { date: string; particulars: string; receipt_no: string; amount: number }[];
+  denoms: { label: string; value: number; quantity: number }[];
+  actual_cash: number;
+}
+
+export async function saveBookingCashierReport(report: BookingCashierReportDB): Promise<void> {
+  if (report.id) {
+    const { error } = await supabase
+      .from("booking_cashier_reports")
+      .update({
+        report_date: report.report_date,
+        beginning_cash: report.beginning_cash,
+        entrance_sales: report.entrance_sales,
+        petty_items: report.petty_items as unknown as null,
+        denoms: report.denoms as unknown as null,
+        actual_cash: report.actual_cash,
+      })
+      .eq("id", report.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("booking_cashier_reports")
+      .insert({
+        report_date: report.report_date,
+        beginning_cash: report.beginning_cash,
+        entrance_sales: report.entrance_sales,
+        petty_items: report.petty_items as unknown as null,
+        denoms: report.denoms as unknown as null,
+        actual_cash: report.actual_cash,
+      });
+    if (error) throw error;
   }
-  return JSON.stringify(data, null, 2);
+}
+
+export async function getBookingCashierReports(): Promise<BookingCashierReportDB[]> {
+  const { data, error } = await supabase
+    .from("booking_cashier_reports")
+    .select("*")
+    .order("report_date", { ascending: false });
+  if (error) return [];
+  return (data || []).map(row => ({
+    id: row.id,
+    report_date: row.report_date,
+    beginning_cash: Number(row.beginning_cash),
+    entrance_sales: Number(row.entrance_sales),
+    petty_items: (row.petty_items as BookingCashierReportDB["petty_items"]) || [],
+    denoms: (row.denoms as BookingCashierReportDB["denoms"]) || [],
+    actual_cash: Number(row.actual_cash),
+  }));
+}
+
+// ─── System Config (cloud key-value) ───
+
+export async function getSystemConfig(key: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("system_config")
+    .select("value")
+    .eq("key", key)
+    .single();
+  return data?.value ?? null;
+}
+
+export async function setSystemConfig(key: string, value: string): Promise<void> {
+  const { error } = await supabase
+    .from("system_config")
+    .upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
+// ─── Export / Import / Reset ───
+
+export async function exportAllData(): Promise<string> {
+  const [txns, settings, cashier, bookingCashier] = await Promise.all([
+    supabase.from("transactions").select("*"),
+    supabase.from("settings").select("*"),
+    supabase.from("cashier_reports").select("*"),
+    supabase.from("booking_cashier_reports").select("*"),
+  ]);
+  return JSON.stringify({
+    transactions: txns.data || [],
+    settings: settings.data || [],
+    cashier_reports: cashier.data || [],
+    booking_cashier_reports: bookingCashier.data || [],
+  }, null, 2);
 }
 
 export async function importData(jsonString: string): Promise<void> {
   const data = JSON.parse(jsonString);
-  const db = await openDB();
-  const storeNames = ["transactions", "settings", "cashier_reports"];
-  for (const name of storeNames) {
-    if (data[name]) {
-      const tx = db.transaction(name, "readwrite");
-      const store = tx.objectStore(name);
-      store.clear();
-      for (const item of data[name]) {
-        store.add(item);
-      }
-      await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); });
+
+  // Clear existing data
+  await supabase.from("transactions").delete().neq("id", 0);
+  await supabase.from("cashier_reports").delete().neq("id", 0);
+  await supabase.from("booking_cashier_reports").delete().neq("id", 0);
+
+  // Import transactions
+  if (data.transactions?.length) {
+    const txns = data.transactions.map((t: Record<string, unknown>) => {
+      const { id: _id, created_at: _ca, ...rest } = t;
+      return rest;
+    });
+    for (let i = 0; i < txns.length; i += 100) {
+      await supabase.from("transactions").insert(txns.slice(i, i + 100));
+    }
+  }
+
+  // Import settings
+  if (data.settings?.length) {
+    for (const s of data.settings) {
+      await supabase.from("settings").upsert(s);
+    }
+  }
+
+  // Import cashier reports
+  if (data.cashier_reports?.length) {
+    const reports = data.cashier_reports.map((r: Record<string, unknown>) => {
+      const { id: _id, created_at: _ca, ...rest } = r;
+      return rest;
+    });
+    for (let i = 0; i < reports.length; i += 100) {
+      await supabase.from("cashier_reports").insert(reports.slice(i, i + 100));
+    }
+  }
+
+  // Import booking cashier reports
+  if (data.booking_cashier_reports?.length) {
+    const reports = data.booking_cashier_reports.map((r: Record<string, unknown>) => {
+      const { id: _id, created_at: _ca, ...rest } = r;
+      return rest;
+    });
+    for (let i = 0; i < reports.length; i += 100) {
+      await supabase.from("booking_cashier_reports").insert(reports.slice(i, i + 100));
     }
   }
 }
 
 export async function resetAllData(): Promise<void> {
-  const db = await openDB();
-  const storeNames = ["transactions", "settings", "cashier_reports"];
-  for (const name of storeNames) {
-    const tx = db.transaction(name, "readwrite");
-    tx.objectStore(name).clear();
-    await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); });
-  }
+  await Promise.all([
+    supabase.from("transactions").delete().neq("id", 0),
+    supabase.from("cashier_reports").delete().neq("id", 0),
+    supabase.from("booking_cashier_reports").delete().neq("id", 0),
+    supabase.from("settings").delete().neq("id", ""),
+  ]);
+  // Re-insert default settings
+  await supabase.from("settings").insert({ id: "default" });
 }
