@@ -197,7 +197,8 @@ function PettyCashMonitoring() {
   );
 }
 
-  export default function ReportsModule() {
+export default function ReportsModule() {
+  const [tab, setTab] = useState<Tab>("transactions");
   const [data, setData] = useState<Transaction[]>([]);
   const [moduleFilter, setModuleFilter] = useState("All");
   const [dateFrom, setDateFrom] = useState("");
