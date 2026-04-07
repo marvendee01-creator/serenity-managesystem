@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Banknote, Plus, Trash2, Save, Printer, Download, ArrowLeft } from "lucide-react";
-import { getTransactions } from "@/lib/db";
+import { getTransactions, getBookingCashierReports, saveBookingCashierReport, getSystemConfig, setSystemConfig, type BookingCashierReportDB } from "@/lib/db";
 import { toast } from "sonner";
 
 interface PettyItem {
@@ -29,26 +29,24 @@ const DEFAULT_DENOMS: DenomRow[] = [
   { label: "GCASH", value: 1, quantity: "" },
 ];
 
-export interface BookingCashierReport {
-  id?: number;
+export type BookingCashierReport = BookingCashierReportDB & {
   reportDate: string;
   beginningCash: number;
   entranceSales: number;
   pettyItems: { date: string; particulars: string; receipt_no: string; amount: number }[];
-  denoms: { label: string; value: number; quantity: number }[];
   actualCash: number;
-}
+};
 
-const STORAGE_KEY = "serenity_booking_cashier_reports";
-
-export function loadBookingCashierReports(): BookingCashierReport[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch { return []; }
-}
-
-function saveReports(reports: BookingCashierReport[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+export async function loadBookingCashierReports(): Promise<BookingCashierReport[]> {
+  const reports = await getBookingCashierReports();
+  return reports.map(r => ({
+    ...r,
+    reportDate: r.report_date,
+    beginningCash: r.beginning_cash,
+    entranceSales: r.entrance_sales,
+    pettyItems: r.petty_items || [],
+    actualCash: r.actual_cash,
+  }));
 }
 
 export function buildBookingCashierHTML(report: BookingCashierReport) {
@@ -102,8 +100,6 @@ interface Props {
   onBack?: () => void;
 }
 
-const PREV_ENDING_CASH_BOOKING_KEY = "serenity_prev_ending_cash_booking";
-
 export default function BookingCashierModule({ editReport, onBack }: Props) {
   const [reportDate, setReportDate] = useState(editReport?.reportDate || new Date().toISOString().slice(0, 10));
   const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginningCash.toString() : "");
@@ -125,13 +121,12 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
-  // Auto-fill beginning cash from previous day
+  // Auto-fill beginning cash from cloud config
   useEffect(() => {
     if (editReport) return;
-    const prev = localStorage.getItem(PREV_ENDING_CASH_BOOKING_KEY);
-    if (prev && !beginningCash) {
-      setBeginningCash(prev);
-    }
+    getSystemConfig("prev_ending_cash_booking").then(val => {
+      if (val && !beginningCash) setBeginningCash(val);
+    });
   }, []);
 
   // Auto-populate sales from today's entrance + booking deposits
@@ -147,9 +142,7 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
       const entranceTotal = entranceToday.reduce((s, t) => s + t.amount_paid, 0);
       const bookingTotal = bookingToday.reduce((s, t) => s + (t.deposit_amount || 0), 0);
       const totalSales = entranceTotal + bookingTotal;
-      if (totalSales > 0) {
-        setEntranceSales(totalSales.toString());
-      }
+      if (totalSales > 0) setEntranceSales(totalSales.toString());
     });
   }, [editReport]);
 
@@ -170,36 +163,42 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    const reports = loadBookingCashierReports();
-    const report: BookingCashierReport = {
-      id: editReport?.id || Date.now(),
-      reportDate,
-      beginningCash: bc,
-      entranceSales: sales,
-      pettyItems: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
-      denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
-      actualCash: totalActualCash,
-    };
-    if (editReport?.id) {
-      const idx = reports.findIndex(r => r.id === editReport.id);
-      if (idx >= 0) reports[idx] = report;
-      else reports.push(report);
-    } else {
-      reports.push(report);
+    try {
+      await saveBookingCashierReport({
+        id: editReport?.id,
+        report_date: reportDate,
+        beginning_cash: bc,
+        entrance_sales: sales,
+        petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+        denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
+        actual_cash: totalActualCash,
+      });
+      toast.success("Booking cashier report saved!");
+      if (onBack) onBack();
+    } catch {
+      toast.error("Failed to save report");
     }
-    saveReports(reports);
-    toast.success("Booking cashier report saved!");
     setSaving(false);
-    if (onBack) onBack();
   }, [reportDate, bc, sales, pettyItems, denoms, totalActualCash, editReport, onBack]);
+
+  const handleCloseDay = async () => {
+    await setSystemConfig("prev_ending_cash_booking", expected.toString());
+    toast.success("Day closed! Beginning cash set for next day: ₱" + expected.toLocaleString());
+  };
 
   const handlePrint = () => {
     const report: BookingCashierReport = {
+      id: editReport?.id,
+      report_date: reportDate,
       reportDate,
+      beginning_cash: bc,
       beginningCash: bc,
+      entrance_sales: sales,
       entranceSales: sales,
+      petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
       pettyItems: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
       denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
+      actual_cash: totalActualCash,
       actualCash: totalActualCash,
     };
     const w = window.open("", "_blank", "width=800,height=1000");
@@ -366,7 +365,7 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
           <button onClick={handleSave} disabled={saving} className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all disabled:opacity-50">
             <Save size={18} /> {saving ? "Saving..." : "Save"}
           </button>
-          <button onClick={() => { localStorage.setItem(PREV_ENDING_CASH_BOOKING_KEY, expected.toString()); toast.success("Day closed! Beginning cash set for next day: ₱" + expected.toLocaleString()); }} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-success/10 text-success font-semibold text-sm hover:bg-success/20 active:scale-[0.97] transition-all border border-success/30">
+          <button onClick={handleCloseDay} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-success/10 text-success font-semibold text-sm hover:bg-success/20 active:scale-[0.97] transition-all border border-success/30">
             ✅ Close Day
           </button>
           <button onClick={handlePrint} className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium text-sm hover:bg-accent active:scale-[0.97] transition-all">
