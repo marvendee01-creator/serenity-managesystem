@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Banknote, Download, Plus, Trash2, Printer, Save, ArrowLeft } from "lucide-react";
-import { saveCashierReport, deleteCashierReport, type CashierReport } from "@/lib/db";
+import { saveCashierReport, deleteCashierReport, getSystemConfig, setSystemConfig, type CashierReport } from "@/lib/db";
 import { toast } from "sonner";
 
 interface PettyItem {
