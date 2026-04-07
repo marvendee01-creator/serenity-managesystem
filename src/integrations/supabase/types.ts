@@ -14,7 +14,264 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      booking_cashier_reports: {
+        Row: {
+          actual_cash: number
+          beginning_cash: number
+          created_at: string
+          denoms: Json | null
+          entrance_sales: number
+          id: number
+          petty_items: Json | null
+          report_date: string
+        }
+        Insert: {
+          actual_cash?: number
+          beginning_cash?: number
+          created_at?: string
+          denoms?: Json | null
+          entrance_sales?: number
+          id?: number
+          petty_items?: Json | null
+          report_date: string
+        }
+        Update: {
+          actual_cash?: number
+          beginning_cash?: number
+          created_at?: string
+          denoms?: Json | null
+          entrance_sales?: number
+          id?: number
+          petty_items?: Json | null
+          report_date?: string
+        }
+        Relationships: []
+      }
+      cashier_reports: {
+        Row: {
+          actual_cash: number
+          beginning_cash: number
+          cash_over_short: number
+          created_at: string
+          date: string
+          denoms: Json | null
+          expected_ending_cash: number
+          id: number
+          petty_cash: number
+          petty_items: Json | null
+          sales: number
+        }
+        Insert: {
+          actual_cash?: number
+          beginning_cash?: number
+          cash_over_short?: number
+          created_at?: string
+          date: string
+          denoms?: Json | null
+          expected_ending_cash?: number
+          id?: number
+          petty_cash?: number
+          petty_items?: Json | null
+          sales?: number
+        }
+        Update: {
+          actual_cash?: number
+          beginning_cash?: number
+          cash_over_short?: number
+          created_at?: string
+          date?: string
+          denoms?: Json | null
+          expected_ending_cash?: number
+          id?: number
+          petty_cash?: number
+          petty_items?: Json | null
+          sales?: number
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          adult_rate_day: number
+          adult_rate_night: number
+          barkada_room_rate: number
+          child_rate_day: number
+          child_rate_night: number
+          company_address: string | null
+          company_name: string | null
+          contact_number: string | null
+          exclusive_fee: number
+          id: string
+          kids_5_7_rate_day: number | null
+          kids_5_7_rate_night: number | null
+          kids_8_above_rate_day: number | null
+          kids_8_above_rate_night: number | null
+          kubo_room_rate: number
+          table_rent_rate: number
+          tin_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          adult_rate_day?: number
+          adult_rate_night?: number
+          barkada_room_rate?: number
+          child_rate_day?: number
+          child_rate_night?: number
+          company_address?: string | null
+          company_name?: string | null
+          contact_number?: string | null
+          exclusive_fee?: number
+          id?: string
+          kids_5_7_rate_day?: number | null
+          kids_5_7_rate_night?: number | null
+          kids_8_above_rate_day?: number | null
+          kids_8_above_rate_night?: number | null
+          kubo_room_rate?: number
+          table_rent_rate?: number
+          tin_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adult_rate_day?: number
+          adult_rate_night?: number
+          barkada_room_rate?: number
+          child_rate_day?: number
+          child_rate_night?: number
+          company_address?: string | null
+          company_name?: string | null
+          contact_number?: string | null
+          exclusive_fee?: number
+          id?: string
+          kids_5_7_rate_day?: number | null
+          kids_5_7_rate_night?: number | null
+          kids_8_above_rate_day?: number | null
+          kids_8_above_rate_night?: number | null
+          kubo_room_rate?: number
+          table_rent_rate?: number
+          tin_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      system_config: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          adults: number
+          amount_paid: number
+          balance: number | null
+          booking_type: string | null
+          check_in: string | null
+          check_out: string | null
+          checkout_time: string | null
+          children: number
+          comments: string | null
+          corkage_fee: number | null
+          created_at: string
+          customer_name: string | null
+          date_time: string
+          deposit_amount: number | null
+          entry_time: string | null
+          extension_fee: number | null
+          function_hall_fee: number | null
+          game_type: string | null
+          id: number
+          kids_4_below: number | null
+          kids_5_7: number | null
+          kids_8_above: number | null
+          module: string
+          number_of_tables: number | null
+          pax: number | null
+          payment_method: string
+          payment_status: string | null
+          room_type: string | null
+          total_headcount: number
+          tour_type: string | null
+          transaction_no: string
+        }
+        Insert: {
+          adults?: number
+          amount_paid?: number
+          balance?: number | null
+          booking_type?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          checkout_time?: string | null
+          children?: number
+          comments?: string | null
+          corkage_fee?: number | null
+          created_at?: string
+          customer_name?: string | null
+          date_time?: string
+          deposit_amount?: number | null
+          entry_time?: string | null
+          extension_fee?: number | null
+          function_hall_fee?: number | null
+          game_type?: string | null
+          id?: number
+          kids_4_below?: number | null
+          kids_5_7?: number | null
+          kids_8_above?: number | null
+          module: string
+          number_of_tables?: number | null
+          pax?: number | null
+          payment_method?: string
+          payment_status?: string | null
+          room_type?: string | null
+          total_headcount?: number
+          tour_type?: string | null
+          transaction_no: string
+        }
+        Update: {
+          adults?: number
+          amount_paid?: number
+          balance?: number | null
+          booking_type?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          checkout_time?: string | null
+          children?: number
+          comments?: string | null
+          corkage_fee?: number | null
+          created_at?: string
+          customer_name?: string | null
+          date_time?: string
+          deposit_amount?: number | null
+          entry_time?: string | null
+          extension_fee?: number | null
+          function_hall_fee?: number | null
+          game_type?: string | null
+          id?: number
+          kids_4_below?: number | null
+          kids_5_7?: number | null
+          kids_8_above?: number | null
+          module?: string
+          number_of_tables?: number | null
+          pax?: number | null
+          payment_method?: string
+          payment_status?: string | null
+          room_type?: string | null
+          total_headcount?: number
+          tour_type?: string | null
+          transaction_no?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
