@@ -125,10 +125,9 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
   // Auto-fill beginning cash from previous day's expected ending cash
   useEffect(() => {
     if (editReport) return;
-    const prev = localStorage.getItem(PREV_ENDING_CASH_KEY);
-    if (prev && !beginningCash) {
-      setBeginningCash(prev);
-    }
+    getSystemConfig("prev_ending_cash").then(val => {
+      if (val && !beginningCash) setBeginningCash(val);
+    });
   }, []);
 
   const bc = parseFloat(beginningCash) || 0;
