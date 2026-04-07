@@ -78,18 +78,19 @@ export default function ReportsModule() {
   }, [tab, cashierFilter, cashierDate, refreshKey]);
 
   useEffect(() => {
-    const reports = loadBookingCashierReports();
-    let filtered = reports;
-    if (bcDate) {
-      if (bcFilter === "Daily") {
-        filtered = reports.filter(r => r.reportDate === bcDate);
-      } else {
-        const ym = bcDate.slice(0, 7);
-        filtered = reports.filter(r => r.reportDate.slice(0, 7) === ym);
+    loadBookingCashierReports().then(reports => {
+      let filtered = reports;
+      if (bcDate) {
+        if (bcFilter === "Daily") {
+          filtered = reports.filter(r => r.reportDate === bcDate);
+        } else {
+          const ym = bcDate.slice(0, 7);
+          filtered = reports.filter(r => r.reportDate.slice(0, 7) === ym);
+        }
       }
-    }
-    filtered.sort((a, b) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime());
-    setBookingCashierReports(filtered);
+      filtered.sort((a, b) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime());
+      setBookingCashierReports(filtered);
+    });
   }, [tab, bcFilter, bcDate, refreshKey]);
 
   const totalAmount = data.reduce((s, t) => s + t.amount_paid, 0);
