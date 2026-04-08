@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { CalendarDays, AlertTriangle, XCircle } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
-import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
+
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getTransactions, getSettings } from "@/lib/db";
 import { toast } from "sonner";
@@ -86,7 +86,7 @@ export default function BookingModule() {
   const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string }[]>([]);
-  const [successChange, setSuccessChange] = useState<number | null>(null);
+  
   const [receiptData, setReceiptData] = useState<any>(null);
   const firstRef = useRef<HTMLInputElement>(null);
 
@@ -188,10 +188,9 @@ export default function BookingModule() {
 
   return (
     <>
-      {successChange !== null && <PaymentSuccessDialog change={successChange} onClose={() => { setSuccessChange(null); }} />}
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <DateConflictDialog onClose={() => setShowDateConflict(false)} />}
-      {receiptData && !successChange && !showBalanceWarning && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
+      {receiptData && !showBalanceWarning && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
       <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
         <div>
           <label className="text-sm font-medium block mb-1">Customer Name</label>
