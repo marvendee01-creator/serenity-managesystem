@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { CalendarDays, AlertTriangle, XCircle } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
-import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
+
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getTransactions, getSettings } from "@/lib/db";
 import { toast } from "sonner";
@@ -72,7 +72,7 @@ export default function BookingModule() {
   const [corkageFee, setCorkageFee] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
-  const [amountReceived, setAmountReceived] = useState("");
+  
 
   const [exclusiveFee, setExclusiveFee] = useState(5000);
   const [adultRate, setAdultRate] = useState(100);
@@ -86,7 +86,7 @@ export default function BookingModule() {
   const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string }[]>([]);
-  const [successChange, setSuccessChange] = useState<number | null>(null);
+  
   const [receiptData, setReceiptData] = useState<any>(null);
   const firstRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +107,7 @@ export default function BookingModule() {
   const corkage = parseFloat(corkageFee) || 0;
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
-  const received = parseFloat(amountReceived) || 0;
+
 
   const personFee = a * adultRate + c * childRate;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
@@ -115,7 +115,7 @@ export default function BookingModule() {
   const total = isExclusive ? (exclusiveFee + roomFee + tableFee + funcHall + corkage) : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
-  const depositChange = received - deposit;
+
 
   const hasDateConflict = useCallback(() => {
     if (!checkIn || !checkOut) return false;
@@ -130,7 +130,7 @@ export default function BookingModule() {
   const handleSave = useCallback(async () => {
     if (total === 0) { toast.error("Enter amount"); return; }
     if (hasDateConflict()) { setShowDateConflict(true); return; }
-    if (received > 0 && received < deposit) { toast.error("Insufficient amount received for deposit"); return; }
+    
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
     const now = new Date().toISOString();
@@ -155,8 +155,6 @@ export default function BookingModule() {
         customerName: customerName || undefined,
         adults: a, children: c, headcount,
         totalAmount: total,
-        amountReceived: received > 0 ? received : undefined,
-        change: received >= deposit && received > 0 ? depositChange : undefined,
         paymentMethod: payment, paymentStatus,
         details: [
           ...(isExclusive ? [{ label: "Exclusive Fee", value: `₱${exclusiveFee.toLocaleString()}` }] : []),
@@ -166,10 +164,6 @@ export default function BookingModule() {
         ],
       };
 
-      if (received >= deposit && received > 0 && deposit > 0) {
-        setSuccessChange(depositChange);
-      }
-
       if (paymentStatus !== "Fully Paid" && balance > 0) {
         setSavedBalance(balance);
         setShowBalanceWarning(true);
@@ -177,14 +171,14 @@ export default function BookingModule() {
         setReceiptData(rData);
       }
 
-      setCustomerName(""); setAdults(""); setChildren(""); setDepositAmount(""); setAmountReceived("");
+      setCustomerName(""); setAdults(""); setChildren(""); setDepositAmount("");
       setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
       setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee("");
       getTransactions({ module: "Booking" }).then(setExistingBookings);
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, checkIn, checkOut, corkage, funcHall, a, c, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, received, depositChange, isExclusive, exclusiveFee, roomFee]);
+  }, [customerName, bookingType, checkIn, checkOut, corkage, funcHall, a, c, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, isExclusive, exclusiveFee, roomFee]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -194,10 +188,9 @@ export default function BookingModule() {
 
   return (
     <>
-      {successChange !== null && <PaymentSuccessDialog change={successChange} onClose={() => { setSuccessChange(null); }} />}
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <DateConflictDialog onClose={() => setShowDateConflict(false)} />}
-      {receiptData && !successChange && !showBalanceWarning && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
+      {receiptData && !showBalanceWarning && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
       <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
         <div>
           <label className="text-sm font-medium block mb-1">Customer Name</label>
@@ -298,20 +291,6 @@ export default function BookingModule() {
           <PaymentToggle value={payment} onChange={setPayment} />
         </div>
 
-        <div>
-          <label className="text-sm font-medium block mb-1">Amount Received</label>
-          <input type="number" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
-          {deposit > 0 && <p className="text-xs text-muted-foreground mt-1">Change computed against deposit amount (₱{deposit.toLocaleString()})</p>}
-        </div>
-
-        {received > 0 && deposit > 0 && (
-          <div className={`pos-card ${received >= deposit ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
-            <p className="text-sm text-muted-foreground mb-1">Change</p>
-            <p className={`text-2xl font-bold tabular-nums ${received >= deposit ? "text-success" : "text-destructive"}`}>
-              ₱{depositChange.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-        )}
       </ModuleShell>
     </>
   );
