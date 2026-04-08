@@ -99,9 +99,9 @@ function PettyCashMonitoring() {
   }, [dateFrom, dateTo]);
 
   const exportExcel = () => {
-    const headers = ["Date", "Customer", "Amount", "Expenses", "Cash on Hand", "Running Balance"];
+    const headers = ["Date", "Customer", "Source Module", "Amount", "Expenses", "Cash on Hand", "Running Balance"];
     const csvRows = rows.map(r => [
-      formatDateTime(r.date), r.customer, r.amount, r.expenses, r.cashOnHand, r.runningBalance
+      formatDateTime(r.date), r.customer, r.sourceModule, r.amount, r.expenses, r.cashOnHand, r.runningBalance
     ]);
     const csv = [headers, ...csvRows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -121,8 +121,8 @@ function PettyCashMonitoring() {
     </head><body>
       <h2>BOOKING PETTY CASH MONITORING</h2>
       <table>
-        <tr><th>Date</th><th>Customer</th><th class="right">Amount</th><th class="right">Expenses</th><th class="right">Cash on Hand</th><th class="right">Running Balance</th></tr>
-        ${rows.map(r => `<tr><td>${formatDateTime(r.date)}</td><td>${r.customer}</td><td class="right">₱${r.amount.toLocaleString()}</td><td class="right">₱${r.expenses.toLocaleString()}</td><td class="right">₱${r.cashOnHand.toLocaleString()}</td><td class="right">₱${r.runningBalance.toLocaleString()}</td></tr>`).join("")}
+        <tr><th>Date</th><th>Customer</th><th>Source</th><th class="right">Amount</th><th class="right">Expenses</th><th class="right">Cash on Hand</th><th class="right">Running Balance</th></tr>
+        ${rows.map(r => `<tr><td>${formatDateTime(r.date)}</td><td>${r.customer}</td><td>${r.sourceModule}</td><td class="right">₱${r.amount.toLocaleString()}</td><td class="right">₱${r.expenses.toLocaleString()}</td><td class="right">₱${r.cashOnHand.toLocaleString()}</td><td class="right">₱${r.runningBalance.toLocaleString()}</td></tr>`).join("")}
       </table>
     </body></html>`);
     w.document.close();
@@ -167,6 +167,7 @@ function PettyCashMonitoring() {
             <tr className="bg-muted">
               <th className="text-left px-3 py-2 font-medium">Date</th>
               <th className="text-left px-3 py-2 font-medium">Customer</th>
+              <th className="text-left px-3 py-2 font-medium">Source</th>
               <th className="text-right px-3 py-2 font-medium">Amount</th>
               <th className="text-right px-3 py-2 font-medium">Expenses</th>
               <th className="text-right px-3 py-2 font-medium">Cash on Hand</th>
@@ -175,12 +176,15 @@ function PettyCashMonitoring() {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No data found</td></tr>
+              <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No data found</td></tr>
             )}
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-border hover:bg-muted/50">
                 <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(r.date)}</td>
                 <td className="px-3 py-2">{r.customer}</td>
+                <td className="px-3 py-2">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.sourceModule === "Expense" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{r.sourceModule}</span>
+                </td>
                 <td className="px-3 py-2 text-right tabular-nums text-success font-medium">{r.amount > 0 ? `₱${r.amount.toLocaleString()}` : "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{r.expenses > 0 ? `₱${r.expenses.toLocaleString()}` : "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-medium">₱{r.cashOnHand.toLocaleString()}</td>
