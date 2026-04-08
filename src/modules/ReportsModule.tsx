@@ -30,6 +30,7 @@ type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "pet
 interface PettyMonitorRow {
   date: string;
   customer: string;
+  sourceModule: string;
   amount: number;
   expenses: number;
   cashOnHand: number;
@@ -43,33 +44,36 @@ function PettyCashMonitoring() {
 
   useEffect(() => {
     Promise.all([
-      getTransactions({ module: "Booking" }),
       getTransactions({ module: "Entrance" }),
+      getTransactions({ module: "Room" }),
+      getTransactions({ module: "Games Rental" }),
+      getTransactions({ module: "Booking" }),
       getBookingCashierReports(),
-    ]).then(([bookings, entrances, bcReports]) => {
-      // Combine fully paid bookings and entrance transactions
-      const paidBookings = bookings.filter(t => t.payment_status === "Fully Paid" || !t.payment_status);
-      const allIncome: { date: string; customer: string; amount: number; expenses: number }[] = [];
+    ]).then(([entrances, rooms, games, bookings, bcReports]) => {
+      const allIncome: { date: string; customer: string; sourceModule: string; amount: number; expenses: number }[] = [];
 
-      for (const t of [...paidBookings, ...entrances]) {
-        allIncome.push({
-          date: t.date_time,
-          customer: t.customer_name || t.module,
-          amount: t.amount_paid,
-          expenses: 0,
-        });
+      // Entrance, Room, Games → use amount_paid as income
+      for (const t of entrances) {
+        if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Entrance Guest", sourceModule: "Entrance", amount: t.amount_paid, expenses: 0 });
+      }
+      for (const t of rooms) {
+        if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Room Guest", sourceModule: "Room", amount: t.amount_paid, expenses: 0 });
+      }
+      for (const t of games) {
+        if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Games Guest", sourceModule: "Games", amount: t.amount_paid, expenses: 0 });
+      }
+
+      // Booking → use deposit_amount as income
+      for (const t of bookings) {
+        const dep = t.deposit_amount ?? 0;
+        if (dep > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Booking Guest", sourceModule: "Booking", amount: dep, expenses: 0 });
       }
 
       // Add expenses from booking cashier petty items
       for (const report of bcReports) {
         for (const item of report.petty_items || []) {
           if (item.amount > 0) {
-            allIncome.push({
-              date: item.date || report.report_date,
-              customer: item.particulars || "Petty Cash Expense",
-              amount: 0,
-              expenses: item.amount,
-            });
+            allIncome.push({ date: item.date || report.report_date, customer: item.particulars || "Petty Cash Expense", sourceModule: "Expense", amount: 0, expenses: item.amount });
           }
         }
       }
@@ -87,14 +91,7 @@ function PettyCashMonitoring() {
       const result: PettyMonitorRow[] = filtered.map(r => {
         const cashOnHand = r.amount - r.expenses;
         balance += cashOnHand;
-        return {
-          date: r.date,
-          customer: r.customer,
-          amount: r.amount,
-          expenses: r.expenses,
-          cashOnHand,
-          runningBalance: balance,
-        };
+        return { date: r.date, customer: r.customer, sourceModule: r.sourceModule, amount: r.amount, expenses: r.expenses, cashOnHand, runningBalance: balance };
       });
 
       setRows(result);
