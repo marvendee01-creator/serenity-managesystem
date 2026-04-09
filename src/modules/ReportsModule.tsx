@@ -47,12 +47,13 @@ function PettyCashMonitoring() {
       getTransactions({ module: "Entrance" }),
       getTransactions({ module: "Room" }),
       getTransactions({ module: "Games Rental" }),
+      getTransactions({ module: "Table Rent" }),
       getTransactions({ module: "Booking" }),
       getBookingCashierReports(),
-    ]).then(([entrances, rooms, games, bookings, bcReports]) => {
+    ]).then(([entrances, rooms, games, tables, bookings, bcReports]) => {
       const allIncome: { date: string; customer: string; sourceModule: string; amount: number; expenses: number }[] = [];
 
-      // Entrance, Room, Games → use amount_paid as income
+      // Entrance, Room, Games, Table → use amount_paid as income
       for (const t of entrances) {
         if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Entrance Guest", sourceModule: "Entrance", amount: t.amount_paid, expenses: 0 });
       }
@@ -61,6 +62,9 @@ function PettyCashMonitoring() {
       }
       for (const t of games) {
         if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Games Guest", sourceModule: "Games", amount: t.amount_paid, expenses: 0 });
+      }
+      for (const t of tables) {
+        if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Table Guest", sourceModule: "Table", amount: t.amount_paid, expenses: 0 });
       }
 
       // Booking → use deposit_amount as income
@@ -86,8 +90,16 @@ function PettyCashMonitoring() {
       if (dateFrom) filtered = filtered.filter(r => r.date >= dateFrom);
       if (dateTo) filtered = filtered.filter(r => r.date <= dateTo + "T23:59:59");
 
-      // Compute running balance
-      let balance = 0;
+      // Determine beginning balance from previous day's data
+      let beginningBalance = 0;
+      if (dateFrom) {
+        // Sum all records before dateFrom to get carry-over balance
+        const prior = allIncome.filter(r => r.date < dateFrom);
+        beginningBalance = prior.reduce((sum, r) => sum + (r.amount - r.expenses), 0);
+      }
+
+      // Compute running balance starting from beginning balance
+      let balance = beginningBalance;
       const result: PettyMonitorRow[] = filtered.map(r => {
         const cashOnHand = r.amount - r.expenses;
         balance += cashOnHand;
@@ -269,9 +281,9 @@ export default function ReportsModule() {
   const totalChildren = data.reduce((s, t) => s + t.children, 0);
 
   const exportCSV = () => {
-    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Adults", "Children", "Headcount", "Amount", "Payment"];
+    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Adults", "Kids (8+)", "Kids (5-7)", "Kids (4 & Below)", "Headcount", "Amount", "Payment"];
     const rows = data.map((t) => [
-      t.transaction_no, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.children, t.total_headcount, t.amount_paid, t.payment_method,
+      t.transaction_no, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0), t.amount_paid, t.payment_method,
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -381,19 +393,20 @@ export default function ReportsModule() {
                   <th className="text-left px-3 py-2 font-medium">Module</th>
                   <th className="text-left px-3 py-2 font-medium">Customer</th>
                   <th className="text-right px-3 py-2 font-medium">Adults</th>
-                  <th className="text-right px-3 py-2 font-medium">Children</th>
+                  <th className="text-right px-3 py-2 font-medium">Kids (8+)</th>
+                  <th className="text-right px-3 py-2 font-medium">Kids (5-7)</th>
+                  <th className="text-right px-3 py-2 font-medium text-xs">Kids (4↓ FREE)</th>
                   <th className="text-right px-3 py-2 font-medium">Headcount</th>
                   <th className="text-right px-3 py-2 font-medium">Amount</th>
-                  <th className="text-left px-3 py-2 font-medium">Status</th>
                   <th className="text-left px-3 py-2 font-medium">Payment</th>
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 && (
-                  <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+                  <tr><td colSpan={11} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
                 )}
                 {data.map((t) => {
-                  const statusColor = t.payment_status === "Fully Paid" ? "green" : t.payment_status === "Partially Paid" ? "orange" : t.payment_status === "Unpaid" ? "red" : undefined;
+                  const computedHeadcount = t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0);
                   return (
                     <tr key={t.id} className="border-t border-border hover:bg-muted/50">
                       <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
@@ -401,10 +414,11 @@ export default function ReportsModule() {
                       <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
                       <td className="px-3 py-2">{t.customer_name || "—"}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{t.adults}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{t.children}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{t.total_headcount}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.kids_8_above ?? 0}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.kids_5_7 ?? 0}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.kids_4_below ?? 0}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{computedHeadcount}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
-                      <td className="px-3 py-2 font-bold text-xs" style={{ color: statusColor }}>{t.payment_status || "—"}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
                     </tr>
                   );
