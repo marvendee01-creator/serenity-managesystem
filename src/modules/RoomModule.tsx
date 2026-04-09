@@ -25,15 +25,9 @@ export default function RoomModule() {
   const [customerName, setCustomerName] = useState("");
   const [roomType, setRoomType] = useState<string>(ROOM_TYPES[0]);
   const [pax, setPax] = useState("");
-  const [adults, setAdults] = useState("");
-  const [kids8Above, setKids8Above] = useState("");
-  const [kids5to7, setKids5to7] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [roomRate, setRoomRate] = useState(0);
-  const [adultRate, setAdultRate] = useState(100);
-  const [kids8Rate, setKids8Rate] = useState(50);
-  const [kids5Rate, setKids5Rate] = useState(30);
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -46,9 +40,6 @@ export default function RoomModule() {
   useEffect(() => {
     getSettings().then((s) => {
       setRoomRate(roomType === "Barkada Room" ? s.barkada_room_rate : s.kubo_room_rate);
-      setAdultRate(s.adult_rate_day || 100);
-      setKids8Rate(s.kids_8_above_rate_day || 50);
-      setKids5Rate(s.kids_5_7_rate_day || 30);
     });
   }, [roomType]);
 
@@ -65,24 +56,19 @@ export default function RoomModule() {
   useEffect(() => { loadActiveRooms(); }, [loadActiveRooms]);
   useEffect(() => { const interval = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(interval); }, []);
 
-  const adultsNum = parseInt(adults) || 0;
-  const kids8Num = parseInt(kids8Above) || 0;
-  const kids5Num = parseInt(kids5to7) || 0;
   const paxNum = parseInt(pax) || 0;
-  const totalPax = paxNum || (adultsNum + kids8Num + kids5Num);
   const paxLimit = PAX_LIMITS[roomType] || 20;
-  const headcountFee = (adultsNum * adultRate) + (kids8Num * kids8Rate) + (kids5Num * kids5Rate);
   const received = parseFloat(amountReceived) || 0;
 
   const getHoursStayed = (entryTime: string) => Math.max(0, Math.floor((now - new Date(entryTime).getTime()) / (1000 * 60 * 60)));
   const getExtensionFee = (entryTime: string, paxCount: number) => paxCount * getHoursStayed(entryTime) * EXTENSION_RATE;
 
-  const totalRoomAmount = roomRate + headcountFee;
+  const totalRoomAmount = roomRate;
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
-    if (totalPax === 0) { toast.error("Enter number of pax"); return; }
-    if (totalPax > paxLimit) { toast.error(`PAX LIMIT: Max ${paxLimit} pax only for ${roomType}`); return; }
+    if (paxNum === 0) { toast.error("Enter number of pax"); return; }
+    if (paxNum > paxLimit) { toast.error(`PAX LIMIT: Max ${paxLimit} pax only for ${roomType}`); return; }
     if (received < totalRoomAmount && received > 0) { toast.error("Insufficient amount received"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
@@ -91,8 +77,8 @@ export default function RoomModule() {
       await addTransaction({
         transaction_no: txNo, date_time: entryTime, module: "Room",
         customer_name: customerName || undefined, room_type: roomType,
-        pax: totalPax, adults: adultsNum, children: kids8Num + kids5Num,
-        kids_8_above: kids8Num, kids_5_7: kids5Num, total_headcount: totalPax,
+        pax: paxNum, adults: 0, children: 0,
+        total_headcount: paxNum,
         amount_paid: totalRoomAmount, payment_method: payment, entry_time: entryTime,
       });
       toast.success("Room check-in recorded!");
@@ -100,7 +86,7 @@ export default function RoomModule() {
       const rData = {
         transactionNo: txNo, dateTime: entryTime, module: `Room - ${roomType}`,
         customerName: customerName || undefined,
-        adults: adultsNum, children: kids8Num + kids5Num, headcount: totalPax,
+        adults: 0, children: 0, headcount: paxNum,
         totalAmount: totalRoomAmount, amountReceived: received > 0 ? received : undefined,
         change: received >= totalRoomAmount && received > 0 ? change : undefined,
         paymentMethod: payment,
@@ -110,11 +96,11 @@ export default function RoomModule() {
       if (received >= totalRoomAmount && received > 0) setSuccessChange(change);
       setReceiptData(rData);
 
-      setCustomerName(""); setPax(""); setAdults(""); setKids8Above(""); setKids5to7(""); setAmountReceived("");
+      setCustomerName(""); setPax(""); setAmountReceived("");
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalPax, paxLimit, totalRoomAmount, payment, loadActiveRooms, adultsNum, kids8Num, kids5Num, received, change, roomRate]);
+  }, [customerName, roomType, paxNum, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate]);
 
   const handleCheckout = useCallback(async (room: ActiveRoom) => {
     const checkoutTime = new Date().toISOString();
@@ -151,36 +137,17 @@ export default function RoomModule() {
           </div>
         </div>
         <div className="pos-card">
-          <p className="text-sm text-muted-foreground">Room Rate: ₱{roomRate.toLocaleString()}</p>
+          <p className="text-sm font-bold text-primary">Total: ₱{roomRate.toLocaleString()}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: ₱{EXTENSION_RATE}/pax/hr</p>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="text-sm font-medium block mb-1">Adults</label>
-            <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
-            {adultsNum > 0 && <p className="text-xs text-muted-foreground mt-1">{adultsNum} × ₱{adultRate}</p>}
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Kids 8+</label>
-            <input type="number" className="pos-input w-full" value={kids8Above} onChange={(e) => setKids8Above(e.target.value)} placeholder="0" min="0" />
-            {kids8Num > 0 && <p className="text-xs text-muted-foreground mt-1">{kids8Num} × ₱{kids8Rate}</p>}
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Kids 5-7</label>
-            <input type="number" className="pos-input w-full" value={kids5to7} onChange={(e) => setKids5to7(e.target.value)} placeholder="0" min="0" />
-            {kids5Num > 0 && <p className="text-xs text-muted-foreground mt-1">{kids5Num} × ₱{kids5Rate}</p>}
-          </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Number of Pax</label>
+          <input type="number" className="pos-input w-full" value={pax} onChange={(e) => setPax(e.target.value)} placeholder="0" min="0" />
         </div>
-        {totalPax > paxLimit && (
+        {paxNum > paxLimit && (
           <p className="text-xs text-destructive flex items-center gap-1">
             <AlertTriangle size={12} /> Max {paxLimit} pax only for {roomType}
           </p>
-        )}
-        {headcountFee > 0 && (
-          <div className="pos-card border-primary/20">
-            <p className="text-sm text-muted-foreground">Headcount Fee: <span className="font-bold text-foreground">₱{headcountFee.toLocaleString()}</span></p>
-            <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-primary">₱{totalRoomAmount.toLocaleString()}</span></p>
-          </div>
         )}
         <div>
           <label className="text-sm font-medium block mb-2">Payment Method</label>
