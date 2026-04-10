@@ -39,8 +39,7 @@ interface PettyMonitorRow {
 
 function PettyCashMonitoring() {
   const [rows, setRows] = useState<PettyMonitorRow[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     Promise.all([
@@ -53,7 +52,6 @@ function PettyCashMonitoring() {
     ]).then(([entrances, rooms, games, tables, bookings, bcReports]) => {
       const allIncome: { date: string; customer: string; sourceModule: string; amount: number; expenses: number }[] = [];
 
-      // Entrance, Room, Games, Table → use amount_paid as income
       for (const t of entrances) {
         if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Entrance Guest", sourceModule: "Entrance", amount: t.amount_paid, expenses: 0 });
       }
@@ -66,14 +64,10 @@ function PettyCashMonitoring() {
       for (const t of tables) {
         if (t.amount_paid > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Table Guest", sourceModule: "Table", amount: t.amount_paid, expenses: 0 });
       }
-
-      // Booking → use deposit_amount as income
       for (const t of bookings) {
         const dep = t.deposit_amount ?? 0;
         if (dep > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Booking Guest", sourceModule: "Booking", amount: dep, expenses: 0 });
       }
-
-      // Add expenses from booking cashier petty items
       for (const report of bcReports) {
         for (const item of report.petty_items || []) {
           if (item.amount > 0) {
@@ -82,45 +76,57 @@ function PettyCashMonitoring() {
         }
       }
 
-      // Sort by date
       allIncome.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      // Apply date filter
-      let filtered = allIncome;
-      if (dateFrom) filtered = filtered.filter(r => r.date >= dateFrom);
-      if (dateTo) filtered = filtered.filter(r => r.date <= dateTo + "T23:59:59");
+      // Strict single-date filter
+      const matchDate = (iso: string) => formatDate(iso) === formatDate(selectedDate + "T00:00:00");
 
-      // Determine beginning balance from previous day's data
+      const filtered = selectedDate ? allIncome.filter(r => matchDate(r.date)) : allIncome;
+
+      // Beginning balance = sum of all records before selected date
       let beginningBalance = 0;
-      if (dateFrom) {
-        // Sum all records before dateFrom to get carry-over balance
-        const prior = allIncome.filter(r => r.date < dateFrom);
+      if (selectedDate) {
+        const prior = allIncome.filter(r => r.date < selectedDate);
         beginningBalance = prior.reduce((sum, r) => sum + (r.amount - r.expenses), 0);
       }
 
-      // Compute running balance starting from beginning balance
+      // Build rows with beginning balance row prepended
+      const result: PettyMonitorRow[] = [];
+      const selDateFormatted = selectedDate ? formatDate(selectedDate + "T00:00:00") : "";
+
+      // Prepend beginning balance row
+      result.push({
+        date: selectedDate ? selectedDate + "T00:00:00" : "",
+        customer: "Beginning Bal.",
+        sourceModule: "",
+        amount: 0,
+        expenses: 0,
+        cashOnHand: 0,
+        runningBalance: beginningBalance,
+      });
+
       let balance = beginningBalance;
-      const result: PettyMonitorRow[] = filtered.map(r => {
+      for (const r of filtered) {
         const cashOnHand = r.amount - r.expenses;
         balance += cashOnHand;
-        return { date: r.date, customer: r.customer, sourceModule: r.sourceModule, amount: r.amount, expenses: r.expenses, cashOnHand, runningBalance: balance };
-      });
+        result.push({ date: r.date, customer: r.customer, sourceModule: r.sourceModule, amount: r.amount, expenses: r.expenses, cashOnHand, runningBalance: balance });
+      }
 
       setRows(result);
     });
-  }, [dateFrom, dateTo]);
+  }, [selectedDate]);
 
   const exportExcel = () => {
-    const headers = ["Date", "Customer", "Source Module", "Amount", "Expenses", "Cash on Hand", "Running Balance"];
+    const headers = ["Date", "Customer", "Source", "Amount", "Expense", "Cash on Hand", "Running Balance"];
     const csvRows = rows.map(r => [
-      formatDateTime(r.date), r.customer, r.sourceModule, r.amount, r.expenses, r.cashOnHand, r.runningBalance
+      r.customer === "Beginning Bal." ? formatDate(r.date) : formatDateTime(r.date), r.customer, r.sourceModule, r.amount || "", r.expenses || "", r.cashOnHand || "", r.runningBalance
     ]);
     const csv = [headers, ...csvRows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `petty_cash_monitoring_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `petty_cash_monitoring_${selectedDate || new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -129,27 +135,35 @@ function PettyCashMonitoring() {
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) return;
     w.document.write(`<html><head><title>Booking Petty Cash Monitoring</title>
-      <style>body{font-family:Arial;font-size:11px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:4px 6px;font-size:11px}th{background:#f0f0f0}.right{text-align:right}</style>
+      <style>body{font-family:Arial;font-size:11px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:4px 6px;font-size:11px}th{background:#f0f0f0}.right{text-align:right}.beg{background:#f9f9e0;font-weight:bold}</style>
     </head><body>
       <h2>BOOKING PETTY CASH MONITORING</h2>
+      <p style="text-align:center;font-size:12px">Date: ${selectedDate ? formatDate(selectedDate + "T00:00:00") : "All"}</p>
       <table>
-        <tr><th>Date</th><th>Customer</th><th>Source</th><th class="right">Amount</th><th class="right">Expenses</th><th class="right">Cash on Hand</th><th class="right">Running Balance</th></tr>
-        ${rows.map(r => `<tr><td>${formatDateTime(r.date)}</td><td>${r.customer}</td><td>${r.sourceModule}</td><td class="right">₱${r.amount.toLocaleString()}</td><td class="right">₱${r.expenses.toLocaleString()}</td><td class="right">₱${r.cashOnHand.toLocaleString()}</td><td class="right">₱${r.runningBalance.toLocaleString()}</td></tr>`).join("")}
+        <tr><th>Date</th><th>Customer</th><th>Source</th><th class="right">Amount</th><th class="right">Expense</th><th class="right">Cash on Hand</th><th class="right">Running Balance</th></tr>
+        ${rows.map(r => `<tr${r.customer === "Beginning Bal." ? ' class="beg"' : ''}>
+          <td>${r.customer === "Beginning Bal." ? formatDate(r.date) : formatDateTime(r.date)}</td>
+          <td>${r.customer}</td><td>${r.sourceModule}</td>
+          <td class="right">${r.amount > 0 ? "₱" + r.amount.toLocaleString() : "—"}</td>
+          <td class="right">${r.expenses > 0 ? "₱" + r.expenses.toLocaleString() : "—"}</td>
+          <td class="right">${r.customer === "Beginning Bal." ? "—" : "₱" + r.cashOnHand.toLocaleString()}</td>
+          <td class="right">₱${r.runningBalance.toLocaleString()}</td></tr>`).join("")}
       </table>
     </body></html>`);
     w.document.close();
     w.print();
   };
 
-  const totalAmount = rows.reduce((s, r) => s + r.amount, 0);
-  const totalExpenses = rows.reduce((s, r) => s + r.expenses, 0);
+  const dataRows = rows.filter(r => r.customer !== "Beginning Bal.");
+  const totalAmount = dataRows.reduce((s, r) => s + r.amount, 0);
+  const totalExpenses = dataRows.reduce((s, r) => s + r.expenses, 0);
   const finalBalance = rows.length > 0 ? rows[rows.length - 1].runningBalance : 0;
 
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <input type="date" className="pos-input text-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} placeholder="From" />
-        <input type="date" className="pos-input text-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} placeholder="To" />
+        <input type="date" className="pos-input text-sm" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
+        <div />
         <button onClick={exportExcel} className="flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
           <Download size={16} /> Export CSV
         </button>
@@ -181,25 +195,27 @@ function PettyCashMonitoring() {
               <th className="text-left px-3 py-2 font-medium">Customer</th>
               <th className="text-left px-3 py-2 font-medium">Source</th>
               <th className="text-right px-3 py-2 font-medium">Amount</th>
-              <th className="text-right px-3 py-2 font-medium">Expenses</th>
+              <th className="text-right px-3 py-2 font-medium">Expense</th>
               <th className="text-right px-3 py-2 font-medium">Cash on Hand</th>
               <th className="text-right px-3 py-2 font-medium">Running Balance</th>
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No data found</td></tr>
+            {rows.length <= 1 && (
+              <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No data found for this date</td></tr>
             )}
             {rows.map((r, i) => (
-              <tr key={i} className="border-t border-border hover:bg-muted/50">
-                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(r.date)}</td>
+              <tr key={i} className={`border-t border-border ${r.customer === "Beginning Bal." ? "bg-accent/50 font-semibold" : "hover:bg-muted/50"}`}>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{r.customer === "Beginning Bal." ? formatDate(r.date) : formatDateTime(r.date)}</td>
                 <td className="px-3 py-2">{r.customer}</td>
                 <td className="px-3 py-2">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.sourceModule === "Expense" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{r.sourceModule}</span>
+                  {r.sourceModule ? (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.sourceModule === "Expense" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{r.sourceModule}</span>
+                  ) : ""}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-success font-medium">{r.amount > 0 ? `₱${r.amount.toLocaleString()}` : "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{r.expenses > 0 ? `₱${r.expenses.toLocaleString()}` : "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">₱{r.cashOnHand.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{r.customer === "Beginning Bal." ? "—" : `₱${r.cashOnHand.toLocaleString()}`}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-bold">₱{r.runningBalance.toLocaleString()}</td>
               </tr>
             ))}
