@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { CalendarDays, AlertTriangle, XCircle } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
-
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getTransactions, getSettings } from "@/lib/db";
 import { toast } from "sonner";
@@ -65,18 +64,20 @@ export default function BookingModule() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [adults, setAdults] = useState("");
-  const [children, setChildren] = useState("");
+  const [kids8Above, setKids8Above] = useState("");
+  const [kids5to7, setKids5to7] = useState("");
+  const [kids4Below, setKids4Below] = useState("");
   const [addOnRoom, setAddOnRoom] = useState<string>("None");
   const [functionHallFee, setFunctionHallFee] = useState("");
   const [addOnTables, setAddOnTables] = useState("");
   const [corkageFee, setCorkageFee] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
-  
 
   const [exclusiveFee, setExclusiveFee] = useState(5000);
   const [adultRate, setAdultRate] = useState(100);
-  const [childRate, setChildRate] = useState(50);
+  const [kids8Rate, setKids8Rate] = useState(50);
+  const [kids5Rate, setKids5Rate] = useState(30);
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
@@ -93,29 +94,34 @@ export default function BookingModule() {
   useEffect(() => { firstRef.current?.focus(); }, []);
   useEffect(() => {
     getSettings().then((s) => {
-      setExclusiveFee(s.exclusive_fee); setAdultRate(s.adult_rate_day); setChildRate(s.child_rate_day);
+      setExclusiveFee(s.exclusive_fee); setAdultRate(s.adult_rate_day);
+      setKids8Rate(s.kids_8_above_rate_day ?? 50); setKids5Rate(s.kids_5_7_rate_day ?? 30);
       setKuboRate(s.kubo_room_rate); setBarkadaRate(s.barkada_room_rate); setTableRate(s.table_rent_rate);
     });
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
 
   const a = parseInt(adults) || 0;
-  const c = parseInt(children) || 0;
-  const headcount = a + c;
+  const k8 = parseInt(kids8Above) || 0;
+  const k5 = parseInt(kids5to7) || 0;
+  const k4 = parseInt(kids4Below) || 0;
+  const headcount = a + k8 + k5 + k4;
   const isExclusive = bookingType === "Exclusive";
   const numTables = parseInt(addOnTables) || 0;
   const corkage = parseFloat(corkageFee) || 0;
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
 
-
-  const personFee = a * adultRate + c * childRate;
+  const adultFee = a * adultRate;
+  const childrenTotalFee = isExclusive ? 0 : (k8 * kids8Rate + k5 * kids5Rate);
+  const personFee = adultFee + childrenTotalFee;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  const total = isExclusive ? (exclusiveFee + roomFee + tableFee + funcHall + corkage) : (personFee + roomFee + tableFee + funcHall + corkage);
+  const total = isExclusive
+    ? (exclusiveFee + roomFee + tableFee + funcHall + corkage)
+    : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
-
 
   const hasDateConflict = useCallback(() => {
     if (!checkIn || !checkOut) return false;
@@ -143,7 +149,9 @@ export default function BookingModule() {
         function_hall_fee: funcHall > 0 ? funcHall : undefined,
         room_type: addOnRoom !== "None" ? addOnRoom : undefined,
         number_of_tables: numTables > 0 ? numTables : undefined,
-        adults: a, children: c, total_headcount: headcount,
+        adults: a, children: k8 + k5 + k4,
+        kids_8_above: k8, kids_5_7: k5, kids_4_below: k4,
+        total_headcount: headcount,
         amount_paid: total, deposit_amount: deposit,
         balance: balance > 0 ? balance : 0, payment_status: paymentStatus,
         payment_method: payment,
@@ -153,11 +161,15 @@ export default function BookingModule() {
       const rData = {
         transactionNo: txNo, dateTime: now, module: `Booking - ${bookingType}`,
         customerName: customerName || undefined,
-        adults: a, children: c, headcount,
+        adults: a, children: k8 + k5 + k4, headcount,
         totalAmount: total,
         paymentMethod: payment, paymentStatus,
         details: [
           ...(isExclusive ? [{ label: "Exclusive Fee", value: `₱${exclusiveFee.toLocaleString()}` }] : []),
+          ...(!isExclusive && adultFee > 0 ? [{ label: `Adults (${a})`, value: `₱${adultFee.toLocaleString()}` }] : []),
+          ...(!isExclusive && k8 > 0 ? [{ label: `Kids 8+ (${k8})`, value: `₱${(k8 * kids8Rate).toLocaleString()}` }] : []),
+          ...(!isExclusive && k5 > 0 ? [{ label: `Kids 5-7 (${k5})`, value: `₱${(k5 * kids5Rate).toLocaleString()}` }] : []),
+          ...(k4 > 0 ? [{ label: `Kids 4↓ FREE (${k4})`, value: "₱0" }] : []),
           ...(roomFee > 0 ? [{ label: "Room", value: `${addOnRoom} ₱${roomFee.toLocaleString()}` }] : []),
           { label: "Deposit", value: `₱${deposit.toLocaleString()}` },
           { label: "Balance", value: `₱${Math.max(0, balance).toLocaleString()}` },
@@ -171,14 +183,14 @@ export default function BookingModule() {
         setReceiptData(rData);
       }
 
-      setCustomerName(""); setAdults(""); setChildren(""); setDepositAmount("");
-      setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
+      setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
+      setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
       setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee("");
       getTransactions({ module: "Booking" }).then(setExistingBookings);
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, checkIn, checkOut, corkage, funcHall, a, c, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, isExclusive, exclusiveFee, roomFee]);
+  }, [customerName, bookingType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -221,12 +233,25 @@ export default function BookingModule() {
           <div>
             <label className="text-sm font-medium block mb-1">Adults</label>
             <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
-            {a > 0 && <p className="text-xs text-muted-foreground mt-1">{a} × ₱{adultRate.toLocaleString()} = ₱{(a * adultRate).toLocaleString()}</p>}
+            {!isExclusive && a > 0 && <p className="text-xs text-muted-foreground mt-1">{a} × ₱{adultRate.toLocaleString()} = ₱{adultFee.toLocaleString()}</p>}
           </div>
           <div>
-            <label className="text-sm font-medium block mb-1">Children</label>
-            <input type="number" className="pos-input w-full" value={children} onChange={(e) => setChildren(e.target.value)} placeholder="0" min="0" />
-            {c > 0 && <p className="text-xs text-muted-foreground mt-1">{c} × ₱{childRate.toLocaleString()} = ₱{(c * childRate).toLocaleString()}</p>}
+            <label className="text-sm font-medium block mb-1">Kids (8 & above)</label>
+            <input type="number" className="pos-input w-full" value={kids8Above} onChange={(e) => setKids8Above(e.target.value)} placeholder="0" min="0" />
+            {!isExclusive && k8 > 0 && <p className="text-xs text-muted-foreground mt-1">{k8} × ₱{kids8Rate.toLocaleString()} = ₱{(k8 * kids8Rate).toLocaleString()}</p>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Kids (5-7)</label>
+            <input type="number" className="pos-input w-full" value={kids5to7} onChange={(e) => setKids5to7(e.target.value)} placeholder="0" min="0" />
+            {!isExclusive && k5 > 0 && <p className="text-xs text-muted-foreground mt-1">{k5} × ₱{kids5Rate.toLocaleString()} = ₱{(k5 * kids5Rate).toLocaleString()}</p>}
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Kids (4 & Below - FREE)</label>
+            <input type="number" className="pos-input w-full" value={kids4Below} onChange={(e) => setKids4Below(e.target.value)} placeholder="0" min="0" />
+            {k4 > 0 && <p className="text-xs text-success mt-1">FREE</p>}
           </div>
         </div>
 
@@ -259,7 +284,10 @@ export default function BookingModule() {
           <p className="text-2xl font-bold text-primary tabular-nums">₱{total.toLocaleString()}</p>
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
             {isExclusive && <p>Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>}
-            {!isExclusive && personFee > 0 && <p>Entrance ({a} adult + {c} child): ₱{personFee.toLocaleString()}</p>}
+            {!isExclusive && adultFee > 0 && <p>Adults ({a}): ₱{adultFee.toLocaleString()}</p>}
+            {!isExclusive && k8 > 0 && <p>Kids 8+ ({k8}): ₱{(k8 * kids8Rate).toLocaleString()}</p>}
+            {!isExclusive && k5 > 0 && <p>Kids 5-7 ({k5}): ₱{(k5 * kids5Rate).toLocaleString()}</p>}
+            {k4 > 0 && <p>Kids 4↓ ({k4}): FREE</p>}
             {roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
             {funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
