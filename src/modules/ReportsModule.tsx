@@ -230,8 +230,7 @@ export default function ReportsModule() {
   const [tab, setTab] = useState<Tab>("transactions");
   const [data, setData] = useState<Transaction[]>([]);
   const [moduleFilter, setModuleFilter] = useState("All");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [txnDate, setTxnDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gameFilter, setGameFilter] = useState("");
 
   const [cashierReports, setCashierReports] = useState<CashierReport[]>([]);
@@ -249,16 +248,24 @@ export default function ReportsModule() {
   const [previewBcReport, setPreviewBcReport] = useState<BookingCashierReport | null>(null);
 
   useEffect(() => {
+    // Fetch with date range = same day for strict filtering
     getTransactions({
       module: moduleFilter === "All" ? undefined : moduleFilter,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
+      dateFrom: txnDate || undefined,
+      dateTo: txnDate || undefined,
       game_type: gameFilter || undefined,
     }).then(txns => {
-      // Only show Fully Paid transactions in reports
-      setData(txns.filter(t => t.payment_status === "Fully Paid" || !t.payment_status));
+      // Strict date match + only Fully Paid
+      const filtered = txns.filter(t => {
+        if (t.payment_status && t.payment_status !== "Fully Paid") return false;
+        if (txnDate) {
+          return formatDate(t.date_time) === formatDate(txnDate + "T00:00:00");
+        }
+        return true;
+      });
+      setData(filtered);
     });
-  }, [moduleFilter, dateFrom, dateTo, gameFilter]);
+  }, [moduleFilter, txnDate, gameFilter]);
 
   useEffect(() => {
     getCashierReports().then(reports => {
