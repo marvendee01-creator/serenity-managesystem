@@ -377,8 +377,8 @@ export default function ReportsModule() {
             <select className="pos-input text-sm" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
               {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
-            <input type="date" className="pos-input text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="From" />
-            <input type="date" className="pos-input text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="To" />
+            <input type="date" className="pos-input text-sm" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} />
+            {moduleFilter !== "Games Rental" && <div />}
             {moduleFilter === "Games Rental" && (
               <select className="pos-input text-sm" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}>
                 <option value="">All Games</option>
