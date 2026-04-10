@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { BedDouble, Clock, AlertTriangle, LogOut } from "lucide-react";
+import { BedDouble, Clock, AlertTriangle, LogOut, Timer } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
 import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 const ROOM_TYPES = ["Kubo Room", "Barkada Room"] as const;
 const PAX_LIMITS: Record<string, number> = { "Kubo Room": 10, "Barkada Room": 20 };
 const EXTENSION_RATE = 10;
+const MAX_EXTENSION_HOURS = 4;
 
 interface ActiveRoom {
   id: number;
@@ -17,8 +18,55 @@ interface ActiveRoom {
   room_type?: string;
   pax: number;
   entry_time: string;
+  check_in?: string;
   checkout_time?: string;
   amount_paid: number;
+}
+
+function ExtendStayDialog({ room, onConfirm, onCancel }: {
+  room: { pax: number; extensionHours: number; extensionFee: number; totalAmount: number };
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 660; osc.type = "sine"; gain.gain.value = 0.25;
+      osc.start();
+      setTimeout(() => { osc.frequency.value = 880; }, 200);
+      setTimeout(() => { osc.stop(); ctx.close(); }, 400);
+    } catch {}
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6 text-center" onClick={e => e.stopPropagation()}>
+        <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+          <Timer size={32} className="text-warning" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground mb-2">⏰ EXTEND STAY?</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Additional <strong>₱{EXTENSION_RATE}</strong> per pax/hour (max {MAX_EXTENSION_HOURS} hrs). Subject for availability.
+        </p>
+        <div className="pos-card border-warning/30 bg-warning/5 mb-4 text-left">
+          <p className="text-xs text-muted-foreground">Extension: {room.extensionHours}hr × {room.pax} pax × ₱{EXTENSION_RATE}</p>
+          <p className="text-lg font-bold text-warning mt-1">Extension Fee: ₱{room.extensionFee.toLocaleString()}</p>
+          <p className="text-sm font-bold text-foreground mt-1">New Total: ₱{room.totalAmount.toLocaleString()}</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 h-12 rounded-lg border border-border text-foreground font-semibold hover:bg-muted transition-colors">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-accent transition-colors">
+            Confirm Checkout
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function RoomModule() {
@@ -33,6 +81,7 @@ export default function RoomModule() {
   const [now, setNow] = useState(Date.now());
   const [successChange, setSuccessChange] = useState<number | null>(null);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [extendDialog, setExtendDialog] = useState<{ room: ActiveRoom; extensionHours: number; extensionFee: number; totalAmount: number } | null>(null);
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
@@ -48,7 +97,8 @@ export default function RoomModule() {
     setActiveRooms(
       txs.filter((t) => t.entry_time && !t.checkout_time).map((t) => ({
         id: t.id!, customer_name: t.customer_name, room_type: t.room_type,
-        pax: t.pax || 0, entry_time: t.entry_time!, checkout_time: t.checkout_time, amount_paid: t.amount_paid,
+        pax: t.pax || 0, entry_time: t.entry_time!, check_in: t.check_in,
+        checkout_time: t.checkout_time, amount_paid: t.amount_paid,
       }))
     );
   }, []);
@@ -60,8 +110,17 @@ export default function RoomModule() {
   const paxLimit = PAX_LIMITS[roomType] || 20;
   const received = parseFloat(amountReceived) || 0;
 
-  const getHoursStayed = (entryTime: string) => Math.max(0, Math.floor((now - new Date(entryTime).getTime()) / (1000 * 60 * 60)));
-  const getExtensionFee = (entryTime: string, paxCount: number) => paxCount * getHoursStayed(entryTime) * EXTENSION_RATE;
+  const getHoursElapsed = (entryTime: string) => {
+    const diffMs = now - new Date(entryTime).getTime();
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+  };
+
+  const computeExtension = (entryTime: string, paxCount: number) => {
+    const durationHours = getHoursElapsed(entryTime);
+    const extensionHours = Math.min(Math.max(0, durationHours), MAX_EXTENSION_HOURS);
+    const extensionFee = extensionHours * paxCount * EXTENSION_RATE;
+    return { durationHours, extensionHours, extensionFee };
+  };
 
   const totalRoomAmount = roomRate;
   const change = received - totalRoomAmount;
@@ -79,7 +138,8 @@ export default function RoomModule() {
         customer_name: customerName || undefined, room_type: roomType,
         pax: paxNum, adults: 0, children: 0,
         total_headcount: paxNum,
-        amount_paid: totalRoomAmount, payment_method: payment, entry_time: entryTime,
+        amount_paid: totalRoomAmount, payment_method: payment,
+        entry_time: entryTime, check_in: entryTime,
       });
       toast.success("Room check-in recorded!");
 
@@ -102,16 +162,36 @@ export default function RoomModule() {
     setSaving(false);
   }, [customerName, roomType, paxNum, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate]);
 
-  const handleCheckout = useCallback(async (room: ActiveRoom) => {
-    const checkoutTime = new Date().toISOString();
-    const extensionFee = getExtensionFee(room.entry_time, room.pax);
+  const handleCheckout = useCallback((room: ActiveRoom) => {
+    const { extensionHours, extensionFee } = computeExtension(room.entry_time, room.pax);
     const totalAmount = room.amount_paid + extensionFee;
+
+    if (extensionHours > 0) {
+      setExtendDialog({ room, extensionHours, extensionFee, totalAmount });
+    } else {
+      doCheckout(room, 0, room.amount_paid);
+    }
+  }, [now]);
+
+  const doCheckout = useCallback(async (room: ActiveRoom, extensionFee: number, totalAmount: number) => {
+    const checkoutTime = new Date().toISOString();
     try {
-      await updateTransaction(room.id, { checkout_time: checkoutTime, extension_fee: extensionFee, amount_paid: totalAmount });
+      await updateTransaction(room.id, {
+        checkout_time: checkoutTime,
+        check_out: checkoutTime,
+        extension_fee: extensionFee,
+        amount_paid: totalAmount,
+      });
       toast.success(`Checked out! Total: ₱${totalAmount.toLocaleString()}${extensionFee > 0 ? ` (incl. ₱${extensionFee.toLocaleString()} extension)` : ""}`);
       loadActiveRooms();
     } catch { toast.error("Failed to checkout"); }
-  }, [now, loadActiveRooms]);
+  }, [loadActiveRooms]);
+
+  const handleExtendConfirm = useCallback(() => {
+    if (!extendDialog) return;
+    doCheckout(extendDialog.room, extendDialog.extensionFee, extendDialog.totalAmount);
+    setExtendDialog(null);
+  }, [extendDialog, doCheckout]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -123,6 +203,13 @@ export default function RoomModule() {
     <>
       {successChange !== null && <PaymentSuccessDialog change={successChange} onClose={() => setSuccessChange(null)} />}
       {receiptData && !successChange && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
+      {extendDialog && (
+        <ExtendStayDialog
+          room={{ pax: extendDialog.room.pax, extensionHours: extendDialog.extensionHours, extensionFee: extendDialog.extensionFee, totalAmount: extendDialog.totalAmount }}
+          onConfirm={handleExtendConfirm}
+          onCancel={() => setExtendDialog(null)}
+        />
+      )}
       <ModuleShell title="Room" icon={<BedDouble size={20} />} onSave={handleSave} saveLabel="Check In" saving={saving}>
         <div>
           <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
@@ -138,7 +225,7 @@ export default function RoomModule() {
         </div>
         <div className="pos-card">
           <p className="text-sm font-bold text-primary">Total: ₱{roomRate.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: ₱{EXTENSION_RATE}/pax/hr</p>
+          <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: ₱{EXTENSION_RATE}/pax/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
         <div>
           <label className="text-sm font-medium block mb-1">Number of Pax</label>
@@ -173,9 +260,8 @@ export default function RoomModule() {
             </h3>
             <div className="space-y-2">
               {activeRooms.map((room) => {
-                const hours = getHoursStayed(room.entry_time);
-                const extFee = getExtensionFee(room.entry_time, room.pax);
-                const total = room.amount_paid + extFee;
+                const { durationHours, extensionHours, extensionFee } = computeExtension(room.entry_time, room.pax);
+                const total = room.amount_paid + extensionFee;
                 return (
                   <div key={room.id} className="pos-card border-primary/20">
                     <div className="flex justify-between items-start">
@@ -183,11 +269,11 @@ export default function RoomModule() {
                         <p className="font-medium text-sm">{room.customer_name || "Guest"}</p>
                         <p className="text-xs text-muted-foreground">{room.room_type} • {room.pax} pax</p>
                         <p className="text-xs text-muted-foreground">
-                          In: {new Date(room.entry_time).toLocaleTimeString()} • {hours}h elapsed
+                          In: {new Date(room.entry_time).toLocaleTimeString()} • {durationHours}h elapsed
                         </p>
-                        {extFee > 0 && (
+                        {extensionHours > 0 && (
                           <p className="text-xs text-warning font-medium mt-1">
-                            Extension: ₱{extFee.toLocaleString()} ({room.pax} pax × {hours}h × ₱{EXTENSION_RATE})
+                            Extension: ₱{extensionFee.toLocaleString()} ({room.pax} pax × {extensionHours}h × ₱{EXTENSION_RATE}) {extensionHours >= MAX_EXTENSION_HOURS && "— MAX"}
                           </p>
                         )}
                         <p className="text-sm font-bold mt-1">Total: ₱{total.toLocaleString()}</p>
