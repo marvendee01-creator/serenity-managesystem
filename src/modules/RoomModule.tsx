@@ -28,12 +28,31 @@ interface ActiveRoom {
   kids_4_below?: number;
 }
 
-function ExtendStayDialog({ room, onConfirm, onCancel }: {
-  room: { pax: number; extensionHours: number; extensionFee: number; totalAmount: number };
-  onConfirm: () => void;
+function CheckoutDialog({ room, onConfirm, onCancel }: {
+  room: ActiveRoom;
+  onConfirm: (checkoutISO: string, extensionFee: number, totalAmount: number) => void;
   onCancel: () => void;
 }) {
+  const [checkOutDate, setCheckOutDate] = useState(getTodayDate);
+  const [checkOutTime, setCheckOutTime] = useState(getCurrentTime);
+  const [manualOverride, setManualOverride] = useState(false);
+
+  // Auto-update time every minute if not manual override
   useEffect(() => {
+    if (manualOverride) return;
+    const interval = setInterval(() => setCheckOutTime(getCurrentTime()), 60000);
+    return () => clearInterval(interval);
+  }, [manualOverride]);
+
+  const checkoutISO = new Date(`${checkOutDate}T${checkOutTime}`).toISOString();
+  const diffMs = new Date(checkoutISO).getTime() - new Date(room.entry_time).getTime();
+  const durationHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+  const extensionHours = Math.min(Math.max(0, durationHours), MAX_EXTENSION_HOURS);
+  const extensionFee = extensionHours * room.pax * EXTENSION_RATE;
+  const totalAmount = room.amount_paid + extensionFee;
+
+  useEffect(() => {
+    if (extensionHours <= 0) return;
     try {
       const ctx = new AudioContext();
       const osc = ctx.createOscillator();
@@ -44,28 +63,63 @@ function ExtendStayDialog({ room, onConfirm, onCancel }: {
       setTimeout(() => { osc.frequency.value = 880; }, 200);
       setTimeout(() => { osc.stop(); ctx.close(); }, 400);
     } catch {}
-  }, []);
+  }, [extensionHours]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6 text-center" onClick={e => e.stopPropagation()}>
-        <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
-          <Timer size={32} className="text-warning" />
-        </div>
-        <h3 className="text-xl font-bold text-foreground mb-2">⏰ EXTEND STAY?</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Additional <strong>₱{EXTENSION_RATE}</strong> per pax/hour (max {MAX_EXTENSION_HOURS} hrs). Subject for availability.
+      <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-foreground mb-1 text-center">
+          {extensionHours > 0 ? "⏰ EXTEND STAY?" : "Checkout"}
+        </h3>
+        <p className="text-sm text-muted-foreground mb-3 text-center">
+          {room.customer_name || "Guest"} • {room.room_type} • {room.pax} pax
         </p>
-        <div className="pos-card border-warning/30 bg-warning/5 mb-4 text-left">
-          <p className="text-xs text-muted-foreground">Extension: {room.extensionHours}hr × {room.pax} pax × ₱{EXTENSION_RATE}</p>
-          <p className="text-lg font-bold text-warning mt-1">Extension Fee: {formatPeso(room.extensionFee)}</p>
-          <p className="text-sm font-bold text-foreground mt-1">New Total: {formatPeso(room.totalAmount)}</p>
+
+        {/* Checkout Date & Time */}
+        <div className="grid grid-cols-2 gap-3 mb-2">
+          <div>
+            <label className="text-xs font-medium block mb-1">Check-out Date</label>
+            <input type="date" className="pos-input w-full text-sm" value={checkOutDate} onChange={e => setCheckOutDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1">Check-out Time</label>
+            <input type="time" className="pos-input w-full text-sm" value={checkOutTime}
+              onChange={e => { setCheckOutTime(e.target.value); setManualOverride(true); }}
+              disabled={!manualOverride} />
+          </div>
         </div>
+        <div className="flex items-center gap-2 mb-4">
+          <input type="checkbox" id="coManualOverride" checked={manualOverride}
+            onChange={e => { setManualOverride(e.target.checked); if (!e.target.checked) setCheckOutTime(getCurrentTime()); }}
+            className="rounded border-border" />
+          <label htmlFor="coManualOverride" className="text-xs text-muted-foreground">Override Time (Manual Input)</label>
+        </div>
+
+        {extensionHours > 0 && (
+          <>
+            <p className="text-sm text-muted-foreground mb-2 text-center">
+              Additional <strong>₱{EXTENSION_RATE}</strong> per pax/hour (max {MAX_EXTENSION_HOURS} hrs). Subject for availability.
+            </p>
+            <div className="pos-card border-warning/30 bg-warning/5 mb-4 text-left">
+              <p className="text-xs text-muted-foreground">Extension: {extensionHours}hr × {room.pax} pax × ₱{EXTENSION_RATE}</p>
+              <p className="text-lg font-bold text-warning mt-1">Extension Fee: {formatPeso(extensionFee)}</p>
+              <p className="text-sm font-bold text-foreground mt-1">New Total: {formatPeso(totalAmount)}</p>
+            </div>
+          </>
+        )}
+
+        {extensionHours === 0 && (
+          <div className="pos-card border-primary/20 mb-4 text-left">
+            <p className="text-xs text-muted-foreground">Duration: {durationHours}h</p>
+            <p className="text-sm font-bold text-foreground mt-1">Total: {formatPeso(totalAmount)}</p>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 h-12 rounded-lg border border-border text-foreground font-semibold hover:bg-muted transition-colors">
             Cancel
           </button>
-          <button onClick={onConfirm} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-accent transition-colors">
+          <button onClick={() => onConfirm(checkoutISO, extensionFee, totalAmount)} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-accent transition-colors">
             Confirm Checkout
           </button>
         </div>
