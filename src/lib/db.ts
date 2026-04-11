@@ -32,6 +32,7 @@ export interface Transaction {
   kids_8_above?: number;
   kids_5_7?: number;
   kids_4_below?: number;
+  date_settled?: string;
 }
 
 export interface BookingCashierEntry {
