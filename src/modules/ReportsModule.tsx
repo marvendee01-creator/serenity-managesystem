@@ -400,7 +400,7 @@ export default function ReportsModule() {
             </div>
             <div className="pos-card text-center">
               <p className="text-xs text-muted-foreground">Total Amount</p>
-              <p className="text-lg font-bold tabular-nums">₱{totalAmount.toLocaleString()}</p>
+              <p className="text-lg font-bold tabular-nums">{formatPeso(totalAmount)}</p>
             </div>
           </div>
 
@@ -442,7 +442,7 @@ export default function ReportsModule() {
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_5_7 ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_4_below ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{computedHeadcount}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.amount_paid)}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
                     </tr>
                   );
