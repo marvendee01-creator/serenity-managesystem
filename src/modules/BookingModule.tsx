@@ -5,6 +5,7 @@ import PaymentToggle from "@/components/PaymentToggle";
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getTransactions, getSettings } from "@/lib/db";
 import { toast } from "sonner";
+import { formatPeso } from "@/lib/format";
 
 const TYPES = ["Exclusive", "Non-Exclusive"] as const;
 const ROOM_OPTIONS = ["None", "Kubo Room", "Barkada Room"] as const;
@@ -31,9 +32,9 @@ function BalanceWarningDialog({ balance, onClose }: { balance: number; onClose: 
           <AlertTriangle size={32} className="text-warning" />
         </div>
         <h3 className="text-xl font-bold text-foreground mb-2">⚠️ PARTIAL PAYMENT</h3>
-        <p className="text-3xl font-bold text-destructive tabular-nums mb-3">₱{balance.toLocaleString()}</p>
+        <p className="text-3xl font-bold text-destructive tabular-nums mb-3">{formatPeso(balance)}</p>
         <p className="text-sm text-muted-foreground mb-6">
-          Customer has remaining balance: ₱{balance.toLocaleString()}. Please settle in <strong>Booking Management</strong>.
+          Customer has remaining balance: {formatPeso(balance)}. Please settle in <strong>Booking Management</strong>.
         </p>
         <button onClick={onClose} className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all">
           OK, Got It
@@ -228,7 +229,7 @@ export default function BookingModule() {
               <button key={t} className={`toggle-btn flex-1 ${bookingType === t ? "toggle-btn-active" : ""}`} onClick={() => setBookingType(t)}>{t}</button>
             ))}
           </div>
-          {isExclusive && <p className="text-xs text-muted-foreground mt-1">Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>}
+          {isExclusive && <p className="text-xs text-muted-foreground mt-1">Exclusive Fee: {formatPeso(exclusiveFee)}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -246,12 +247,12 @@ export default function BookingModule() {
           <div>
             <label className="text-sm font-medium block mb-1">Adults</label>
             <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
-            {!isExclusive && a > 0 && <p className="text-xs text-muted-foreground mt-1">{a} × ₱{adultRate.toLocaleString()} = ₱{adultFee.toLocaleString()}</p>}
+            {!isExclusive && a > 0 && <p className="text-xs text-muted-foreground mt-1">{a} × {formatPeso(adultRate)} = {formatPeso(adultFee)}</p>}
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Kids (8 & above)</label>
             <input type="number" className="pos-input w-full" value={kids8Above} onChange={(e) => setKids8Above(e.target.value)} placeholder="0" min="0" />
-            {!isExclusive && k8 > 0 && <p className="text-xs text-muted-foreground mt-1">{k8} × ₱{kids8Rate.toLocaleString()} = ₱{(k8 * kids8Rate).toLocaleString()}</p>}
+            {!isExclusive && k8 > 0 && <p className="text-xs text-muted-foreground mt-1">{k8} × {formatPeso(kids8Rate)} = {formatPeso(k8 * kids8Rate)}</p>}
           </div>
         </div>
 
@@ -259,7 +260,7 @@ export default function BookingModule() {
           <div>
             <label className="text-sm font-medium block mb-1">Kids (5-7)</label>
             <input type="number" className="pos-input w-full" value={kids5to7} onChange={(e) => setKids5to7(e.target.value)} placeholder="0" min="0" />
-            {!isExclusive && k5 > 0 && <p className="text-xs text-muted-foreground mt-1">{k5} × ₱{kids5Rate.toLocaleString()} = ₱{(k5 * kids5Rate).toLocaleString()}</p>}
+            {!isExclusive && k5 > 0 && <p className="text-xs text-muted-foreground mt-1">{k5} × {formatPeso(kids5Rate)} = {formatPeso(k5 * kids5Rate)}</p>}
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Kids (4 & Below - FREE)</label>
@@ -273,44 +274,44 @@ export default function BookingModule() {
           <select className="pos-input w-full" value={addOnRoom} onChange={(e) => setAddOnRoom(e.target.value)}>
             {ROOM_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
-          {addOnRoom !== "None" && <p className="text-xs text-muted-foreground mt-1">Rate: ₱{roomFee.toLocaleString()}</p>}
+          {addOnRoom !== "None" && <p className="text-xs text-muted-foreground mt-1">Rate: {formatPeso(roomFee)}</p>}
         </div>
 
         <div>
           <label className="text-sm font-medium block mb-1">Function Hall Fee (Optional)</label>
-          <input type="number" className="pos-input w-full" value={functionHallFee} onChange={(e) => setFunctionHallFee(e.target.value)} placeholder="0.00" min="0" />
+          <input type="number" step="0.01" className="pos-input w-full" value={functionHallFee} onChange={(e) => setFunctionHallFee(e.target.value)} placeholder="0.00" min="0" />
         </div>
 
         <div>
           <label className="text-sm font-medium block mb-1">Tables (Optional)</label>
           <input type="number" className="pos-input w-full" value={addOnTables} onChange={(e) => setAddOnTables(e.target.value)} placeholder="0" min="0" />
-          {numTables > 0 && <p className="text-xs text-muted-foreground mt-1">{numTables} × ₱{tableRate.toLocaleString()} = ₱{tableFee.toLocaleString()}</p>}
+          {numTables > 0 && <p className="text-xs text-muted-foreground mt-1">{numTables} × {formatPeso(tableRate)} = {formatPeso(tableFee)}</p>}
         </div>
 
         <div>
           <label className="text-sm font-medium block mb-1">Corkage Fee (Optional)</label>
-          <input type="number" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
+          <input type="number" step="0.01" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
         </div>
 
         <div className="pos-card border-primary/30">
           <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-          <p className="text-2xl font-bold text-primary tabular-nums">₱{total.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-primary tabular-nums">{formatPeso(total)}</p>
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
-            {isExclusive && <p>Exclusive Fee: ₱{exclusiveFee.toLocaleString()}</p>}
-            {!isExclusive && adultFee > 0 && <p>Adults ({a}): ₱{adultFee.toLocaleString()}</p>}
-            {!isExclusive && k8 > 0 && <p>Kids 8+ ({k8}): ₱{(k8 * kids8Rate).toLocaleString()}</p>}
-            {!isExclusive && k5 > 0 && <p>Kids 5-7 ({k5}): ₱{(k5 * kids5Rate).toLocaleString()}</p>}
+            {isExclusive && <p>Exclusive Fee: {formatPeso(exclusiveFee)}</p>}
+            {!isExclusive && adultFee > 0 && <p>Adults ({a}): {formatPeso(adultFee)}</p>}
+            {!isExclusive && k8 > 0 && <p>Kids 8+ ({k8}): {formatPeso(k8 * kids8Rate)}</p>}
+            {!isExclusive && k5 > 0 && <p>Kids 5-7 ({k5}): {formatPeso(k5 * kids5Rate)}</p>}
             {k4 > 0 && <p>Kids 4↓ ({k4}): FREE</p>}
-            {roomFee > 0 && <p>+ {addOnRoom}: ₱{roomFee.toLocaleString()}</p>}
-            {funcHall > 0 && <p>+ Function Hall: ₱{funcHall.toLocaleString()}</p>}
-            {tableFee > 0 && <p>+ {numTables} table(s): ₱{tableFee.toLocaleString()}</p>}
-            {corkage > 0 && <p>+ Corkage: ₱{corkage.toLocaleString()}</p>}
+            {roomFee > 0 && <p>+ {addOnRoom}: {formatPeso(roomFee)}</p>}
+            {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
+            {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
+            {corkage > 0 && <p>+ Corkage: {formatPeso(corkage)}</p>}
           </div>
         </div>
 
         <div>
           <label className="text-sm font-medium block mb-1">Deposit Amount</label>
-          <input type="number" className="pos-input w-full" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min="0" />
+          <input type="number" step="0.01" className="pos-input w-full" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min="0" />
         </div>
 
         <div className={`pos-card ${paymentStatus === "Fully Paid" ? "border-success/30 bg-success/5" : paymentStatus === "Partially Paid" ? "border-warning/30 bg-warning/5" : "border-destructive/30 bg-destructive/5"}`}>
@@ -318,7 +319,7 @@ export default function BookingModule() {
             <div>
               <p className="text-sm text-muted-foreground">Balance</p>
               <p className={`text-2xl font-bold tabular-nums ${paymentStatus === "Fully Paid" ? "text-success" : paymentStatus === "Partially Paid" ? "text-warning" : "text-destructive"}`}>
-                ₱{Math.max(0, balance).toLocaleString()}
+                {formatPeso(Math.max(0, balance))}
               </p>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-bold ${paymentStatus === "Fully Paid" ? "bg-success/20 text-success" : paymentStatus === "Partially Paid" ? "bg-warning/20 text-warning" : "bg-destructive/20 text-destructive"}`}>

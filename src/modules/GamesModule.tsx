@@ -6,6 +6,7 @@ import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction } from "@/lib/db";
 import { toast } from "sonner";
+import { formatPeso } from "@/lib/format";
 
 const GAMES = ["Volleyball", "Dart", "Basketball", "Billiard"] as const;
 
@@ -90,7 +91,7 @@ export default function GamesModule() {
         </div>
         <div>
           <label className="text-sm font-medium block mb-1">Amount</label>
-          <input type="number" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+          <input type="number" step="0.01" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
         </div>
         <div>
           <label className="text-sm font-medium block mb-2">Payment Method</label>
@@ -98,13 +99,13 @@ export default function GamesModule() {
         </div>
         <div>
           <label className="text-sm font-medium block mb-1">Amount Received</label>
-          <input type="number" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
+          <input type="number" step="0.01" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
         </div>
         {received > 0 && amt > 0 && (
           <div className={`pos-card ${received >= amt ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
             <p className="text-sm text-muted-foreground mb-1">Change</p>
             <p className={`text-2xl font-bold tabular-nums ${received >= amt ? "text-success" : "text-destructive"}`}>
-              ₱{change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              {formatPeso(change)}
             </p>
           </div>
         )}
