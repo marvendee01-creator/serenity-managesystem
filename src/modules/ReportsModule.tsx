@@ -4,6 +4,7 @@ import { getTransactions, getCashierReports, getBookingCashierReports, type Tran
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
+import { formatPeso } from "@/lib/format";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
@@ -83,16 +84,16 @@ function PettyCashMonitoring() {
 
       const filtered = selectedDate ? allIncome.filter(r => matchDate(r.date)) : allIncome;
 
-      // Beginning balance = sum of all records before selected date
+      // Beginning balance = last running balance from any date before selected date
+      // We compute a full running balance of ALL prior records, then take the final value
       let beginningBalance = 0;
       if (selectedDate) {
-        const prior = allIncome.filter(r => r.date < selectedDate);
+        const prior = allIncome.filter(r => !matchDate(r.date) && new Date(r.date).getTime() < new Date(selectedDate + "T00:00:00").getTime());
         beginningBalance = prior.reduce((sum, r) => sum + (r.amount - r.expenses), 0);
       }
 
       // Build rows with beginning balance row prepended
       const result: PettyMonitorRow[] = [];
-      const selDateFormatted = selectedDate ? formatDate(selectedDate + "T00:00:00") : "";
 
       // Prepend beginning balance row
       result.push({
