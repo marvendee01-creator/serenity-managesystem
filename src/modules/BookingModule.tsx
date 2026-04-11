@@ -43,7 +43,7 @@ function BalanceWarningDialog({ balance, onClose }: { balance: number; onClose: 
   );
 }
 
-function DateConflictDialog({ onClose }: { onClose: () => void }) {
+function DateConflictDialog({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6 text-center" onClick={e => e.stopPropagation()}>
@@ -51,7 +51,7 @@ function DateConflictDialog({ onClose }: { onClose: () => void }) {
           <XCircle size={32} className="text-destructive" />
         </div>
         <h3 className="text-xl font-bold text-foreground mb-2">❌ BOOKING NOT ALLOWED</h3>
-        <p className="text-sm text-muted-foreground mb-6">Selected date is already booked. Please choose another date.</p>
+        <p className="text-sm text-muted-foreground mb-6">{message}</p>
         <button onClick={onClose} className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all">OK</button>
       </div>
     </div>
@@ -86,7 +86,8 @@ export default function BookingModule() {
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
   const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
-  const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string }[]>([]);
+  const [dateConflictMessage, setDateConflictMessage] = useState("");
+  const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string; booking_type?: string }[]>([]);
   
   const [receiptData, setReceiptData] = useState<any>(null);
   const firstRef = useRef<HTMLInputElement>(null);
@@ -124,18 +125,30 @@ export default function BookingModule() {
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
   const hasDateConflict = useCallback(() => {
-    if (!checkIn || !checkOut) return false;
+    if (!checkIn || !checkOut) return { conflict: false, message: "" };
     const newIn = new Date(checkIn).getTime();
     const newOut = new Date(checkOut).getTime();
-    return existingBookings.some(b => {
+    // Block if exclusive and date already has an exclusive booking
+    if (isExclusive) {
+      const exclusiveConflict = existingBookings.some(b => {
+        if (!b.check_in || !b.check_out || b.booking_type !== "Exclusive") return false;
+        return newIn < new Date(b.check_out).getTime() && newOut > new Date(b.check_in).getTime();
+      });
+      if (exclusiveConflict) return { conflict: true, message: "Date already booked for Exclusive. Please choose another date." };
+    }
+    // General overlap check
+    const overlap = existingBookings.some(b => {
       if (!b.check_in || !b.check_out) return false;
       return newIn < new Date(b.check_out).getTime() && newOut > new Date(b.check_in).getTime();
     });
-  }, [checkIn, checkOut, existingBookings]);
+    if (overlap) return { conflict: true, message: "Selected date range overlaps with an existing booking. Please choose another date." };
+    return { conflict: false, message: "" };
+  }, [checkIn, checkOut, existingBookings, isExclusive]);
 
   const handleSave = useCallback(async () => {
     if (total === 0) { toast.error("Enter amount"); return; }
-    if (hasDateConflict()) { setShowDateConflict(true); return; }
+    const conflict = hasDateConflict();
+    if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
     
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
@@ -201,7 +214,7 @@ export default function BookingModule() {
   return (
     <>
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
-      {showDateConflict && <DateConflictDialog onClose={() => setShowDateConflict(false)} />}
+      {showDateConflict && <DateConflictDialog message={dateConflictMessage} onClose={() => setShowDateConflict(false)} />}
       {receiptData && !showBalanceWarning && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
       <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
         <div>

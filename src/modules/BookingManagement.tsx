@@ -60,14 +60,16 @@ export default function BookingManagement() {
     const newDeposit = Math.min(totalAmount, currentDeposit + amount);
     const newBalance = Math.max(0, totalAmount - newDeposit);
     const newStatus = newDeposit >= totalAmount ? "Fully Paid" : newDeposit > 0 ? "Partially Paid" : "Unpaid";
+    const today = new Date().toISOString().slice(0, 10);
 
     try {
       await updateTransaction(booking.id, {
         deposit_amount: newDeposit,
         balance: newBalance,
         payment_status: newStatus,
+        ...(newStatus === "Fully Paid" ? { date_settled: today } : {}),
         comments: newStatus === "Fully Paid"
-          ? `Full payment settled. Amount received: ₱${amount.toLocaleString()}`
+          ? `Full payment settled on ${today}. Amount received: ₱${amount.toLocaleString()}`
           : `Partial payment of ₱${amount.toLocaleString()} received. Remaining: ₱${newBalance.toLocaleString()}`,
       });
       toast.success(
@@ -85,6 +87,26 @@ export default function BookingManagement() {
       toast.error("Failed to update");
     }
   }, [settleAmount, loadBookings]);
+
+  const handleMarkFullyPaid = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    const totalAmount = booking.amount_paid || 0;
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      await updateTransaction(booking.id, {
+        deposit_amount: totalAmount,
+        balance: 0,
+        payment_status: "Fully Paid",
+        date_settled: today,
+        comments: `Marked as Fully Paid on ${today}.`,
+      });
+      toast.success(`${booking.customer_name || "Booking"} marked as Fully Paid!`);
+      setFilter("Fully Paid");
+      loadBookings();
+    } catch {
+      toast.error("Failed to update");
+    }
+  }, [loadBookings]);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -162,12 +184,20 @@ export default function BookingManagement() {
               </div>
 
               {(b.payment_status === "Unpaid" || b.payment_status === "Partially Paid") && !isSettling && (
-                <button
-                  onClick={() => { setSettlingId(b.id!); setSettleAmount(currentBalance.toString()); }}
-                  className="w-full h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
-                >
-                  Settle Payment
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setSettlingId(b.id!); setSettleAmount(currentBalance.toString()); }}
+                    className="flex-1 h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
+                  >
+                    Settle Payment
+                  </button>
+                  <button
+                    onClick={() => handleMarkFullyPaid(b)}
+                    className="flex-1 h-10 rounded-lg text-sm font-medium bg-success/20 text-success hover:bg-success/30 active:scale-[0.97] transition-all"
+                  >
+                    Mark as Fully Paid
+                  </button>
+                </div>
               )}
 
               {isSettling && (

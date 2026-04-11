@@ -13,6 +13,7 @@ import maintenanceIcon from "@/assets/icons/maintenance.png";
 import bookingMgmtIcon from "@/assets/icons/booking-mgmt.png";
 import bookingCashierIcon from "@/assets/icons/booking-cashier.png";
 import SplashScreen from "@/components/SplashScreen";
+import WelcomePopup from "@/components/WelcomePopup";
 import EntranceModule from "@/modules/EntranceModule";
 import RoomModule from "@/modules/RoomModule";
 import BookingModule from "@/modules/BookingModule";
@@ -58,8 +59,12 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
 export default function Index() {
   const [splash, setSplash] = useState(true);
   const [active, setActive] = useState<ModuleId | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
-  const handleSplashDone = useCallback(() => setSplash(false), []);
+  const handleSplashDone = useCallback(() => {
+    setSplash(false);
+    setShowWelcome(true);
+  }, []);
 
   if (splash) return <SplashScreen onDone={handleSplashDone} />;
 
@@ -87,6 +92,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}
       <header className="bg-sidebar px-4 py-5 flex items-center gap-3 shadow-md">
         <img src={logo} alt="Logo" className="w-10 h-10 rounded-full" />
         <div>

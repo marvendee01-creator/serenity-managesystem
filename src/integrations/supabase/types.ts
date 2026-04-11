@@ -184,6 +184,7 @@ export type Database = {
           corkage_fee: number | null
           created_at: string
           customer_name: string | null
+          date_settled: string | null
           date_time: string
           deposit_amount: number | null
           entry_time: string | null
@@ -217,6 +218,7 @@ export type Database = {
           corkage_fee?: number | null
           created_at?: string
           customer_name?: string | null
+          date_settled?: string | null
           date_time?: string
           deposit_amount?: number | null
           entry_time?: string | null
@@ -250,6 +252,7 @@ export type Database = {
           corkage_fee?: number | null
           created_at?: string
           customer_name?: string | null
+          date_settled?: string | null
           date_time?: string
           deposit_amount?: number | null
           entry_time?: string | null

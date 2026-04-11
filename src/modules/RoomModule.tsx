@@ -21,6 +21,10 @@ interface ActiveRoom {
   check_in?: string;
   checkout_time?: string;
   amount_paid: number;
+  adults?: number;
+  kids_8_above?: number;
+  kids_5_7?: number;
+  kids_4_below?: number;
 }
 
 function ExtendStayDialog({ room, onConfirm, onCancel }: {
@@ -69,10 +73,25 @@ function ExtendStayDialog({ room, onConfirm, onCancel }: {
   );
 }
 
+function getCurrentTime() {
+  const now = new Date();
+  return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function RoomModule() {
   const [customerName, setCustomerName] = useState("");
   const [roomType, setRoomType] = useState<string>(ROOM_TYPES[0]);
-  const [pax, setPax] = useState("");
+  const [adults, setAdults] = useState("");
+  const [kids8Above, setKids8Above] = useState("");
+  const [kids5to7, setKids5to7] = useState("");
+  const [kids4Below, setKids4Below] = useState("");
+  const [checkInDate, setCheckInDate] = useState(getTodayDate);
+  const [checkInTime, setCheckInTime] = useState(getCurrentTime);
+  const [manualOverrideTime, setManualOverrideTime] = useState(false);
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [roomRate, setRoomRate] = useState(0);
@@ -85,6 +104,15 @@ export default function RoomModule() {
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
+
+  // Auto-update time every minute if not manual override
+  useEffect(() => {
+    if (manualOverrideTime) return;
+    const interval = setInterval(() => {
+      setCheckInTime(getCurrentTime());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [manualOverrideTime]);
 
   useEffect(() => {
     getSettings().then((s) => {
@@ -99,6 +127,7 @@ export default function RoomModule() {
         id: t.id!, customer_name: t.customer_name, room_type: t.room_type,
         pax: t.pax || 0, entry_time: t.entry_time!, check_in: t.check_in,
         checkout_time: t.checkout_time, amount_paid: t.amount_paid,
+        adults: t.adults, kids_8_above: t.kids_8_above, kids_5_7: t.kids_5_7, kids_4_below: t.kids_4_below,
       }))
     );
   }, []);
@@ -106,7 +135,11 @@ export default function RoomModule() {
   useEffect(() => { loadActiveRooms(); }, [loadActiveRooms]);
   useEffect(() => { const interval = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(interval); }, []);
 
-  const paxNum = parseInt(pax) || 0;
+  const a = parseInt(adults) || 0;
+  const k8 = parseInt(kids8Above) || 0;
+  const k5 = parseInt(kids5to7) || 0;
+  const k4 = parseInt(kids4Below) || 0;
+  const totalHeadcount = a + k8 + k5 + k4;
   const paxLimit = PAX_LIMITS[roomType] || 20;
   const received = parseFloat(amountReceived) || 0;
 
@@ -126,41 +159,53 @@ export default function RoomModule() {
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
-    if (paxNum === 0) { toast.error("Enter number of pax"); return; }
-    if (paxNum > paxLimit) { toast.error(`PAX LIMIT: Max ${paxLimit} pax only for ${roomType}`); return; }
+    if (totalHeadcount === 0) { toast.error("Enter number of guests"); return; }
+    if (totalHeadcount > paxLimit) { toast.error(`PAX LIMIT: Max ${paxLimit} pax only for ${roomType}`); return; }
     if (received < totalRoomAmount && received > 0) { toast.error("Insufficient amount received"); return; }
+    if (!checkInDate) { toast.error("Select check-in date"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
-    const entryTime = new Date().toISOString();
+    const checkInDateTime = new Date(`${checkInDate}T${checkInTime || getCurrentTime()}`).toISOString();
     try {
       await addTransaction({
-        transaction_no: txNo, date_time: entryTime, module: "Room",
+        transaction_no: txNo, date_time: checkInDateTime, module: "Room",
         customer_name: customerName || undefined, room_type: roomType,
-        pax: paxNum, adults: 0, children: 0,
-        total_headcount: paxNum,
+        pax: totalHeadcount, adults: a, children: k8 + k5 + k4,
+        kids_8_above: k8, kids_5_7: k5, kids_4_below: k4,
+        total_headcount: totalHeadcount,
         amount_paid: totalRoomAmount, payment_method: payment,
-        entry_time: entryTime, check_in: entryTime,
+        entry_time: checkInDateTime, check_in: checkInDateTime,
       });
       toast.success("Room check-in recorded!");
 
       const rData = {
-        transactionNo: txNo, dateTime: entryTime, module: `Room - ${roomType}`,
+        transactionNo: txNo, dateTime: checkInDateTime, module: `Room - ${roomType}`,
         customerName: customerName || undefined,
-        adults: 0, children: 0, headcount: paxNum,
+        adults: a, children: k8 + k5 + k4, headcount: totalHeadcount,
         totalAmount: totalRoomAmount, amountReceived: received > 0 ? received : undefined,
         change: received >= totalRoomAmount && received > 0 ? change : undefined,
         paymentMethod: payment,
-        details: [{ label: "Room Type", value: roomType }, { label: "Room Rate", value: `₱${roomRate.toLocaleString()}` }],
+        details: [
+          { label: "Room Type", value: roomType },
+          { label: "Room Rate", value: `₱${roomRate.toLocaleString()}` },
+          { label: "Check-in", value: `${checkInDate} ${checkInTime}` },
+          ...(a > 0 ? [{ label: "Adults", value: `${a}` }] : []),
+          ...(k8 > 0 ? [{ label: "Kids 8+", value: `${k8}` }] : []),
+          ...(k5 > 0 ? [{ label: "Kids 5-7", value: `${k5}` }] : []),
+          ...(k4 > 0 ? [{ label: "Kids 4↓ FREE", value: `${k4}` }] : []),
+        ],
       };
 
       if (received >= totalRoomAmount && received > 0) setSuccessChange(change);
       setReceiptData(rData);
 
-      setCustomerName(""); setPax(""); setAmountReceived("");
+      setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
+      setAmountReceived(""); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
+      setManualOverrideTime(false);
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, paxNum, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, a, k8, k5, k4]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     const { extensionHours, extensionFee } = computeExtension(room.entry_time, room.pax);
@@ -227,11 +272,68 @@ export default function RoomModule() {
           <p className="text-sm font-bold text-primary">Total: ₱{roomRate.toLocaleString()}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: ₱{EXTENSION_RATE}/pax/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">Number of Pax</label>
-          <input type="number" className="pos-input w-full" value={pax} onChange={(e) => setPax(e.target.value)} placeholder="0" min="0" />
+
+        {/* Check-in Date & Time */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Check-in Date</label>
+            <input type="date" className="pos-input w-full" value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Check-in Time</label>
+            <input
+              type="time"
+              className="pos-input w-full"
+              value={checkInTime}
+              onChange={(e) => { setCheckInTime(e.target.value); setManualOverrideTime(true); }}
+              disabled={!manualOverrideTime}
+            />
+          </div>
         </div>
-        {paxNum > paxLimit && (
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="manualOverride"
+            checked={manualOverrideTime}
+            onChange={(e) => {
+              setManualOverrideTime(e.target.checked);
+              if (!e.target.checked) setCheckInTime(getCurrentTime());
+            }}
+            className="rounded border-border"
+          />
+          <label htmlFor="manualOverride" className="text-xs text-muted-foreground">Manual override time</label>
+        </div>
+
+        {/* Age group headcount */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Adults</label>
+            <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Kids (8 & above)</label>
+            <input type="number" className="pos-input w-full" value={kids8Above} onChange={(e) => setKids8Above(e.target.value)} placeholder="0" min="0" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Kids (5-7)</label>
+            <input type="number" className="pos-input w-full" value={kids5to7} onChange={(e) => setKids5to7(e.target.value)} placeholder="0" min="0" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Kids (4 & Below - FREE)</label>
+            <input type="number" className="pos-input w-full" value={kids4Below} onChange={(e) => setKids4Below(e.target.value)} placeholder="0" min="0" />
+            {k4 > 0 && <p className="text-xs text-success mt-1">FREE</p>}
+          </div>
+        </div>
+
+        {totalHeadcount > 0 && (
+          <div className="pos-card border-primary/20">
+            <p className="text-xs text-muted-foreground">Total Headcount: <strong>{totalHeadcount}</strong></p>
+          </div>
+        )}
+
+        {totalHeadcount > paxLimit && (
           <p className="text-xs text-destructive flex items-center gap-1">
             <AlertTriangle size={12} /> Max {paxLimit} pax only for {roomType}
           </p>
