@@ -155,7 +155,7 @@ export default function RoomModule() {
   const [now, setNow] = useState(Date.now());
   const [successChange, setSuccessChange] = useState<number | null>(null);
   const [receiptData, setReceiptData] = useState<any>(null);
-  const [extendDialog, setExtendDialog] = useState<{ room: ActiveRoom; extensionHours: number; extensionFee: number; totalAmount: number } | null>(null);
+  const [checkoutRoom, setCheckoutRoom] = useState<ActiveRoom | null>(null);
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
