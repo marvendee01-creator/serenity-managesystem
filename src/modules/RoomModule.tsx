@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { BedDouble, Clock, AlertTriangle, LogOut, Timer } from "lucide-react";
+import { BedDouble, Clock, AlertTriangle, LogOut } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
 import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
