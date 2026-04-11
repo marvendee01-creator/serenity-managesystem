@@ -263,35 +263,23 @@ export default function RoomModule() {
   }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, a, k8, k5, k4]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
-    const { extensionHours, extensionFee } = computeExtension(room.entry_time, room.pax);
-    const totalAmount = room.amount_paid + extensionFee;
+    setCheckoutRoom(room);
+  }, []);
 
-    if (extensionHours > 0) {
-      setExtendDialog({ room, extensionHours, extensionFee, totalAmount });
-    } else {
-      doCheckout(room, 0, room.amount_paid);
-    }
-  }, [now]);
-
-  const doCheckout = useCallback(async (room: ActiveRoom, extensionFee: number, totalAmount: number) => {
-    const checkoutTime = new Date().toISOString();
+  const doCheckout = useCallback(async (checkoutISO: string, extensionFee: number, totalAmount: number) => {
+    if (!checkoutRoom) return;
     try {
-      await updateTransaction(room.id, {
-        checkout_time: checkoutTime,
-        check_out: checkoutTime,
+      await updateTransaction(checkoutRoom.id, {
+        checkout_time: checkoutISO,
+        check_out: checkoutISO,
         extension_fee: extensionFee,
         amount_paid: totalAmount,
       });
       toast.success(`Checked out! Total: ₱${totalAmount.toLocaleString()}${extensionFee > 0 ? ` (incl. ₱${extensionFee.toLocaleString()} extension)` : ""}`);
+      setCheckoutRoom(null);
       loadActiveRooms();
     } catch { toast.error("Failed to checkout"); }
-  }, [loadActiveRooms]);
-
-  const handleExtendConfirm = useCallback(() => {
-    if (!extendDialog) return;
-    doCheckout(extendDialog.room, extendDialog.extensionFee, extendDialog.totalAmount);
-    setExtendDialog(null);
-  }, [extendDialog, doCheckout]);
+  }, [checkoutRoom, loadActiveRooms]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
