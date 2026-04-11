@@ -4,6 +4,7 @@ import { getTransactions, getCashierReports, getBookingCashierReports, type Tran
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
+import { formatPeso } from "@/lib/format";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
@@ -83,16 +84,16 @@ function PettyCashMonitoring() {
 
       const filtered = selectedDate ? allIncome.filter(r => matchDate(r.date)) : allIncome;
 
-      // Beginning balance = sum of all records before selected date
+      // Beginning balance = last running balance from any date before selected date
+      // We compute a full running balance of ALL prior records, then take the final value
       let beginningBalance = 0;
       if (selectedDate) {
-        const prior = allIncome.filter(r => r.date < selectedDate);
+        const prior = allIncome.filter(r => !matchDate(r.date) && new Date(r.date).getTime() < new Date(selectedDate + "T00:00:00").getTime());
         beginningBalance = prior.reduce((sum, r) => sum + (r.amount - r.expenses), 0);
       }
 
       // Build rows with beginning balance row prepended
       const result: PettyMonitorRow[] = [];
-      const selDateFormatted = selectedDate ? formatDate(selectedDate + "T00:00:00") : "";
 
       // Prepend beginning balance row
       result.push({
@@ -144,10 +145,10 @@ function PettyCashMonitoring() {
         ${rows.map(r => `<tr${r.customer === "Beginning Bal." ? ' class="beg"' : ''}>
           <td>${r.customer === "Beginning Bal." ? formatDate(r.date) : formatDateTime(r.date)}</td>
           <td>${r.customer}</td><td>${r.sourceModule}</td>
-          <td class="right">${r.amount > 0 ? "₱" + r.amount.toLocaleString() : "—"}</td>
-          <td class="right">${r.expenses > 0 ? "₱" + r.expenses.toLocaleString() : "—"}</td>
-          <td class="right">${r.customer === "Beginning Bal." ? "—" : "₱" + r.cashOnHand.toLocaleString()}</td>
-          <td class="right">₱${r.runningBalance.toLocaleString()}</td></tr>`).join("")}
+          <td class="right">${r.amount > 0 ? formatPeso(r.amount) : "—"}</td>
+          <td class="right">${r.expenses > 0 ? formatPeso(r.expenses) : "—"}</td>
+          <td class="right">${r.customer === "Beginning Bal." ? "—" : formatPeso(r.cashOnHand)}</td>
+          <td class="right">${formatPeso(r.runningBalance)}</td></tr>`).join("")}
       </table>
     </body></html>`);
     w.document.close();
@@ -175,15 +176,15 @@ function PettyCashMonitoring() {
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="pos-card text-center">
           <p className="text-xs text-muted-foreground">Total Income</p>
-          <p className="text-lg font-bold tabular-nums text-success">₱{totalAmount.toLocaleString()}</p>
+          <p className="text-lg font-bold tabular-nums text-success">{formatPeso(totalAmount)}</p>
         </div>
         <div className="pos-card text-center">
           <p className="text-xs text-muted-foreground">Total Expenses</p>
-          <p className="text-lg font-bold tabular-nums text-destructive">₱{totalExpenses.toLocaleString()}</p>
+          <p className="text-lg font-bold tabular-nums text-destructive">{formatPeso(totalExpenses)}</p>
         </div>
         <div className="pos-card text-center">
           <p className="text-xs text-muted-foreground">Running Balance</p>
-          <p className="text-lg font-bold tabular-nums">₱{finalBalance.toLocaleString()}</p>
+          <p className="text-lg font-bold tabular-nums">{formatPeso(finalBalance)}</p>
         </div>
       </div>
 
@@ -213,10 +214,10 @@ function PettyCashMonitoring() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.sourceModule === "Expense" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{r.sourceModule}</span>
                   ) : ""}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums text-success font-medium">{r.amount > 0 ? `₱${r.amount.toLocaleString()}` : "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{r.expenses > 0 ? `₱${r.expenses.toLocaleString()}` : "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">{r.customer === "Beginning Bal." ? "—" : `₱${r.cashOnHand.toLocaleString()}`}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-bold">₱{r.runningBalance.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-success font-medium">{r.amount > 0 ? formatPeso(r.amount) : "—"}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{r.expenses > 0 ? formatPeso(r.expenses) : "—"}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{r.customer === "Beginning Bal." ? "—" : formatPeso(r.cashOnHand)}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-bold">{formatPeso(r.runningBalance)}</td>
               </tr>
             ))}
           </tbody>
@@ -399,7 +400,7 @@ export default function ReportsModule() {
             </div>
             <div className="pos-card text-center">
               <p className="text-xs text-muted-foreground">Total Amount</p>
-              <p className="text-lg font-bold tabular-nums">₱{totalAmount.toLocaleString()}</p>
+              <p className="text-lg font-bold tabular-nums">{formatPeso(totalAmount)}</p>
             </div>
           </div>
 
@@ -441,7 +442,7 @@ export default function ReportsModule() {
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_5_7 ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_4_below ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{computedHeadcount}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">₱{t.amount_paid.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.amount_paid)}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
                     </tr>
                   );

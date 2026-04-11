@@ -6,6 +6,7 @@ import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getSettings, getTransactions, updateTransaction } from "@/lib/db";
 import { toast } from "sonner";
+import { formatPeso } from "@/lib/format";
 
 const ROOM_TYPES = ["Kubo Room", "Barkada Room"] as const;
 const PAX_LIMITS: Record<string, number> = { "Kubo Room": 10, "Barkada Room": 20 };
@@ -57,8 +58,8 @@ function ExtendStayDialog({ room, onConfirm, onCancel }: {
         </p>
         <div className="pos-card border-warning/30 bg-warning/5 mb-4 text-left">
           <p className="text-xs text-muted-foreground">Extension: {room.extensionHours}hr × {room.pax} pax × ₱{EXTENSION_RATE}</p>
-          <p className="text-lg font-bold text-warning mt-1">Extension Fee: ₱{room.extensionFee.toLocaleString()}</p>
-          <p className="text-sm font-bold text-foreground mt-1">New Total: ₱{room.totalAmount.toLocaleString()}</p>
+          <p className="text-lg font-bold text-warning mt-1">Extension Fee: {formatPeso(room.extensionFee)}</p>
+          <p className="text-sm font-bold text-foreground mt-1">New Total: {formatPeso(room.totalAmount)}</p>
         </div>
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 h-12 rounded-lg border border-border text-foreground font-semibold hover:bg-muted transition-colors">
@@ -269,7 +270,7 @@ export default function RoomModule() {
           </div>
         </div>
         <div className="pos-card">
-          <p className="text-sm font-bold text-primary">Total: ₱{roomRate.toLocaleString()}</p>
+          <p className="text-sm font-bold text-primary">Total: {formatPeso(roomRate)}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: ₱{EXTENSION_RATE}/pax/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
 
@@ -344,13 +345,13 @@ export default function RoomModule() {
         </div>
         <div>
           <label className="text-sm font-medium block mb-1">Amount Received</label>
-          <input type="number" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
+          <input type="number" step="0.01" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
         </div>
         {received > 0 && totalRoomAmount > 0 && (
           <div className={`pos-card ${received >= totalRoomAmount ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
             <p className="text-sm text-muted-foreground mb-1">Change</p>
             <p className={`text-2xl font-bold tabular-nums ${received >= totalRoomAmount ? "text-success" : "text-destructive"}`}>
-              ₱{change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              {formatPeso(change)}
             </p>
           </div>
         )}
@@ -378,7 +379,7 @@ export default function RoomModule() {
                             Extension: ₱{extensionFee.toLocaleString()} ({room.pax} pax × {extensionHours}h × ₱{EXTENSION_RATE}) {extensionHours >= MAX_EXTENSION_HOURS && "— MAX"}
                           </p>
                         )}
-                        <p className="text-sm font-bold mt-1">Total: ₱{total.toLocaleString()}</p>
+                        <p className="text-sm font-bold mt-1">Total: {formatPeso(total)}</p>
                       </div>
                       <button onClick={() => handleCheckout(room)} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors">
                         <LogOut size={14} /> Checkout

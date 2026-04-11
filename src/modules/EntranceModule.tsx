@@ -6,6 +6,7 @@ import PaymentSuccessDialog from "@/components/PaymentSuccessDialog";
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getSettings } from "@/lib/db";
 import { toast } from "sonner";
+import { formatPeso } from "@/lib/format";
 
 const TOUR_TYPES = ["Day Tour", "Overnight"] as const;
 
@@ -140,7 +141,7 @@ export default function EntranceModule() {
   }, [handleSave]);
 
   const rateLabel = (count: number, rate: number) =>
-    count > 0 ? `${count} × ₱${rate.toLocaleString()} = ₱${(count * rate).toLocaleString()}` : null;
+    count > 0 ? `${count} × ${formatPeso(rate)} = ${formatPeso(count * rate)}` : null;
 
   return (
     <>
@@ -202,7 +203,7 @@ export default function EntranceModule() {
 
         <div className="pos-card border-primary/30">
           <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-          <p className="text-2xl font-bold text-primary tabular-nums">₱{totalAmount.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-primary tabular-nums">{formatPeso(totalAmount)}</p>
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
             {a > 0 && <p>Adults: {rateLabel(a, isDayTour ? dayAdultRate : overnightAdultRate)}</p>}
             {k8 > 0 && <p>Kids 8+: {rateLabel(k8, isDayTour ? dayKids8Rate : overnightKids8Rate)}</p>}
@@ -218,14 +219,14 @@ export default function EntranceModule() {
 
         <div>
           <label className="text-sm font-medium block mb-1">Amount Received</label>
-          <input type="number" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
+          <input type="number" step="0.01" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
         </div>
 
         {received > 0 && totalAmount > 0 && (
           <div className={`pos-card ${received >= totalAmount ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
             <p className="text-sm text-muted-foreground mb-1">Change</p>
             <p className={`text-2xl font-bold tabular-nums ${received >= totalAmount ? "text-success" : "text-destructive"}`}>
-              ₱{change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              {formatPeso(change)}
             </p>
           </div>
         )}
