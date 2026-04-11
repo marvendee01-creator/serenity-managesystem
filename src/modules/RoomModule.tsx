@@ -291,11 +291,11 @@ export default function RoomModule() {
     <>
       {successChange !== null && <PaymentSuccessDialog change={successChange} onClose={() => setSuccessChange(null)} />}
       {receiptData && !successChange && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
-      {extendDialog && (
-        <ExtendStayDialog
-          room={{ pax: extendDialog.room.pax, extensionHours: extendDialog.extensionHours, extensionFee: extendDialog.extensionFee, totalAmount: extendDialog.totalAmount }}
-          onConfirm={handleExtendConfirm}
-          onCancel={() => setExtendDialog(null)}
+      {checkoutRoom && (
+        <CheckoutDialog
+          room={checkoutRoom}
+          onConfirm={doCheckout}
+          onCancel={() => setCheckoutRoom(null)}
         />
       )}
       <ModuleShell title="Room" icon={<BedDouble size={20} />} onSave={handleSave} saveLabel="Check In" saving={saving}>
