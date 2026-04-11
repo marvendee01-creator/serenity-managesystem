@@ -58,8 +58,12 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
 export default function Index() {
   const [splash, setSplash] = useState(true);
   const [active, setActive] = useState<ModuleId | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
-  const handleSplashDone = useCallback(() => setSplash(false), []);
+  const handleSplashDone = useCallback(() => {
+    setSplash(false);
+    setShowWelcome(true);
+  }, []);
 
   if (splash) return <SplashScreen onDone={handleSplashDone} />;
 
