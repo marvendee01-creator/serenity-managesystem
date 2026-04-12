@@ -20,7 +20,8 @@ interface ActiveRoom {
   pax: number;
   entry_time: string;
   check_in?: string;
-  checkout_time?: string;
+  check_out?: string; // scheduled checkout
+  checkout_time?: string; // actual checkout
   amount_paid: number;
   adults?: number;
   kids_8_above?: number;
@@ -28,6 +29,41 @@ interface ActiveRoom {
   kids_4_below?: number;
 }
 
+/* ── Extension Reminder Popup ── */
+function ExtendReminderDialog({ room, onExtend, onCheckoutNow }: {
+  room: ActiveRoom;
+  onExtend: () => void;
+  onCheckoutNow: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
+      <div className="bg-card rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center animate-in zoom-in-95">
+        <div className="text-4xl mb-3">⏰</div>
+        <h3 className="text-lg font-bold text-warning mb-2">CHECK-OUT REMINDER</h3>
+        <p className="text-sm text-muted-foreground mb-1">
+          <strong>{room.customer_name || "Guest"}</strong> • {room.room_type}
+        </p>
+        <p className="text-sm text-foreground mb-4">
+          Scheduled check-out is in <strong>less than 1 hour</strong>.<br />
+          Would you like to extend the stay?
+        </p>
+        <p className="text-xs text-muted-foreground mb-4">
+          Extension rate: {formatPeso(EXTENSION_RATE_PER_HOUR)}/hour (max {MAX_EXTENSION_HOURS} hrs)
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onCheckoutNow} className="flex-1 h-11 rounded-lg border border-border text-foreground font-semibold hover:bg-muted transition-colors text-sm">
+            Checkout Now
+          </button>
+          <button onClick={onExtend} className="flex-1 h-11 rounded-lg bg-warning text-warning-foreground font-semibold hover:bg-warning/90 transition-colors text-sm">
+            Extend Stay
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Checkout Dialog ── */
 function CheckoutDialog({ room, onConfirm, onCancel }: {
   room: ActiveRoom;
   onConfirm: (checkoutISO: string, extensionFee: number, totalAmount: number) => void;
@@ -37,7 +73,6 @@ function CheckoutDialog({ room, onConfirm, onCancel }: {
   const [checkOutTime, setCheckOutTime] = useState(getCurrentTime);
   const [manualOverride, setManualOverride] = useState(false);
 
-  // Auto-update time every minute if not manual override
   useEffect(() => {
     if (manualOverride) return;
     const interval = setInterval(() => setCheckOutTime(getCurrentTime()), 60000);
@@ -45,10 +80,24 @@ function CheckoutDialog({ room, onConfirm, onCancel }: {
   }, [manualOverride]);
 
   const checkoutISO = new Date(`${checkOutDate}T${checkOutTime}`).toISOString();
-  const diffMs = new Date(checkoutISO).getTime() - new Date(room.entry_time).getTime();
-  const durationHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
-  const extensionHours = Math.min(Math.max(0, durationHours), MAX_EXTENSION_HOURS);
-  const extensionFee = extensionHours * EXTENSION_RATE_PER_HOUR;
+
+  // Extension is calculated from scheduled checkout, not entry_time
+  const scheduledCheckout = room.check_out ? new Date(room.check_out).getTime() : null;
+  const actualCheckoutMs = new Date(checkoutISO).getTime();
+
+  let extensionHours = 0;
+  let extensionFee = 0;
+  let durationFromEntry = 0;
+
+  if (scheduledCheckout && actualCheckoutMs > scheduledCheckout) {
+    const overMs = actualCheckoutMs - scheduledCheckout;
+    extensionHours = Math.min(Math.ceil(overMs / (1000 * 60 * 60)), MAX_EXTENSION_HOURS);
+    extensionFee = extensionHours * EXTENSION_RATE_PER_HOUR;
+  }
+
+  const diffMsEntry = actualCheckoutMs - new Date(room.entry_time).getTime();
+  durationFromEntry = Math.max(0, Math.floor(diffMsEntry / (1000 * 60 * 60)));
+
   const totalAmount = room.amount_paid + extensionFee;
 
   useEffect(() => {
@@ -69,7 +118,7 @@ function CheckoutDialog({ room, onConfirm, onCancel }: {
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onCancel}>
       <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-foreground mb-1 text-center">
-          {extensionHours > 0 ? "⏰ EXTEND STAY?" : "Checkout"}
+          {extensionHours > 0 ? "⏰ EXTENSION CHARGES" : "Checkout"}
         </h3>
         <p className="text-sm text-muted-foreground mb-3 text-center">
           {room.customer_name || "Guest"} • {room.room_type} • {room.pax} pax
@@ -95,10 +144,16 @@ function CheckoutDialog({ room, onConfirm, onCancel }: {
           <label htmlFor="coManualOverride" className="text-xs text-muted-foreground">Override Time (Manual Input)</label>
         </div>
 
+        {scheduledCheckout && (
+          <p className="text-xs text-muted-foreground mb-2 text-center">
+            Scheduled checkout: {new Date(scheduledCheckout).toLocaleString()}
+          </p>
+        )}
+
         {extensionHours > 0 && (
           <>
             <p className="text-sm text-muted-foreground mb-2 text-center">
-              Additional <strong>{formatPeso(EXTENSION_RATE_PER_HOUR)}</strong> per hour (max {MAX_EXTENSION_HOURS} hrs). Subject for availability.
+              Additional <strong>{formatPeso(EXTENSION_RATE_PER_HOUR)}</strong> per hour (max {MAX_EXTENSION_HOURS} hrs).
             </p>
             <div className="pos-card border-warning/30 bg-warning/5 mb-4 text-left">
               <p className="text-xs text-muted-foreground">Extension: {extensionHours}hr × {formatPeso(EXTENSION_RATE_PER_HOUR)}</p>
@@ -110,7 +165,7 @@ function CheckoutDialog({ room, onConfirm, onCancel }: {
 
         {extensionHours === 0 && (
           <div className="pos-card border-primary/20 mb-4 text-left">
-            <p className="text-xs text-muted-foreground">Duration: {durationHours}h</p>
+            <p className="text-xs text-muted-foreground">Duration: {durationFromEntry}h</p>
             <p className="text-sm font-bold text-foreground mt-1">Total: {formatPeso(totalAmount)}</p>
           </div>
         )}
@@ -147,6 +202,9 @@ export default function RoomModule() {
   const [checkInDate, setCheckInDate] = useState(getTodayDate);
   const [checkInTime, setCheckInTime] = useState(getCurrentTime);
   const [manualOverrideTime, setManualOverrideTime] = useState(false);
+  // Scheduled check-out fields
+  const [checkOutDate, setCheckOutDate] = useState(getTodayDate);
+  const [checkOutTime, setCheckOutTime] = useState("17:00"); // default 5PM
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [roomRate, setRoomRate] = useState(0);
@@ -156,11 +214,12 @@ export default function RoomModule() {
   const [successChange, setSuccessChange] = useState<number | null>(null);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [checkoutRoom, setCheckoutRoom] = useState<ActiveRoom | null>(null);
+  const [reminderRoom, setReminderRoom] = useState<ActiveRoom | null>(null);
+  const [dismissedReminders, setDismissedReminders] = useState<Set<number>>(new Set());
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
-  // Auto-update time every minute if not manual override
   useEffect(() => {
     if (manualOverrideTime) return;
     const interval = setInterval(() => {
@@ -181,7 +240,8 @@ export default function RoomModule() {
       txs.filter((t) => t.entry_time && !t.checkout_time).map((t) => ({
         id: t.id!, customer_name: t.customer_name, room_type: t.room_type,
         pax: t.pax || 0, entry_time: t.entry_time!, check_in: t.check_in,
-        checkout_time: t.checkout_time, amount_paid: t.amount_paid,
+        check_out: t.check_out || undefined, checkout_time: t.checkout_time || undefined,
+        amount_paid: t.amount_paid,
         adults: t.adults, kids_8_above: t.kids_8_above, kids_5_7: t.kids_5_7, kids_4_below: t.kids_4_below,
       }))
     );
@@ -189,6 +249,21 @@ export default function RoomModule() {
 
   useEffect(() => { loadActiveRooms(); }, [loadActiveRooms]);
   useEffect(() => { const interval = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(interval); }, []);
+
+  // ── Auto-popup 1hr before scheduled checkout ──
+  useEffect(() => {
+    if (reminderRoom || checkoutRoom) return; // don't interrupt existing dialogs
+    for (const room of activeRooms) {
+      if (!room.check_out || dismissedReminders.has(room.id)) continue;
+      const scheduledMs = new Date(room.check_out).getTime();
+      const timeUntil = scheduledMs - now;
+      // Show reminder when <= 1 hour (60min) before scheduled checkout and not yet past
+      if (timeUntil > 0 && timeUntil <= 60 * 60 * 1000) {
+        setReminderRoom(room);
+        break;
+      }
+    }
+  }, [now, activeRooms, dismissedReminders, reminderRoom, checkoutRoom]);
 
   const a = parseInt(adults) || 0;
   const k8 = parseInt(kids8Above) || 0;
@@ -203,9 +278,13 @@ export default function RoomModule() {
     return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
   };
 
-  const computeExtension = (entryTime: string, _paxCount: number) => {
-    const durationHours = getHoursElapsed(entryTime);
-    const extensionHours = Math.min(Math.max(0, durationHours), MAX_EXTENSION_HOURS);
+  const computeExtensionFromSchedule = (room: ActiveRoom) => {
+    const durationHours = getHoursElapsed(room.entry_time);
+    if (!room.check_out) return { durationHours, extensionHours: 0, extensionFee: 0 };
+    const scheduledMs = new Date(room.check_out).getTime();
+    const overMs = now - scheduledMs;
+    if (overMs <= 0) return { durationHours, extensionHours: 0, extensionFee: 0 };
+    const extensionHours = Math.min(Math.ceil(overMs / (1000 * 60 * 60)), MAX_EXTENSION_HOURS);
     const extensionFee = extensionHours * EXTENSION_RATE_PER_HOUR;
     return { durationHours, extensionHours, extensionFee };
   };
@@ -218,9 +297,11 @@ export default function RoomModule() {
     if (totalHeadcount > paxLimit) { toast.error(`PAX LIMIT: Max ${paxLimit} pax only for ${roomType}`); return; }
     if (received < totalRoomAmount && received > 0) { toast.error("Insufficient amount received"); return; }
     if (!checkInDate) { toast.error("Select check-in date"); return; }
+    if (!checkOutDate) { toast.error("Select check-out date"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
     const checkInDateTime = new Date(`${checkInDate}T${checkInTime || getCurrentTime()}`).toISOString();
+    const scheduledCheckOutISO = new Date(`${checkOutDate}T${checkOutTime || "17:00"}`).toISOString();
     try {
       await addTransaction({
         transaction_no: txNo, date_time: checkInDateTime, module: "Room",
@@ -230,6 +311,7 @@ export default function RoomModule() {
         total_headcount: totalHeadcount,
         amount_paid: totalRoomAmount, payment_method: payment,
         entry_time: checkInDateTime, check_in: checkInDateTime,
+        check_out: scheduledCheckOutISO,
       });
       toast.success("Room check-in recorded!");
 
@@ -242,8 +324,9 @@ export default function RoomModule() {
         paymentMethod: payment,
         details: [
           { label: "Room Type", value: roomType },
-          { label: "Room Rate", value: `₱${roomRate.toLocaleString()}` },
+          { label: "Room Rate", value: formatPeso(roomRate) },
           { label: "Check-in", value: `${checkInDate} ${checkInTime}` },
+          { label: "Scheduled Check-out", value: `${checkOutDate} ${checkOutTime}` },
           ...(a > 0 ? [{ label: "Adults", value: `${a}` }] : []),
           ...(k8 > 0 ? [{ label: "Kids 8+", value: `${k8}` }] : []),
           ...(k5 > 0 ? [{ label: "Kids 5-7", value: `${k5}` }] : []),
@@ -256,11 +339,12 @@ export default function RoomModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setAmountReceived(""); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
+      setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, a, k8, k5, k4]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
@@ -271,11 +355,10 @@ export default function RoomModule() {
     try {
       await updateTransaction(checkoutRoom.id, {
         checkout_time: checkoutISO,
-        check_out: checkoutISO,
         extension_fee: extensionFee,
         amount_paid: totalAmount,
       });
-      toast.success(`Checked out! Total: ₱${totalAmount.toLocaleString()}${extensionFee > 0 ? ` (incl. ₱${extensionFee.toLocaleString()} extension)` : ""}`);
+      toast.success(`Checked out! Total: ${formatPeso(totalAmount)}${extensionFee > 0 ? ` (incl. ${formatPeso(extensionFee)} extension)` : ""}`);
       setCheckoutRoom(null);
       loadActiveRooms();
     } catch { toast.error("Failed to checkout"); }
@@ -287,10 +370,33 @@ export default function RoomModule() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleSave]);
 
+  const getTimeRemaining = (scheduledCheckout: string) => {
+    const diff = new Date(scheduledCheckout).getTime() - now;
+    if (diff <= 0) return null;
+    const mins = Math.floor(diff / 60000);
+    const hrs = Math.floor(mins / 60);
+    const remainMins = mins % 60;
+    return hrs > 0 ? `${hrs}h ${remainMins}m left` : `${remainMins}m left`;
+  };
+
   return (
     <>
       {successChange !== null && <PaymentSuccessDialog change={successChange} onClose={() => setSuccessChange(null)} />}
       {receiptData && !successChange && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
+      {reminderRoom && (
+        <ExtendReminderDialog
+          room={reminderRoom}
+          onExtend={() => {
+            setDismissedReminders(prev => new Set(prev).add(reminderRoom.id));
+            setReminderRoom(null);
+            toast.info("Extension noted. Charges will apply after scheduled checkout.");
+          }}
+          onCheckoutNow={() => {
+            setReminderRoom(null);
+            setCheckoutRoom(reminderRoom);
+          }}
+        />
+      )}
       {checkoutRoom && (
         <CheckoutDialog
           room={checkoutRoom}
@@ -346,6 +452,19 @@ export default function RoomModule() {
           />
           <label htmlFor="manualOverride" className="text-xs text-muted-foreground">Manual override time</label>
         </div>
+
+        {/* Scheduled Check-out Date & Time */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Check-out Date</label>
+            <input type="date" className="pos-input w-full" value={checkOutDate} onChange={(e) => setCheckOutDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Check-out Time</label>
+            <input type="time" className="pos-input w-full" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-2">Set the scheduled check-out. Extension charges apply if exceeded.</p>
 
         {/* Age group headcount */}
         <div className="grid grid-cols-2 gap-3">
@@ -405,10 +524,12 @@ export default function RoomModule() {
             </h3>
             <div className="space-y-2">
               {activeRooms.map((room) => {
-                const { durationHours, extensionHours, extensionFee } = computeExtension(room.entry_time, room.pax);
+                const { durationHours, extensionHours, extensionFee } = computeExtensionFromSchedule(room);
                 const total = room.amount_paid + extensionFee;
+                const timeLeft = room.check_out ? getTimeRemaining(room.check_out) : null;
+                const isPastSchedule = room.check_out && now > new Date(room.check_out).getTime();
                 return (
-                  <div key={room.id} className="pos-card border-primary/20">
+                  <div key={room.id} className={`pos-card ${isPastSchedule ? "border-destructive/30 bg-destructive/5" : "border-primary/20"}`}>
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-medium text-sm">{room.customer_name || "Guest"}</p>
@@ -416,6 +537,13 @@ export default function RoomModule() {
                         <p className="text-xs text-muted-foreground">
                           In: {new Date(room.entry_time).toLocaleTimeString()} • {durationHours}h elapsed
                         </p>
+                        {room.check_out && (
+                          <p className={`text-xs font-medium mt-0.5 ${isPastSchedule ? "text-destructive" : "text-muted-foreground"}`}>
+                            Scheduled out: {new Date(room.check_out).toLocaleString()}
+                            {timeLeft && <span className="text-warning ml-1">({timeLeft})</span>}
+                            {isPastSchedule && <span className="text-destructive ml-1">(OVERDUE)</span>}
+                          </p>
+                        )}
                         {extensionHours > 0 && (
                           <p className="text-xs text-warning font-medium mt-1">
                             Extension: {formatPeso(extensionFee)} ({extensionHours}h × {formatPeso(EXTENSION_RATE_PER_HOUR)}) {extensionHours >= MAX_EXTENSION_HOURS && "— MAX"}
