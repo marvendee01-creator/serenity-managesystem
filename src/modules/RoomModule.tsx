@@ -48,7 +48,7 @@ function CheckoutDialog({ room, onConfirm, onCancel }: {
   const diffMs = new Date(checkoutISO).getTime() - new Date(room.entry_time).getTime();
   const durationHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
   const extensionHours = Math.min(Math.max(0, durationHours), MAX_EXTENSION_HOURS);
-  const extensionFee = extensionHours * room.pax * EXTENSION_RATE;
+  const extensionFee = extensionHours * EXTENSION_RATE_PER_HOUR;
   const totalAmount = room.amount_paid + extensionFee;
 
   useEffect(() => {
@@ -98,10 +98,10 @@ function CheckoutDialog({ room, onConfirm, onCancel }: {
         {extensionHours > 0 && (
           <>
             <p className="text-sm text-muted-foreground mb-2 text-center">
-              Additional <strong>₱{EXTENSION_RATE}</strong> per pax/hour (max {MAX_EXTENSION_HOURS} hrs). Subject for availability.
+              Additional <strong>{formatPeso(EXTENSION_RATE_PER_HOUR)}</strong> per hour (max {MAX_EXTENSION_HOURS} hrs). Subject for availability.
             </p>
             <div className="pos-card border-warning/30 bg-warning/5 mb-4 text-left">
-              <p className="text-xs text-muted-foreground">Extension: {extensionHours}hr × {room.pax} pax × ₱{EXTENSION_RATE}</p>
+              <p className="text-xs text-muted-foreground">Extension: {extensionHours}hr × {formatPeso(EXTENSION_RATE_PER_HOUR)}</p>
               <p className="text-lg font-bold text-warning mt-1">Extension Fee: {formatPeso(extensionFee)}</p>
               <p className="text-sm font-bold text-foreground mt-1">New Total: {formatPeso(totalAmount)}</p>
             </div>
@@ -203,10 +203,10 @@ export default function RoomModule() {
     return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
   };
 
-  const computeExtension = (entryTime: string, paxCount: number) => {
+  const computeExtension = (entryTime: string, _paxCount: number) => {
     const durationHours = getHoursElapsed(entryTime);
     const extensionHours = Math.min(Math.max(0, durationHours), MAX_EXTENSION_HOURS);
-    const extensionFee = extensionHours * paxCount * EXTENSION_RATE;
+    const extensionFee = extensionHours * EXTENSION_RATE_PER_HOUR;
     return { durationHours, extensionHours, extensionFee };
   };
 
@@ -313,7 +313,7 @@ export default function RoomModule() {
         </div>
         <div className="pos-card">
           <p className="text-sm font-bold text-primary">Total: {formatPeso(roomRate)}</p>
-          <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: ₱{EXTENSION_RATE}/pax/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
+          <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: {formatPeso(EXTENSION_RATE_PER_HOUR)}/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
 
         {/* Check-in Date & Time */}
@@ -418,7 +418,7 @@ export default function RoomModule() {
                         </p>
                         {extensionHours > 0 && (
                           <p className="text-xs text-warning font-medium mt-1">
-                            Extension: ₱{extensionFee.toLocaleString()} ({room.pax} pax × {extensionHours}h × ₱{EXTENSION_RATE}) {extensionHours >= MAX_EXTENSION_HOURS && "— MAX"}
+                            Extension: {formatPeso(extensionFee)} ({extensionHours}h × {formatPeso(EXTENSION_RATE_PER_HOUR)}) {extensionHours >= MAX_EXTENSION_HOURS && "— MAX"}
                           </p>
                         )}
                         <p className="text-sm font-bold mt-1">Total: {formatPeso(total)}</p>
