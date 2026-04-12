@@ -182,6 +182,11 @@ export default function BookingManagement() {
                   <p className="font-bold tabular-nums">₱{currentBalance.toLocaleString()}</p>
                 </div>
               </div>
+              {(b.extension_fee != null && b.extension_fee > 0) && (
+                <div className="text-xs mb-2 px-2 py-1 rounded bg-warning/10 text-warning font-medium">
+                  Room Additional Charges (Extension): ₱{b.extension_fee.toLocaleString()}
+                </div>
+              )}
 
               {(b.payment_status === "Unpaid" || b.payment_status === "Partially Paid") && !isSettling && (
                 <div className="flex gap-2">
