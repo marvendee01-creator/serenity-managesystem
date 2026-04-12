@@ -10,7 +10,7 @@ import { formatPeso } from "@/lib/format";
 
 const ROOM_TYPES = ["Kubo Room", "Barkada Room"] as const;
 const PAX_LIMITS: Record<string, number> = { "Kubo Room": 10, "Barkada Room": 20 };
-const EXTENSION_RATE = 10;
+const EXTENSION_RATE_PER_HOUR = 10;
 const MAX_EXTENSION_HOURS = 4;
 
 interface ActiveRoom {
