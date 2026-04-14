@@ -152,7 +152,7 @@ export default function EntranceModule() {
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, tblQty, tableFee, discountVal, tableRentRate]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, tblQty, tableFee, discountVal, tableRentRate, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

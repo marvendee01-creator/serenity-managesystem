@@ -72,7 +72,7 @@ export default function GamesModule() {
       nameRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [game, name, amt, payment, received, change]);
+  }, [game, name, amt, payment, received, change, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
