@@ -51,7 +51,7 @@ export default function TableRentModule() {
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, numTables, total, payment]);
+  }, [customerName, numTables, total, payment, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
