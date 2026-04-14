@@ -7,6 +7,8 @@ import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction } from "@/lib/db";
 import { toast } from "sonner";
 import { formatPeso } from "@/lib/format";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const GAMES = ["Volleyball", "Dart", "Basketball", "Billiard"] as const;
 
@@ -16,6 +18,9 @@ export default function GamesModule() {
   const [amount, setAmount] = useState("");
   const [amountReceived, setAmountReceived] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
+  const [useManualDatetime, setUseManualDatetime] = useState(false);
+  const [customDate, setCustomDate] = useState("");
+  const [customTime, setCustomTime] = useState("");
   const [saving, setSaving] = useState(false);
   const [successChange, setSuccessChange] = useState<number | null>(null);
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -32,7 +37,9 @@ export default function GamesModule() {
     if (received < amt && received > 0) { toast.error("Insufficient amount received"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
-    const now = new Date().toISOString();
+    const now = useManualDatetime && customDate
+      ? new Date(`${customDate}T${customTime || "00:00"}`).toISOString()
+      : new Date().toISOString();
     try {
       await addTransaction({
         transaction_no: txNo,
@@ -61,6 +68,7 @@ export default function GamesModule() {
       setReceiptData(rData);
 
       setName(""); setAmount(""); setAmountReceived("");
+      setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       nameRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
@@ -89,6 +97,22 @@ export default function GamesModule() {
           <label className="text-sm font-medium block mb-1">Customer Name</label>
           <input ref={nameRef} type="text" className="pos-input w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional" />
         </div>
+        <div className="flex items-center gap-3">
+          <Switch id="games-manual-dt" checked={useManualDatetime} onCheckedChange={setUseManualDatetime} />
+          <Label htmlFor="games-manual-dt" className="text-sm cursor-pointer">Manual Date/Time Override</Label>
+        </div>
+        {useManualDatetime && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-sm font-medium block mb-1">Date</label>
+              <input type="date" className="pos-input w-full" value={customDate} onChange={(e) => setCustomDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Time</label>
+              <input type="time" className="pos-input w-full" value={customTime} onChange={(e) => setCustomTime(e.target.value)} />
+            </div>
+          </div>
+        )}
         <div>
           <label className="text-sm font-medium block mb-1">Amount</label>
           <input type="number" step="0.01" className="pos-input w-full" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
