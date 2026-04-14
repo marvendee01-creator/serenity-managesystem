@@ -83,7 +83,7 @@ export default function TableRentModule() {
           </div>
         )}
         <div>
-        <div>
+          <label className="text-sm font-medium block mb-1">Number of Tables</label>
           <label className="text-sm font-medium block mb-1">Number of Tables</label>
           <input type="number" className="pos-input w-full" value={tables} onChange={(e) => setTables(e.target.value)} placeholder="0" min="0" />
         </div>
