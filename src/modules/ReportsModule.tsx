@@ -6,6 +6,7 @@ import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/mod
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
+import { toast } from "sonner";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
