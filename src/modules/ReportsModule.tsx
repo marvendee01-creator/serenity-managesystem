@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList } from "lucide-react";
-import { getTransactions, getCashierReports, getBookingCashierReports, type Transaction, type CashierReport } from "@/lib/db";
+import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil } from "lucide-react";
+import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, type Transaction, type CashierReport } from "@/lib/db";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
@@ -233,7 +234,9 @@ export default function ReportsModule() {
   const [moduleFilter, setModuleFilter] = useState("All");
   const [txnDate, setTxnDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gameFilter, setGameFilter] = useState("");
-
+  const [editingTxn, setEditingTxn] = useState<Transaction | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Transaction>>({});
+  const [editSaving, setEditSaving] = useState(false);
   const [cashierReports, setCashierReports] = useState<CashierReport[]>([]);
   const [cashierFilter, setCashierFilter] = useState<"Daily" | "Monthly">("Daily");
   const [cashierDate, setCashierDate] = useState("");
@@ -423,11 +426,12 @@ export default function ReportsModule() {
                   <th className="text-right px-3 py-2 font-medium">Headcount</th>
                   <th className="text-right px-3 py-2 font-medium">Amount</th>
                   <th className="text-left px-3 py-2 font-medium">Payment</th>
+                  <th className="text-center px-3 py-2 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 && (
-                  <tr><td colSpan={11} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+                  <tr><td colSpan={12} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
                 )}
                 {data.map((t) => {
                   const computedHeadcount = t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0);
@@ -444,6 +448,15 @@ export default function ReportsModule() {
                       <td className="px-3 py-2 text-right tabular-nums">{computedHeadcount}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.amount_paid)}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => { setEditingTxn(t); setEditForm({ ...t }); }}
+                          className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all mx-auto"
+                          title="Edit"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
