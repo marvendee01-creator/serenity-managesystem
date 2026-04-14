@@ -7,6 +7,8 @@ import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getSettings } from "@/lib/db";
 import { toast } from "sonner";
 import { formatPeso } from "@/lib/format";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const TOUR_TYPES = ["Day Tour", "Overnight"] as const;
 
@@ -25,6 +27,9 @@ export default function EntranceModule() {
   const [amountReceived, setAmountReceived] = useState("");
   const [tableQty, setTableQty] = useState("");
   const [discount, setDiscount] = useState("");
+  const [useManualDatetime, setUseManualDatetime] = useState(false);
+  const [customDate, setCustomDate] = useState("");
+  const [customTime, setCustomTime] = useState("");
   const [saving, setSaving] = useState(false);
   const [successChange, setSuccessChange] = useState<number | null>(null);
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -101,7 +106,9 @@ export default function EntranceModule() {
     if (received < totalAmount && received > 0) { toast.error("Insufficient amount received"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
-    const now = new Date().toISOString();
+    const now = useManualDatetime && customDate
+      ? new Date(`${customDate}T${customTime || "00:00"}`).toISOString()
+      : new Date().toISOString();
     try {
       await addTransaction({
         transaction_no: txNo,
@@ -141,10 +148,11 @@ export default function EntranceModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setAmountReceived(""); setTableQty(""); setDiscount(""); setTourType(getAutoTourType());
+      setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, tblQty, tableFee, discountVal, tableRentRate]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, tblQty, tableFee, discountVal, tableRentRate, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -166,6 +174,23 @@ export default function EntranceModule() {
           <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
           <input ref={firstRef} type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
         </div>
+
+        <div className="flex items-center gap-3">
+          <Switch id="manual-dt" checked={useManualDatetime} onCheckedChange={setUseManualDatetime} />
+          <Label htmlFor="manual-dt" className="text-sm cursor-pointer">Manual Date/Time Override</Label>
+        </div>
+        {useManualDatetime && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-sm font-medium block mb-1">Date</label>
+              <input type="date" className="pos-input w-full" value={customDate} onChange={(e) => setCustomDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Time</label>
+              <input type="time" className="pos-input w-full" value={customTime} onChange={(e) => setCustomTime(e.target.value)} />
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="text-sm font-medium block mb-2">Tour Type</label>
