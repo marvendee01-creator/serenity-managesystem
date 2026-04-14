@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList } from "lucide-react";
-import { getTransactions, getCashierReports, getBookingCashierReports, type Transaction, type CashierReport } from "@/lib/db";
+import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil } from "lucide-react";
+import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, type Transaction, type CashierReport } from "@/lib/db";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
 import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
+import { toast } from "sonner";
 
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
@@ -233,7 +235,9 @@ export default function ReportsModule() {
   const [moduleFilter, setModuleFilter] = useState("All");
   const [txnDate, setTxnDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gameFilter, setGameFilter] = useState("");
-
+  const [editingTxn, setEditingTxn] = useState<Transaction | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Transaction>>({});
+  const [editSaving, setEditSaving] = useState(false);
   const [cashierReports, setCashierReports] = useState<CashierReport[]>([]);
   const [cashierFilter, setCashierFilter] = useState<"Daily" | "Monthly">("Daily");
   const [cashierDate, setCashierDate] = useState("");
@@ -423,11 +427,12 @@ export default function ReportsModule() {
                   <th className="text-right px-3 py-2 font-medium">Headcount</th>
                   <th className="text-right px-3 py-2 font-medium">Amount</th>
                   <th className="text-left px-3 py-2 font-medium">Payment</th>
+                  <th className="text-center px-3 py-2 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 && (
-                  <tr><td colSpan={11} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+                  <tr><td colSpan={12} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
                 )}
                 {data.map((t) => {
                   const computedHeadcount = t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0);
@@ -444,6 +449,15 @@ export default function ReportsModule() {
                       <td className="px-3 py-2 text-right tabular-nums">{computedHeadcount}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.amount_paid)}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => { setEditingTxn(t); setEditForm({ ...t }); }}
+                          className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all mx-auto"
+                          title="Edit"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -604,6 +618,111 @@ export default function ReportsModule() {
       {tab === "reservation" && <ReservationBoard />}
 
       {tab === "petty-monitoring" && <PettyCashMonitoring />}
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={!!editingTxn} onOpenChange={(open) => { if (!open) setEditingTxn(null); }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+          </DialogHeader>
+          {editForm && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium block mb-1">Transaction No</label>
+                <input className="pos-input w-full bg-muted" value={editForm.transaction_no || ""} disabled />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Customer Name</label>
+                <input className="pos-input w-full" value={editForm.customer_name || ""} onChange={e => setEditForm(f => ({ ...f, customer_name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Module</label>
+                <input className="pos-input w-full bg-muted" value={editForm.module || ""} disabled />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-sm font-medium block mb-1">Adults</label>
+                  <input type="number" className="pos-input w-full" value={editForm.adults ?? 0} onChange={e => setEditForm(f => ({ ...f, adults: parseInt(e.target.value) || 0 }))} min="0" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1">Kids (8+)</label>
+                  <input type="number" className="pos-input w-full" value={editForm.kids_8_above ?? 0} onChange={e => setEditForm(f => ({ ...f, kids_8_above: parseInt(e.target.value) || 0 }))} min="0" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1">Kids (5-7)</label>
+                  <input type="number" className="pos-input w-full" value={editForm.kids_5_7 ?? 0} onChange={e => setEditForm(f => ({ ...f, kids_5_7: parseInt(e.target.value) || 0 }))} min="0" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1">Kids (4 & Below)</label>
+                  <input type="number" className="pos-input w-full" value={editForm.kids_4_below ?? 0} onChange={e => setEditForm(f => ({ ...f, kids_4_below: parseInt(e.target.value) || 0 }))} min="0" />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Amount Paid</label>
+                <input type="number" step="0.01" className="pos-input w-full" value={editForm.amount_paid ?? 0} onChange={e => setEditForm(f => ({ ...f, amount_paid: parseFloat(e.target.value) || 0 }))} min="0" />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Payment Method</label>
+                <div className="flex gap-2">
+                  {(["Cash", "GCash"] as const).map(m => (
+                    <button key={m} className={`toggle-btn flex-1 ${editForm.payment_method === m ? "toggle-btn-active" : ""}`} onClick={() => setEditForm(f => ({ ...f, payment_method: m }))}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setEditingTxn(null)}
+                  className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={editSaving}
+                  onClick={async () => {
+                    if (!editingTxn?.id) return;
+                    setEditSaving(true);
+                    try {
+                      const totalHc = (editForm.adults ?? 0) + (editForm.kids_8_above ?? 0) + (editForm.kids_5_7 ?? 0) + (editForm.kids_4_below ?? 0);
+                      await updateTransaction(editingTxn.id, {
+                        customer_name: editForm.customer_name || undefined,
+                        adults: editForm.adults,
+                        kids_8_above: editForm.kids_8_above,
+                        kids_5_7: editForm.kids_5_7,
+                        kids_4_below: editForm.kids_4_below,
+                        children: (editForm.kids_8_above ?? 0) + (editForm.kids_5_7 ?? 0) + (editForm.kids_4_below ?? 0),
+                        total_headcount: totalHc,
+                        amount_paid: editForm.amount_paid,
+                        payment_method: editForm.payment_method,
+                      });
+                      toast.success("Transaction updated!");
+                      setEditingTxn(null);
+                      // Refresh data
+                      const txns = await getTransactions({
+                        module: moduleFilter === "All" ? undefined : moduleFilter,
+                        dateFrom: txnDate || undefined,
+                        dateTo: txnDate || undefined,
+                        game_type: gameFilter || undefined,
+                      });
+                      const filtered = txns.filter(t => {
+                        if (t.payment_status && t.payment_status !== "Fully Paid") return false;
+                        if (txnDate) return formatDate(t.date_time) === formatDate(txnDate + "T00:00:00");
+                        return true;
+                      });
+                      setData(filtered);
+                    } catch { toast.error("Failed to update"); }
+                    setEditSaving(false);
+                  }}
+                  className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all disabled:opacity-50"
+                >
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
