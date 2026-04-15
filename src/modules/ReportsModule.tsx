@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil } from "lucide-react";
-import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, type Transaction, type CashierReport } from "@/lib/db";
+import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil, Trash2 } from "lucide-react";
+import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, deleteCashierReport, deleteBookingCashierReport, type Transaction, type CashierReport } from "@/lib/db";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
@@ -505,6 +505,16 @@ export default function ReportsModule() {
                     <button onClick={() => setEditingReport(report)} className="h-9 px-3 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 active:scale-95 transition-all">
                       Edit
                     </button>
+                    <button onClick={async () => {
+                      if (!confirm("Delete this cashier report?")) return;
+                      try {
+                        await deleteCashierReport(report.id!);
+                        toast.success("Report deleted");
+                        setRefreshKey(k => k + 1);
+                      } catch { toast.error("Failed to delete"); }
+                    }} className="w-9 h-9 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 active:scale-95 transition-all" title="Delete">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-xs">
@@ -589,6 +599,16 @@ export default function ReportsModule() {
                       </button>
                       <button onClick={() => setEditingBcReport(report)} className="h-9 px-3 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 active:scale-95 transition-all">
                         Edit
+                      </button>
+                      <button onClick={async () => {
+                        if (!confirm("Delete this booking cashier report?")) return;
+                        try {
+                          await deleteBookingCashierReport(report.id!);
+                          toast.success("Report deleted");
+                          setRefreshKey(k => k + 1);
+                        } catch { toast.error("Failed to delete"); }
+                      }} className="w-9 h-9 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 active:scale-95 transition-all" title="Delete">
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
