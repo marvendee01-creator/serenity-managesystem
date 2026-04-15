@@ -3,6 +3,7 @@ import { Table2 } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
 import BarcodeTicket from "@/components/BarcodeTicket";
+import Stepper from "@/components/Stepper";
 import { addTransaction, getSettings } from "@/lib/db";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
