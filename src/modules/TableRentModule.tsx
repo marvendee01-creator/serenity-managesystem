@@ -112,9 +112,21 @@ export default function TableRentModule() {
             <span className="text-sm font-bold tabular-nums">{totalHeadcount}</span>
           </div>
         </div>
-        <div className="pos-card">
+        <div className="pos-card space-y-1">
           <p className="text-sm text-muted-foreground">Rate per table: ₱{rate.toLocaleString()}</p>
           <p className="text-2xl font-bold tabular-nums mt-1">₱{total.toLocaleString()}</p>
+          {total > 0 && (
+            <div className="border-t border-border pt-2 mt-2 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Store Income (80%)</span>
+                <span className="font-semibold tabular-nums text-green-600">₱{storeIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Budoy Share (20%)</span>
+                <span className="font-semibold tabular-nums text-orange-500">₱{budoyShare.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          )}
         </div>
         <div>
           <label className="text-sm font-medium block mb-2">Payment Method</label>
