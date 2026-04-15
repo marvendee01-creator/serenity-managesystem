@@ -357,6 +357,14 @@ export async function saveBookingCashierReport(report: BookingCashierReportDB): 
   }
 }
 
+export async function deleteBookingCashierReport(id: number): Promise<void> {
+  const { error } = await supabase
+    .from("booking_cashier_reports")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function getBookingCashierReports(): Promise<BookingCashierReportDB[]> {
   const { data, error } = await supabase
     .from("booking_cashier_reports")
