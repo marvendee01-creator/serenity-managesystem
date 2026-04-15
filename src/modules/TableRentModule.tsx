@@ -97,8 +97,18 @@ export default function TableRentModule() {
         )}
         <div>
           <label className="text-sm font-medium block mb-1">Number of Tables</label>
-          <label className="text-sm font-medium block mb-1">Number of Tables</label>
           <input type="number" className="pos-input w-full" value={tables} onChange={(e) => setTables(e.target.value)} placeholder="0" min="0" />
+        </div>
+        <div className="pos-card space-y-2">
+          <p className="text-sm font-medium mb-1">Headcount (for reporting only)</p>
+          <Stepper label="Adults" value={adults} onChange={setAdults} />
+          <Stepper label="Kids 8 & Above" value={kids8Above} onChange={setKids8Above} />
+          <Stepper label="Kids 5-7" value={kids5to7} onChange={setKids5to7} />
+          <Stepper label="Kids 4 & Below (FREE)" value={kids4Below} onChange={setKids4Below} />
+          <div className="flex justify-between pt-1 border-t border-border">
+            <span className="text-sm font-medium">Total Headcount</span>
+            <span className="text-sm font-bold tabular-nums">{totalHeadcount}</span>
+          </div>
         </div>
         <div className="pos-card">
           <p className="text-sm text-muted-foreground">Rate per table: ₱{rate.toLocaleString()}</p>
