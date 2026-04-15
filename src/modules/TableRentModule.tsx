@@ -3,6 +3,7 @@ import { Table2 } from "lucide-react";
 import ModuleShell from "@/components/ModuleShell";
 import PaymentToggle from "@/components/PaymentToggle";
 import BarcodeTicket from "@/components/BarcodeTicket";
+import Stepper from "@/components/Stepper";
 import { addTransaction, getSettings } from "@/lib/db";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -12,6 +13,10 @@ export default function TableRentModule() {
   const [customerName, setCustomerName] = useState("");
   const [tables, setTables] = useState("");
   const [rate, setRate] = useState(200);
+  const [adults, setAdults] = useState(0);
+  const [kids8Above, setKids8Above] = useState(0);
+  const [kids5to7, setKids5to7] = useState(0);
+  const [kids4Below, setKids4Below] = useState(0);
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [useManualDatetime, setUseManualDatetime] = useState(false);
   const [customDate, setCustomDate] = useState("");
@@ -25,6 +30,8 @@ export default function TableRentModule() {
 
   const numTables = parseInt(tables) || 0;
   const total = numTables * rate;
+  const totalHeadcount = adults + kids8Above + kids5to7 + kids4Below;
+  const totalChildren = kids8Above + kids5to7 + kids4Below;
 
   const handleSave = useCallback(async () => {
     if (numTables === 0) { toast.error("Enter number of tables"); return; }
@@ -40,18 +47,24 @@ export default function TableRentModule() {
         module: "Table Rent",
         customer_name: customerName || undefined,
         number_of_tables: numTables,
-        adults: 0, children: 0, total_headcount: 0,
+        adults,
+        children: totalChildren,
+        kids_8_above: kids8Above,
+        kids_5_7: kids5to7,
+        kids_4_below: kids4Below,
+        total_headcount: totalHeadcount,
         amount_paid: total,
         payment_method: payment,
       });
       toast.success("Table rent saved!");
       setTicket({ txNo, date: now, amount: total });
       setCustomerName(""); setTables("");
+      setAdults(0); setKids8Above(0); setKids5to7(0); setKids4Below(0);
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, numTables, total, payment, useManualDatetime, customDate, customTime]);
+  }, [customerName, numTables, total, adults, kids8Above, kids5to7, kids4Below, totalHeadcount, totalChildren, payment, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -84,8 +97,18 @@ export default function TableRentModule() {
         )}
         <div>
           <label className="text-sm font-medium block mb-1">Number of Tables</label>
-          <label className="text-sm font-medium block mb-1">Number of Tables</label>
           <input type="number" className="pos-input w-full" value={tables} onChange={(e) => setTables(e.target.value)} placeholder="0" min="0" />
+        </div>
+        <div className="pos-card space-y-2">
+          <p className="text-sm font-medium mb-1">Headcount (for reporting only)</p>
+          <Stepper label="Adults" value={adults} onChange={setAdults} />
+          <Stepper label="Kids 8 & Above" value={kids8Above} onChange={setKids8Above} />
+          <Stepper label="Kids 5-7" value={kids5to7} onChange={setKids5to7} />
+          <Stepper label="Kids 4 & Below (FREE)" value={kids4Below} onChange={setKids4Below} />
+          <div className="flex justify-between pt-1 border-t border-border">
+            <span className="text-sm font-medium">Total Headcount</span>
+            <span className="text-sm font-bold tabular-nums">{totalHeadcount}</span>
+          </div>
         </div>
         <div className="pos-card">
           <p className="text-sm text-muted-foreground">Rate per table: ₱{rate.toLocaleString()}</p>
