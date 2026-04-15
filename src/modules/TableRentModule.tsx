@@ -13,12 +13,17 @@ export default function TableRentModule() {
   const [customerName, setCustomerName] = useState("");
   const [tables, setTables] = useState("");
   const [rate, setRate] = useState(200);
+  const [adults, setAdults] = useState(0);
+  const [kids8Above, setKids8Above] = useState(0);
+  const [kids5to7, setKids5to7] = useState(0);
+  const [kids4Below, setKids4Below] = useState(0);
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [useManualDatetime, setUseManualDatetime] = useState(false);
   const [customDate, setCustomDate] = useState("");
   const [customTime, setCustomTime] = useState("");
   const [saving, setSaving] = useState(false);
   const [ticket, setTicket] = useState<{ txNo: string; date: string; amount: number } | null>(null);
+  const firstRef = useRef<HTMLInputElement>(null);
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
