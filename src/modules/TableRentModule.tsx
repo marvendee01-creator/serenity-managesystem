@@ -30,6 +30,8 @@ export default function TableRentModule() {
 
   const numTables = parseInt(tables) || 0;
   const total = numTables * rate;
+  const storeIncome = total * 0.80;
+  const budoyShare = total * 0.20;
   const totalHeadcount = adults + kids8Above + kids5to7 + kids4Below;
   const totalChildren = kids8Above + kids5to7 + kids4Below;
 
