@@ -24,13 +24,14 @@ export default function TableRentModule() {
   const [saving, setSaving] = useState(false);
   const [ticket, setTicket] = useState<{ txNo: string; date: string; amount: number } | null>(null);
   const firstRef = useRef<HTMLInputElement>(null);
-  const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
   useEffect(() => { getSettings().then((s) => setRate(s.table_rent_rate)); }, []);
 
   const numTables = parseInt(tables) || 0;
   const total = numTables * rate;
+  const totalHeadcount = adults + kids8Above + kids5to7 + kids4Below;
+  const totalChildren = kids8Above + kids5to7 + kids4Below;
 
   const handleSave = useCallback(async () => {
     if (numTables === 0) { toast.error("Enter number of tables"); return; }
@@ -46,18 +47,24 @@ export default function TableRentModule() {
         module: "Table Rent",
         customer_name: customerName || undefined,
         number_of_tables: numTables,
-        adults: 0, children: 0, total_headcount: 0,
+        adults,
+        children: totalChildren,
+        kids_8_above: kids8Above,
+        kids_5_7: kids5to7,
+        kids_4_below: kids4Below,
+        total_headcount: totalHeadcount,
         amount_paid: total,
         payment_method: payment,
       });
       toast.success("Table rent saved!");
       setTicket({ txNo, date: now, amount: total });
       setCustomerName(""); setTables("");
+      setAdults(0); setKids8Above(0); setKids5to7(0); setKids4Below(0);
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, numTables, total, payment, useManualDatetime, customDate, customTime]);
+  }, [customerName, numTables, total, adults, kids8Above, kids5to7, kids4Below, totalHeadcount, totalChildren, payment, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
