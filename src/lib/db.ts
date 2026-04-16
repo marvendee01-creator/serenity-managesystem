@@ -216,6 +216,13 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       kids_8_above: t.kids_8_above ?? 0,
       kids_5_7: t.kids_5_7 ?? 0,
       kids_4_below: t.kids_4_below ?? 0,
+      start_time: t.start_time ?? null,
+      end_time: t.end_time ?? null,
+      default_hours: t.default_hours ?? 2,
+      extend_hours: t.extend_hours ?? 0,
+      extend_amount: t.extend_amount ?? 0,
+      status: t.status ?? null,
+      rate: t.rate ?? 0,
     })
     .select("id")
     .single();
