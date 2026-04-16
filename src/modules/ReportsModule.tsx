@@ -40,7 +40,141 @@ interface PettyMonitorRow {
   runningBalance: number;
 }
 
-function PettyCashMonitoring() {
+function AnalyticsDashboard() {
+  const [txns, setTxns] = useState<Transaction[]>([]);
+  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+
+  useEffect(() => {
+    getTransactions({}).then(setTxns);
+  }, []);
+
+  const toDateKey = (iso: string) => {
+    const d = new Date(iso);
+    return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
+  };
+  const toMonthKey = (iso: string) => {
+    const d = new Date(iso);
+    return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getFullYear()}`;
+  };
+
+  // Daily headcount for selected month
+  const monthTxns = txns.filter(t => t.date_time.slice(0, 7) === monthFilter);
+  const dailyMap = new Map<string, { headcount: number; sales: number }>();
+  for (const t of monthTxns) {
+    const key = toDateKey(t.date_time);
+    const prev = dailyMap.get(key) || { headcount: 0, sales: 0 };
+    prev.headcount += t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0);
+    prev.sales += t.amount_paid;
+    dailyMap.set(key, prev);
+  }
+  const dailyData = Array.from(dailyMap.entries()).map(([date, v]) => ({ date, ...v })).sort((a, b) => a.date.localeCompare(b.date));
+
+  // Monthly aggregates
+  const monthlyMap = new Map<string, { headcount: number; sales: number }>();
+  for (const t of txns) {
+    const key = toMonthKey(t.date_time);
+    const prev = monthlyMap.get(key) || { headcount: 0, sales: 0 };
+    prev.headcount += t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0);
+    prev.sales += t.amount_paid;
+    monthlyMap.set(key, prev);
+  }
+  const monthlyData = Array.from(monthlyMap.entries()).map(([month, v]) => ({ month, ...v })).sort((a, b) => a.month.localeCompare(b.month));
+
+  // Peak & low day
+  const peakDay = dailyData.reduce((best, d) => d.headcount > (best?.headcount ?? 0) ? d : best, dailyData[0]);
+  const lowDay = dailyData.reduce((best, d) => d.headcount < (best?.headcount ?? Infinity) ? d : best, dailyData[0]);
+
+  // Top revenue day (all time)
+  const allDailyMap = new Map<string, number>();
+  for (const t of txns) {
+    const key = toDateKey(t.date_time);
+    allDailyMap.set(key, (allDailyMap.get(key) || 0) + t.amount_paid);
+  }
+  let topRevDate = "", topRevAmount = 0;
+  for (const [date, amt] of allDailyMap) {
+    if (amt > topRevAmount) { topRevDate = date; topRevAmount = amt; }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Top Revenue Day Card */}
+      <div className="pos-card bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
+        <div className="flex items-center gap-2 mb-2">
+          <Trophy size={18} className="text-primary" />
+          <h3 className="text-sm font-bold">Top Revenue Day</h3>
+        </div>
+        {topRevDate ? (
+          <div className="flex justify-between items-end">
+            <div>
+              <p className="text-xs text-muted-foreground">Date</p>
+              <p className="text-lg font-bold">{topRevDate}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Sales</p>
+              <p className="text-2xl font-bold tabular-nums text-primary">{formatPeso(topRevAmount)}</p>
+            </div>
+          </div>
+        ) : <p className="text-sm text-muted-foreground">No data</p>}
+      </div>
+
+      {/* Peak / Low insights */}
+      {dailyData.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="pos-card text-center">
+            <p className="text-xs text-muted-foreground">Peak Day</p>
+            <p className="text-lg font-bold tabular-nums text-success">{peakDay?.headcount ?? 0}</p>
+            <p className="text-xs text-muted-foreground">{peakDay?.date}</p>
+          </div>
+          <div className="pos-card text-center">
+            <p className="text-xs text-muted-foreground">Low Day</p>
+            <p className="text-lg font-bold tabular-nums text-destructive">{lowDay?.headcount ?? 0}</p>
+            <p className="text-xs text-muted-foreground">{lowDay?.date}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Headcount Chart */}
+      <div className="pos-card">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold flex items-center gap-2"><BarChart3 size={16} /> Daily Headcount</h3>
+          <input type="month" className="pos-input text-sm w-auto" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+        </div>
+        {dailyData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={dailyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(value: number) => [value, "Headcount"]} />
+              <Bar dataKey="headcount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
+      </div>
+
+      {/* Monthly Sales vs Headcount */}
+      <div className="pos-card">
+        <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><TrendingUp size={16} /> Monthly Sales vs Headcount</h3>
+        {monthlyData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(value: number, name: string) => [name === "sales" ? formatPeso(value) : value, name === "sales" ? "Sales (₱)" : "Headcount"]} />
+              <Legend />
+              <Bar yAxisId="left" dataKey="sales" name="Sales (₱)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="right" dataKey="headcount" name="Headcount" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : <p className="text-center text-sm text-muted-foreground py-8">No data available</p>}
+      </div>
+    </div>
+  );
+}
+
+
   const [rows, setRows] = useState<PettyMonitorRow[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
