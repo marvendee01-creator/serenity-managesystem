@@ -28,7 +28,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring" | "analytics";
 
 interface PettyMonitorRow {
   date: string;
