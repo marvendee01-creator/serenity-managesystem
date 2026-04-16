@@ -337,22 +337,22 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
           </div>
           <div className="space-y-2">
             {pettyItems.map((item, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+              <div key={i} className={`grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end ${item.is_budoy ? "bg-orange-500/5 rounded-lg p-1" : ""}`}>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>}
-                  <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
+                  <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} disabled={item.is_budoy} />
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
-                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" />
+                  <input type="text" className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" disabled={item.is_budoy} />
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}
-                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" />
+                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" disabled={item.is_budoy} />
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Amount</label>}
-                  <input type="number" className={`${inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" />
+                  <input type="number" className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" disabled={item.is_budoy} />
                 </div>
                 <button onClick={() => removePettyRow(i)} className="w-8 h-10 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all" disabled={pettyItems.length === 1}>
                   <Trash2 size={14} />
