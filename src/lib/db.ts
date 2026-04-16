@@ -288,6 +288,13 @@ export async function getTransactions(filter?: {
     kids_8_above: row.kids_8_above ?? undefined,
     kids_5_7: row.kids_5_7 ?? undefined,
     kids_4_below: row.kids_4_below ?? undefined,
+    start_time: row.start_time ?? undefined,
+    end_time: row.end_time ?? undefined,
+    default_hours: row.default_hours != null ? Number(row.default_hours) : undefined,
+    extend_hours: row.extend_hours != null ? Number(row.extend_hours) : undefined,
+    extend_amount: row.extend_amount != null ? Number(row.extend_amount) : undefined,
+    status: row.status ?? undefined,
+    rate: row.rate != null ? Number(row.rate) : undefined,
   }));
 }
 
