@@ -112,9 +112,25 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
 
   const [pettyItems, setPettyItems] = useState<PettyItem[]>(
     editReport?.pettyItems?.length
-      ? editReport.pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: p.amount.toString() }))
-      : [{ date: "", particulars: "", receipt_no: "", amount: "" }]
+      ? editReport.pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: p.amount.toString(), is_budoy: p.particulars === "Budoy Share (20%)" }))
+      : [{ date: "", particulars: "", receipt_no: "", amount: "", is_budoy: false }]
   );
+
+  // Auto-fill Budoy Share amounts from Table Rent transactions for the report date
+  const [budoyTotal, setBudoyTotal] = useState(0);
+  useEffect(() => {
+    getTransactions({ module: "Table Rent" }).then(tables => {
+      const matchDate = (iso: string) => {
+        const d = new Date(iso);
+        return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
+      };
+      const dayTables = tables.filter(t => matchDate(t.date_time) === reportDate);
+      const total = dayTables.reduce((s, t) => s + t.amount_paid * 0.20, 0);
+      setBudoyTotal(total);
+      // Auto-update any budoy petty items
+      setPettyItems(prev => prev.map(item => item.is_budoy ? { ...item, amount: total.toFixed(2) } : item));
+    });
+  }, [reportDate]);
 
   const [denoms, setDenoms] = useState<DenomRow[]>(
     editReport?.denoms?.length
