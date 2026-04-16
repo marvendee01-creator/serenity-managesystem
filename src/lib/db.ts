@@ -33,6 +33,13 @@ export interface Transaction {
   kids_5_7?: number;
   kids_4_below?: number;
   date_settled?: string;
+  start_time?: string;
+  end_time?: string;
+  default_hours?: number;
+  extend_hours?: number;
+  extend_amount?: number;
+  status?: string;
+  rate?: number;
 }
 
 export interface BookingCashierEntry {
@@ -59,6 +66,8 @@ export interface Settings {
   barkada_room_rate: number;
   kubo_room_rate: number;
   table_rent_rate: number;
+  billiard_rate?: number;
+  videoke_rate?: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
