@@ -199,10 +199,7 @@ function PettyCashMonitoring() {
       }
       for (const t of tables) {
         if (t.amount_paid > 0) {
-          const storeIncome = t.amount_paid * 0.80;
-          const budoyShare = t.amount_paid * 0.20;
-          allIncome.push({ date: t.date_time, customer: t.customer_name || "Table Guest", sourceModule: "Table", amount: storeIncome, expenses: 0 });
-          allIncome.push({ date: t.date_time, customer: "Share to Budoy", sourceModule: "Table", amount: 0, expenses: budoyShare });
+          allIncome.push({ date: t.date_time, customer: t.customer_name || "Table Guest", sourceModule: "Table", amount: t.amount_paid, expenses: 0 });
         }
       }
       for (const t of bookings) {
