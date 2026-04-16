@@ -42,7 +42,6 @@ export default function EntranceModule() {
   const [overnightAdultRate, setOvernightAdultRate] = useState(150);
   const [overnightKids8Rate, setOvernightKids8Rate] = useState(75);
   const [overnightKids5Rate, setOvernightKids5Rate] = useState(50);
-  const [tableRentRate, setTableRentRate] = useState(200);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -54,7 +53,6 @@ export default function EntranceModule() {
       setOvernightAdultRate(s.adult_rate_night);
       setOvernightKids8Rate(s.kids_8_above_rate_night ?? s.child_rate_night);
       setOvernightKids5Rate(s.kids_5_7_rate_night ?? Math.round(s.child_rate_night * 0.6));
-      setTableRentRate(s.table_rent_rate);
     });
   }, []);
 
@@ -86,7 +84,6 @@ export default function EntranceModule() {
   const k8 = parseInt(kids8Above) || 0;
   const k5 = parseInt(kids5to7) || 0;
   const k4 = parseInt(kids4Below) || 0;
-  const tblQty = parseInt(tableQty) || 0;
   const discountVal = parseFloat(discount) || 0;
   const headcount = a + k8 + k5 + k4;
   const received = parseFloat(amountReceived) || 0;
@@ -96,8 +93,7 @@ export default function EntranceModule() {
     ? (a * dayAdultRate) + (k8 * dayKids8Rate) + (k5 * dayKids5Rate)
     : (a * overnightAdultRate) + (k8 * overnightKids8Rate) + (k5 * overnightKids5Rate);
 
-  const tableFee = tblQty * tableRentRate;
-  const totalAmount = Math.max(0, baseAmount + tableFee - discountVal);
+  const totalAmount = Math.max(0, baseAmount - discountVal);
 
   const change = received - totalAmount;
 
@@ -124,7 +120,6 @@ export default function EntranceModule() {
         kids_8_above: k8,
         kids_5_7: k5,
         kids_4_below: k4,
-        number_of_tables: tblQty > 0 ? tblQty : undefined,
       });
       toast.success("Entrance recorded!");
 
@@ -136,7 +131,6 @@ export default function EntranceModule() {
         change: received >= totalAmount && received > 0 ? change : undefined,
         paymentMethod: payment,
         details: [
-          ...(tblQty > 0 ? [{ label: "Table Rental", value: `${tblQty} × ${formatPeso(tableRentRate)} = ${formatPeso(tableFee)}` }] : []),
           ...(discountVal > 0 ? [{ label: "Discount", value: `-${formatPeso(discountVal)}` }] : []),
         ],
       };
@@ -147,12 +141,12 @@ export default function EntranceModule() {
       setReceiptData(rData);
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
-      setAmountReceived(""); setTableQty(""); setDiscount(""); setTourType(getAutoTourType());
+      setAmountReceived(""); setDiscount(""); setTourType(getAutoTourType());
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, tblQty, tableFee, discountVal, tableRentRate, useManualDatetime, customDate, customTime]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -240,13 +234,6 @@ export default function EntranceModule() {
           <p className="text-2xl font-bold tabular-nums">{headcount}</p>
         </div>
 
-        {/* Table Rental */}
-        <div>
-          <label className="text-sm font-medium block mb-1">Table Rental (Qty)</label>
-          <input type="number" className="pos-input w-full" value={tableQty} onChange={(e) => setTableQty(e.target.value)} placeholder="0" min="0" />
-          {tblQty > 0 && <p className="text-xs text-muted-foreground mt-1">{tblQty} × {formatPeso(tableRentRate)} = {formatPeso(tableFee)}</p>}
-        </div>
-
         {/* Discount */}
         <div>
           <label className="text-sm font-medium block mb-1">Discount</label>
@@ -262,7 +249,6 @@ export default function EntranceModule() {
             {k8 > 0 && <p>Kids 8+: {rateLabel(k8, isDayTour ? dayKids8Rate : overnightKids8Rate)}</p>}
             {k5 > 0 && <p>Kids 5-7: {rateLabel(k5, isDayTour ? dayKids5Rate : overnightKids5Rate)}</p>}
             {k4 > 0 && <p>Kids 4 & below: FREE</p>}
-            {tblQty > 0 && <p>Table Rental: {tblQty} × {formatPeso(tableRentRate)} = {formatPeso(tableFee)}</p>}
             {discountVal > 0 && <p className="text-success">Discount: -{formatPeso(discountVal)}</p>}
           </div>
         </div>
