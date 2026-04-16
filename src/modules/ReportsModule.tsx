@@ -173,8 +173,7 @@ function AnalyticsDashboard() {
     </div>
   );
 }
-
-
+function PettyCashMonitoring() {
   const [rows, setRows] = useState<PettyMonitorRow[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
