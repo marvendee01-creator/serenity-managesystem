@@ -8,7 +8,6 @@ import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { formatPeso } from "@/lib/format";
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
 function formatDateTime(iso: string) {
