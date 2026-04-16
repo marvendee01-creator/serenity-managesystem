@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil, Trash2 } from "lucide-react";
+import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil, Trash2, BarChart3, TrendingUp, Trophy } from "lucide-react";
 import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, deleteCashierReport, deleteBookingCashierReport, type Transaction, type CashierReport } from "@/lib/db";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
