@@ -8,7 +8,10 @@ interface PettyItem {
   particulars: string;
   receipt_no: string;
   amount: string;
+  is_budoy?: boolean;
 }
+
+
 
 interface DenomRow {
   label: string;
@@ -109,9 +112,25 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
 
   const [pettyItems, setPettyItems] = useState<PettyItem[]>(
     editReport?.pettyItems?.length
-      ? editReport.pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: p.amount.toString() }))
-      : [{ date: "", particulars: "", receipt_no: "", amount: "" }]
+      ? editReport.pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: p.amount.toString(), is_budoy: p.particulars === "Budoy Share (20%)" }))
+      : [{ date: "", particulars: "", receipt_no: "", amount: "", is_budoy: false }]
   );
+
+  // Auto-fill Budoy Share amounts from Table Rent transactions for the report date
+  const [budoyTotal, setBudoyTotal] = useState(0);
+  useEffect(() => {
+    getTransactions({ module: "Table Rent" }).then(tables => {
+      const matchDate = (iso: string) => {
+        const d = new Date(iso);
+        return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,"0")}-${d.getDate().toString().padStart(2,"0")}`;
+      };
+      const dayTables = tables.filter(t => matchDate(t.date_time) === reportDate);
+      const total = dayTables.reduce((s, t) => s + t.amount_paid * 0.20, 0);
+      setBudoyTotal(total);
+      // Auto-update any budoy petty items
+      setPettyItems(prev => prev.map(item => item.is_budoy ? { ...item, amount: total.toFixed(2) } : item));
+    });
+  }, [reportDate]);
 
   const [denoms, setDenoms] = useState<DenomRow[]>(
     editReport?.denoms?.length
@@ -154,7 +173,12 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
   const expected = totalCashAvailable - totalPettyCash;
   const overShort = totalActualCash - expected;
 
-  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", receipt_no: "", amount: "" }]);
+  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", receipt_no: "", amount: "", is_budoy: false }]);
+  const addBudoyRow = () => {
+    // Only allow one budoy row
+    if (pettyItems.some(p => p.is_budoy)) { toast.error("Budoy Share row already exists"); return; }
+    setPettyItems(prev => [...prev, { date: reportDate, particulars: "Budoy Share (20%)", receipt_no: "—", amount: budoyTotal.toFixed(2), is_budoy: true }]);
+  };
   const removePettyRow = (i: number) => setPettyItems(prev => prev.filter((_, idx) => idx !== i));
   const updatePetty = (i: number, field: keyof PettyItem, val: string) =>
     setPettyItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
@@ -302,28 +326,33 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
         <div className="pos-card space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground tracking-wide">B. PETTY CASH EXPENSE DETAILS</h3>
-            <button onClick={addPettyRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
-              <Plus size={16} />
-            </button>
+            <div className="flex gap-1">
+              <button onClick={addBudoyRow} className="h-8 px-2 rounded-lg bg-orange-500/10 text-orange-600 text-xs font-medium flex items-center gap-1 hover:bg-orange-500/20 active:scale-95 transition-all" title="Add Budoy Share row">
+                💰 Budoy
+              </button>
+              <button onClick={addPettyRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
+                <Plus size={16} />
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             {pettyItems.map((item, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
+              <div key={i} className={`grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end ${item.is_budoy ? "bg-orange-500/5 rounded-lg p-1" : ""}`}>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>}
-                  <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
+                  <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} disabled={item.is_budoy} />
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
-                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" />
+                  <input type="text" className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" disabled={item.is_budoy} />
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}
-                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" />
+                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" disabled={item.is_budoy} />
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Amount</label>}
-                  <input type="number" className={`${inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" />
+                  <input type="number" className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" disabled={item.is_budoy} />
                 </div>
                 <button onClick={() => removePettyRow(i)} className="w-8 h-10 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all" disabled={pettyItems.length === 1}>
                   <Trash2 size={14} />
