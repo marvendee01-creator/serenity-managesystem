@@ -8,7 +8,10 @@ interface PettyItem {
   particulars: string;
   receipt_no: string;
   amount: string;
+  is_budoy?: boolean;
 }
+
+const PETTY_PRESETS = ["Others", "Budoy Share (20%)"];
 
 interface DenomRow {
   label: string;
