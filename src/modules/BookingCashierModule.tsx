@@ -11,7 +11,7 @@ interface PettyItem {
   is_budoy?: boolean;
 }
 
-const PETTY_PRESETS = ["Others", "Budoy Share (20%)"];
+
 
 interface DenomRow {
   label: string;
