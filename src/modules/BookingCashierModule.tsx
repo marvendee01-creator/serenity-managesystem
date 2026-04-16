@@ -326,9 +326,14 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
         <div className="pos-card space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground tracking-wide">B. PETTY CASH EXPENSE DETAILS</h3>
-            <button onClick={addPettyRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
-              <Plus size={16} />
-            </button>
+            <div className="flex gap-1">
+              <button onClick={addBudoyRow} className="h-8 px-2 rounded-lg bg-orange-500/10 text-orange-600 text-xs font-medium flex items-center gap-1 hover:bg-orange-500/20 active:scale-95 transition-all" title="Add Budoy Share row">
+                💰 Budoy
+              </button>
+              <button onClick={addPettyRow} className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 active:scale-95 transition-all">
+                <Plus size={16} />
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             {pettyItems.map((item, i) => (
