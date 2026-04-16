@@ -18,6 +18,7 @@ import EntranceModule from "@/modules/EntranceModule";
 import RoomModule from "@/modules/RoomModule";
 import BookingModule from "@/modules/BookingModule";
 import GamesModule from "@/modules/GamesModule";
+import GamesManagement from "@/modules/GamesManagement";
 import TableRentModule from "@/modules/TableRentModule";
 import ReportsModule from "@/modules/ReportsModule";
 import CashierModule from "@/modules/CashierModule";
@@ -32,6 +33,7 @@ const MODULES = [
   { id: "booking", label: "Booking", icon: bookingIcon },
   { id: "booking-mgmt", label: "Booking Mgmt", icon: bookingMgmtIcon },
   { id: "games", label: "Games", icon: gamesIcon },
+  { id: "games-mgmt", label: "Games Mgmt", icon: gamesIcon },
   { id: "tables", label: "Tables", icon: tablesIcon },
   { id: "reports", label: "Reports", icon: reportsIcon },
   { id: "cashier", label: "Cashier Store", icon: cashierIcon },
@@ -48,6 +50,7 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   booking: BookingModule,
   "booking-mgmt": BookingManagement,
   games: GamesModule,
+  "games-mgmt": GamesManagement,
   tables: TableRentModule,
   reports: ReportsModule,
   cashier: CashierModule,

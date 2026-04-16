@@ -33,6 +33,13 @@ export interface Transaction {
   kids_5_7?: number;
   kids_4_below?: number;
   date_settled?: string;
+  start_time?: string;
+  end_time?: string;
+  default_hours?: number;
+  extend_hours?: number;
+  extend_amount?: number;
+  status?: string;
+  rate?: number;
 }
 
 export interface BookingCashierEntry {
@@ -59,6 +66,8 @@ export interface Settings {
   barkada_room_rate: number;
   kubo_room_rate: number;
   table_rent_rate: number;
+  billiard_rate?: number;
+  videoke_rate?: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
@@ -105,6 +114,8 @@ const DEFAULT_SETTINGS: Settings = {
   barkada_room_rate: 1500,
   kubo_room_rate: 1000,
   table_rent_rate: 200,
+  billiard_rate: 100,
+  videoke_rate: 200,
   company_name: "SERENITY INLAND RESORT",
   company_address: "",
   contact_number: "",
@@ -134,6 +145,8 @@ export async function getSettings(): Promise<Settings> {
     barkada_room_rate: Number(data.barkada_room_rate),
     kubo_room_rate: Number(data.kubo_room_rate),
     table_rent_rate: Number(data.table_rent_rate),
+    billiard_rate: data.billiard_rate != null ? Number(data.billiard_rate) : 100,
+    videoke_rate: data.videoke_rate != null ? Number(data.videoke_rate) : 200,
     company_name: data.company_name ?? "",
     company_address: data.company_address ?? "",
     contact_number: data.contact_number ?? "",
@@ -158,6 +171,8 @@ export async function saveSettings(settings: Settings): Promise<void> {
       barkada_room_rate: settings.barkada_room_rate,
       kubo_room_rate: settings.kubo_room_rate,
       table_rent_rate: settings.table_rent_rate,
+      billiard_rate: settings.billiard_rate ?? null,
+      videoke_rate: settings.videoke_rate ?? null,
       company_name: settings.company_name ?? null,
       company_address: settings.company_address ?? null,
       contact_number: settings.contact_number ?? null,
@@ -201,6 +216,13 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       kids_8_above: t.kids_8_above ?? 0,
       kids_5_7: t.kids_5_7 ?? 0,
       kids_4_below: t.kids_4_below ?? 0,
+      start_time: t.start_time ?? null,
+      end_time: t.end_time ?? null,
+      default_hours: t.default_hours ?? 2,
+      extend_hours: t.extend_hours ?? 0,
+      extend_amount: t.extend_amount ?? 0,
+      status: t.status ?? null,
+      rate: t.rate ?? 0,
     })
     .select("id")
     .single();
@@ -266,6 +288,13 @@ export async function getTransactions(filter?: {
     kids_8_above: row.kids_8_above ?? undefined,
     kids_5_7: row.kids_5_7 ?? undefined,
     kids_4_below: row.kids_4_below ?? undefined,
+    start_time: row.start_time ?? undefined,
+    end_time: row.end_time ?? undefined,
+    default_hours: row.default_hours != null ? Number(row.default_hours) : undefined,
+    extend_hours: row.extend_hours != null ? Number(row.extend_hours) : undefined,
+    extend_amount: row.extend_amount != null ? Number(row.extend_amount) : undefined,
+    status: row.status ?? undefined,
+    rate: row.rate != null ? Number(row.rate) : undefined,
   }));
 }
 

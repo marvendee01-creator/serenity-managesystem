@@ -94,6 +94,7 @@ export type Database = {
           adult_rate_day: number
           adult_rate_night: number
           barkada_room_rate: number
+          billiard_rate: number | null
           child_rate_day: number
           child_rate_night: number
           company_address: string | null
@@ -109,11 +110,13 @@ export type Database = {
           table_rent_rate: number
           tin_number: string | null
           updated_at: string
+          videoke_rate: number | null
         }
         Insert: {
           adult_rate_day?: number
           adult_rate_night?: number
           barkada_room_rate?: number
+          billiard_rate?: number | null
           child_rate_day?: number
           child_rate_night?: number
           company_address?: string | null
@@ -129,11 +132,13 @@ export type Database = {
           table_rent_rate?: number
           tin_number?: string | null
           updated_at?: string
+          videoke_rate?: number | null
         }
         Update: {
           adult_rate_day?: number
           adult_rate_night?: number
           barkada_room_rate?: number
+          billiard_rate?: number | null
           child_rate_day?: number
           child_rate_night?: number
           company_address?: string | null
@@ -149,6 +154,7 @@ export type Database = {
           table_rent_rate?: number
           tin_number?: string | null
           updated_at?: string
+          videoke_rate?: number | null
         }
         Relationships: []
       }
@@ -186,8 +192,12 @@ export type Database = {
           customer_name: string | null
           date_settled: string | null
           date_time: string
+          default_hours: number | null
           deposit_amount: number | null
+          end_time: string | null
           entry_time: string | null
+          extend_amount: number | null
+          extend_hours: number | null
           extension_fee: number | null
           function_hall_fee: number | null
           game_type: string | null
@@ -200,7 +210,10 @@ export type Database = {
           pax: number | null
           payment_method: string
           payment_status: string | null
+          rate: number | null
           room_type: string | null
+          start_time: string | null
+          status: string | null
           total_headcount: number
           tour_type: string | null
           transaction_no: string
@@ -220,8 +233,12 @@ export type Database = {
           customer_name?: string | null
           date_settled?: string | null
           date_time?: string
+          default_hours?: number | null
           deposit_amount?: number | null
+          end_time?: string | null
           entry_time?: string | null
+          extend_amount?: number | null
+          extend_hours?: number | null
           extension_fee?: number | null
           function_hall_fee?: number | null
           game_type?: string | null
@@ -234,7 +251,10 @@ export type Database = {
           pax?: number | null
           payment_method?: string
           payment_status?: string | null
+          rate?: number | null
           room_type?: string | null
+          start_time?: string | null
+          status?: string | null
           total_headcount?: number
           tour_type?: string | null
           transaction_no: string
@@ -254,8 +274,12 @@ export type Database = {
           customer_name?: string | null
           date_settled?: string | null
           date_time?: string
+          default_hours?: number | null
           deposit_amount?: number | null
+          end_time?: string | null
           entry_time?: string | null
+          extend_amount?: number | null
+          extend_hours?: number | null
           extension_fee?: number | null
           function_hall_fee?: number | null
           game_type?: string | null
@@ -268,7 +292,10 @@ export type Database = {
           pax?: number | null
           payment_method?: string
           payment_status?: string | null
+          rate?: number | null
           room_type?: string | null
+          start_time?: string | null
+          status?: string | null
           total_headcount?: number
           tour_type?: string | null
           transaction_no?: string
