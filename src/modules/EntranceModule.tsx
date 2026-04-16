@@ -25,7 +25,6 @@ export default function EntranceModule() {
   const [tourType, setTourType] = useState<string>(getAutoTourType());
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
-  const [tableQty, setTableQty] = useState("");
   const [discount, setDiscount] = useState("");
   const [useManualDatetime, setUseManualDatetime] = useState(false);
   const [customDate, setCustomDate] = useState("");
