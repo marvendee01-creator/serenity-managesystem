@@ -330,9 +330,9 @@ const PrismaticBurst = ({
 
     return () => {
       cancelAnimationFrame(raf);
-      container.removeEventListener('pointermove', onPointer);
+      (container as HTMLDivElement).removeEventListener('pointermove', onPointer as EventListener);
       ro?.disconnect();
-      if (!ro) window.removeEventListener('resize', resize);
+      
       io?.disconnect();
       document.removeEventListener('visibilitychange', onVis);
       try {
