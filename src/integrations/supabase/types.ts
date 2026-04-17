@@ -100,6 +100,7 @@ export type Database = {
           company_address: string | null
           company_name: string | null
           contact_number: string | null
+          dart_rate: number | null
           exclusive_fee: number
           id: string
           kids_5_7_rate_day: number | null
@@ -111,6 +112,7 @@ export type Database = {
           tin_number: string | null
           updated_at: string
           videoke_rate: number | null
+          volleyball_rate: number | null
         }
         Insert: {
           adult_rate_day?: number
@@ -122,6 +124,7 @@ export type Database = {
           company_address?: string | null
           company_name?: string | null
           contact_number?: string | null
+          dart_rate?: number | null
           exclusive_fee?: number
           id?: string
           kids_5_7_rate_day?: number | null
@@ -133,6 +136,7 @@ export type Database = {
           tin_number?: string | null
           updated_at?: string
           videoke_rate?: number | null
+          volleyball_rate?: number | null
         }
         Update: {
           adult_rate_day?: number
@@ -144,6 +148,7 @@ export type Database = {
           company_address?: string | null
           company_name?: string | null
           contact_number?: string | null
+          dart_rate?: number | null
           exclusive_fee?: number
           id?: string
           kids_5_7_rate_day?: number | null
@@ -155,6 +160,7 @@ export type Database = {
           tin_number?: string | null
           updated_at?: string
           videoke_rate?: number | null
+          volleyball_rate?: number | null
         }
         Relationships: []
       }
