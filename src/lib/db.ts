@@ -181,12 +181,11 @@ export async function saveSettings(settings: Settings): Promise<void> {
       videoke_rate: settings.videoke_rate ?? null,
       dart_rate: settings.dart_rate ?? null,
       volleyball_rate: settings.volleyball_rate ?? null,
-    } as any)
       company_name: settings.company_name ?? null,
       company_address: settings.company_address ?? null,
       contact_number: settings.contact_number ?? null,
       tin_number: settings.tin_number ?? null,
-    });
+    } as any);
   if (error) throw error;
 }
 
