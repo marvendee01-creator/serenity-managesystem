@@ -24,6 +24,8 @@ const FIELDS: { key: keyof Omit<SettingsType, "id">; label: string; group: strin
   { key: "table_rent_rate", label: "Table Rent Rate", group: "Table Rent Settings" },
   { key: "billiard_rate", label: "Billiard Rate", group: "Games Settings" },
   { key: "videoke_rate", label: "Videoke Rate", group: "Games Settings" },
+  { key: "dart_rate", label: "Dart Rate", group: "Games Settings" },
+  { key: "volleyball_rate", label: "Volleyball Rate", group: "Games Settings" },
 ];
 
 export default function SettingsModule() {

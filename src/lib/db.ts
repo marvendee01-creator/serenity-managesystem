@@ -68,6 +68,8 @@ export interface Settings {
   table_rent_rate: number;
   billiard_rate?: number;
   videoke_rate?: number;
+  dart_rate?: number;
+  volleyball_rate?: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
@@ -116,6 +118,8 @@ const DEFAULT_SETTINGS: Settings = {
   table_rent_rate: 200,
   billiard_rate: 100,
   videoke_rate: 200,
+  dart_rate: 100,
+  volleyball_rate: 200,
   company_name: "SERENITY INLAND RESORT",
   company_address: "",
   contact_number: "",
@@ -147,6 +151,8 @@ export async function getSettings(): Promise<Settings> {
     table_rent_rate: Number(data.table_rent_rate),
     billiard_rate: data.billiard_rate != null ? Number(data.billiard_rate) : 100,
     videoke_rate: data.videoke_rate != null ? Number(data.videoke_rate) : 200,
+    dart_rate: (data as any).dart_rate != null ? Number((data as any).dart_rate) : 100,
+    volleyball_rate: (data as any).volleyball_rate != null ? Number((data as any).volleyball_rate) : 200,
     company_name: data.company_name ?? "",
     company_address: data.company_address ?? "",
     contact_number: data.contact_number ?? "",
@@ -173,11 +179,13 @@ export async function saveSettings(settings: Settings): Promise<void> {
       table_rent_rate: settings.table_rent_rate,
       billiard_rate: settings.billiard_rate ?? null,
       videoke_rate: settings.videoke_rate ?? null,
+      dart_rate: settings.dart_rate ?? null,
+      volleyball_rate: settings.volleyball_rate ?? null,
       company_name: settings.company_name ?? null,
       company_address: settings.company_address ?? null,
       contact_number: settings.contact_number ?? null,
       tin_number: settings.tin_number ?? null,
-    });
+    } as any);
   if (error) throw error;
 }
 

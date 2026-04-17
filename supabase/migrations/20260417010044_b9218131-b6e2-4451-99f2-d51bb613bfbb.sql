@@ -1,0 +1,1 @@
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS dart_rate numeric DEFAULT 100, ADD COLUMN IF NOT EXISTS volleyball_rate numeric DEFAULT 200;
