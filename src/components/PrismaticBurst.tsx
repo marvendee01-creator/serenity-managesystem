@@ -277,13 +277,8 @@ const PrismaticBurst = ({
       renderer.setSize(w, h);
       program.uniforms.uResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight];
     };
-    let ro: ResizeObserver | null = null;
-    if ('ResizeObserver' in window) {
-      ro = new ResizeObserver(resize);
-      ro.observe(container);
-    } else {
-      window.addEventListener('resize', resize);
-    }
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
     resize();
 
     const onPointer = (e: PointerEvent) => {
