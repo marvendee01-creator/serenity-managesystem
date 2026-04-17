@@ -292,7 +292,7 @@ const PrismaticBurst = ({
       const y = (e.clientY - rect.top) / Math.max(rect.height, 1);
       mouseTargetRef.current = [Math.min(Math.max(x, 0), 1), Math.min(Math.max(y, 0), 1)];
     };
-    (gl.canvas as HTMLCanvasElement).addEventListener('pointermove', onPointer as EventListener, { passive: true });
+    (container as HTMLDivElement).addEventListener('pointermove', onPointer as EventListener, { passive: true });
 
     let io: IntersectionObserver | null = null;
     if ('IntersectionObserver' in window) {
