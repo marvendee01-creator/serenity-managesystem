@@ -13,6 +13,7 @@ import maintenanceIcon from "@/assets/icons/maintenance.png";
 import bookingMgmtIcon from "@/assets/icons/booking-mgmt.png";
 import bookingCashierIcon from "@/assets/icons/booking-cashier.png";
 import SplashScreen from "@/components/SplashScreen";
+import PrismaticBurst from "@/components/PrismaticBurst";
 import WelcomePopup from "@/components/WelcomePopup";
 import EntranceModule from "@/modules/EntranceModule";
 import RoomModule from "@/modules/RoomModule";
@@ -94,9 +95,19 @@ export default function Index() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="relative min-h-screen flex flex-col bg-background overflow-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <PrismaticBurst
+          intensity={2}
+          speed={0.4}
+          animationType="rotate3d"
+          distort={1.2}
+          colors={["#5227FF", "#FF9FFC", "#B19EEF"]}
+          mixBlendMode="lighten"
+        />
+      </div>
       {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}
-      <header className="bg-sidebar px-4 py-5 flex items-center gap-3 shadow-md">
+      <header className="relative z-10 bg-sidebar/90 backdrop-blur px-4 py-5 flex items-center gap-3 shadow-md">
         <img src={logo} alt="Logo" className="w-10 h-10 rounded-full" />
         <div>
           <h1 className="text-sm font-bold text-sidebar-foreground leading-tight">Serenity Inland Resort</h1>
@@ -104,13 +115,13 @@ export default function Index() {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="relative z-10 flex-1 flex items-center justify-center p-6">
         <div className="grid grid-cols-3 gap-4 max-w-md w-full">
           {MODULES.map((m) => (
             <button
               key={m.id}
               onClick={() => setActive(m.id)}
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card border border-border
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card/85 backdrop-blur border border-border
                          hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 hover:scale-105
                          active:scale-95 transition-all duration-200 ease-out
                          focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
