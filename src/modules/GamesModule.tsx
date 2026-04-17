@@ -10,7 +10,7 @@ import { formatPeso } from "@/lib/format";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-const GAME_TYPES = ["Billiard", "Videoke", "Other"] as const;
+const GAME_TYPES = ["Billiard", "Dart", "Volleyball", "Other"] as const;
 
 export default function GamesModule() {
   const [gameType, setGameType] = useState<string>(GAME_TYPES[0]);
@@ -27,6 +27,8 @@ export default function GamesModule() {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [billiardRate, setBilliardRate] = useState(100);
   const [videokeRate, setVideokeRate] = useState(200);
+  const [dartRate, setDartRate] = useState(100);
+  const [volleyballRate, setVolleyballRate] = useState(200);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,7 +36,8 @@ export default function GamesModule() {
     getSettings().then((s) => {
       setBilliardRate(s.billiard_rate ?? 100);
       setVideokeRate(s.videoke_rate ?? 200);
-      // Auto-prefill rate for default selection
+      setDartRate(s.dart_rate ?? 100);
+      setVolleyballRate(s.volleyball_rate ?? 200);
       setRate(String(s.billiard_rate ?? 100));
     });
   }, []);
@@ -42,9 +45,10 @@ export default function GamesModule() {
   // Auto-prefill rate when game type changes
   useEffect(() => {
     if (gameType === "Billiard") setRate(String(billiardRate));
-    else if (gameType === "Videoke") setRate(String(videokeRate));
+    else if (gameType === "Dart") setRate(String(dartRate));
+    else if (gameType === "Volleyball") setRate(String(volleyballRate));
     else setRate("");
-  }, [gameType, billiardRate, videokeRate]);
+  }, [gameType, billiardRate, dartRate, volleyballRate]);
 
   const amt = parseFloat(rate) || 0;
   const received = parseFloat(amountReceived) || 0;
@@ -107,12 +111,13 @@ export default function GamesModule() {
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       // Re-prefill rate
       if (gameType === "Billiard") setRate(String(billiardRate));
-      else if (gameType === "Videoke") setRate(String(videokeRate));
+      else if (gameType === "Dart") setRate(String(dartRate));
+      else if (gameType === "Volleyball") setRate(String(volleyballRate));
       else setRate("");
       nameRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [gameType, name, amt, payment, received, change, useManualDatetime, customDate, customTime, hours, billiardRate, videokeRate]);
+  }, [gameType, name, amt, payment, received, change, useManualDatetime, customDate, customTime, hours, billiardRate, dartRate, volleyballRate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -127,7 +132,7 @@ export default function GamesModule() {
       <ModuleShell title="Games Rental" icon={<Gamepad2 size={20} />} onSave={handleSave} saveLabel="Start Session" saving={saving}>
         <div>
           <label className="text-sm font-medium block mb-2">Game Type</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {GAME_TYPES.map((g) => (
               <button key={g} className={`toggle-btn ${gameType === g ? "toggle-btn-active" : ""}`} onClick={() => setGameType(g)}>{g}</button>
             ))}
