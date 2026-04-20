@@ -368,7 +368,8 @@ export default function ReportsModule() {
   const [tab, setTab] = useState<Tab>("transactions");
   const [data, setData] = useState<Transaction[]>([]);
   const [moduleFilter, setModuleFilter] = useState("All");
-  const [txnDate, setTxnDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [txnDateFrom, setTxnDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [txnDateTo, setTxnDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [gameFilter, setGameFilter] = useState("");
   const [editingTxn, setEditingTxn] = useState<Transaction | null>(null);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
@@ -388,24 +389,25 @@ export default function ReportsModule() {
   const [previewBcReport, setPreviewBcReport] = useState<BookingCashierReport | null>(null);
 
   useEffect(() => {
-    // Fetch with date range = same day for strict filtering
+    // Fetch with date range filtering
     getTransactions({
       module: moduleFilter === "All" ? undefined : moduleFilter,
-      dateFrom: txnDate || undefined,
-      dateTo: txnDate || undefined,
+      dateFrom: txnDateFrom || undefined,
+      dateTo: txnDateTo || undefined,
       game_type: gameFilter || undefined,
     }).then(txns => {
-      // Strict date match + only Fully Paid
+      const fromMs = txnDateFrom ? new Date(txnDateFrom + "T00:00:00").getTime() : -Infinity;
+      const toMs = txnDateTo ? new Date(txnDateTo + "T23:59:59").getTime() : Infinity;
       const filtered = txns.filter(t => {
+        // Exclude cancelled bookings from reports
+        if (t.status === "Cancelled") return false;
         if (t.payment_status && t.payment_status !== "Fully Paid") return false;
-        if (txnDate) {
-          return formatDate(t.date_time) === formatDate(txnDate + "T00:00:00");
-        }
-        return true;
+        const ts = new Date(t.date_time).getTime();
+        return ts >= fromMs && ts <= toMs;
       });
       setData(filtered);
     });
-  }, [moduleFilter, txnDate, gameFilter]);
+  }, [moduleFilter, txnDateFrom, txnDateTo, gameFilter]);
 
   useEffect(() => {
     getCashierReports().then(reports => {
