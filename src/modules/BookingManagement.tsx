@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ClipboardList, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban } from "lucide-react";
 import { getTransactions, updateTransaction, type Transaction } from "@/lib/db";
 import { toast } from "sonner";
 
@@ -39,10 +39,26 @@ export default function BookingManagement() {
 
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
-      const sorted = txns.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
+      const active = txns.filter(t => t.status !== "Cancelled");
+      const sorted = active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
       setBookings(sorted);
     });
   }, []);
+
+  const handleCancelBooking = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    if (!confirm(`Cancel booking for ${booking.customer_name || "this guest"}? This will exclude it from reports and the reservation board.`)) return;
+    try {
+      await updateTransaction(booking.id, {
+        status: "Cancelled",
+        comments: `Booking cancelled on ${new Date().toISOString().slice(0, 10)}.`,
+      });
+      toast.success(`Booking for ${booking.customer_name || "guest"} cancelled`);
+      loadBookings();
+    } catch {
+      toast.error("Failed to cancel booking");
+    }
+  }, [loadBookings]);
 
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
@@ -161,7 +177,15 @@ export default function BookingManagement() {
                 <div>
                   <p className="font-bold" style={{ color: cardStyle.color || "inherit" }}>{b.customer_name || "Walk-in"}</p>
                   <p className="text-xs opacity-70">{formatDate(b.date_time)} • {b.booking_type}</p>
+                  {(b.check_in || b.check_out) && (
+                    <p className="text-xs opacity-70">
+                      {b.check_in ? new Date(b.check_in).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                      {" → "}
+                      {b.check_out ? new Date(b.check_out).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                    </p>
+                  )}
                   {b.room_type && <p className="text-xs opacity-70">{b.room_type}</p>}
+                  {b.date_settled && <p className="text-xs opacity-70">Fully paid: {formatDate(b.date_settled + "T00:00:00")}</p>}
                 </div>
                 <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${badge.className}`}>
                   {badge.icon}
@@ -189,18 +213,37 @@ export default function BookingManagement() {
               )}
 
               {(b.payment_status === "Unpaid" || b.payment_status === "Partially Paid") && !isSettling && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => { setSettlingId(b.id!); setSettleAmount(currentBalance.toString()); }}
-                    className="flex-1 h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
+                    className="flex-1 min-w-[120px] h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
                   >
                     Settle Payment
                   </button>
                   <button
                     onClick={() => handleMarkFullyPaid(b)}
-                    className="flex-1 h-10 rounded-lg text-sm font-medium bg-success/20 text-success hover:bg-success/30 active:scale-[0.97] transition-all"
+                    className="flex-1 min-w-[120px] h-10 rounded-lg text-sm font-medium bg-success/20 text-success hover:bg-success/30 active:scale-[0.97] transition-all"
                   >
                     Mark as Fully Paid
+                  </button>
+                  <button
+                    onClick={() => handleCancelBooking(b)}
+                    className="h-10 px-3 rounded-lg text-sm font-medium bg-destructive/15 text-destructive hover:bg-destructive/25 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Cancel booking"
+                  >
+                    <Ban size={14} /> Cancel
+                  </button>
+                </div>
+              )}
+
+              {b.payment_status === "Fully Paid" && !isSettling && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleCancelBooking(b)}
+                    className="h-9 px-3 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Cancel booking"
+                  >
+                    <Ban size={12} /> Cancel Booking
                   </button>
                 </div>
               )}
