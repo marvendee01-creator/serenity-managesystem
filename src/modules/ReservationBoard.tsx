@@ -163,16 +163,22 @@ export default function ReservationBoard() {
                         <>
                           <span className="text-xs font-medium text-muted-foreground">{day}</span>
                           <div className="mt-0.5 space-y-0.5">
-                            {dayBookings.map((b, bi) => (
-                              <button
-                                key={bi}
-                                onClick={() => setSelected(b)}
-                                className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[10px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${colorMap.get(b.id!) || COLORS[0]}`}
-                              >
-                                <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
-                                <p className="opacity-70">{b.booking_type || "Booking"}</p>
-                              </button>
-                            ))}
+                            {dayBookings.map((b, bi) => {
+                              const ttCheckIn = b.check_in ? new Date(b.check_in).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+                              const ttCheckOut = b.check_out ? new Date(b.check_out).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+                              const tooltip = `Customer: ${b.customer_name || "Guest"}\nCheck-in: ${ttCheckIn}\nCheck-out: ${ttCheckOut}\nStatus: ${b.payment_status || "—"}`;
+                              return (
+                                <button
+                                  key={bi}
+                                  onClick={() => setSelected(b)}
+                                  title={tooltip}
+                                  className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[10px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
+                                >
+                                  <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
+                                  <p className="opacity-70">{b.booking_type || "Booking"}</p>
+                                </button>
+                              );
+                            })}
                           </div>
                         </>
                       )}
