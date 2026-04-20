@@ -16,17 +16,14 @@ function getMonthDays(year: number, month: number) {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const COLORS = [
-  "bg-pink-100 border-pink-300 text-pink-800",
-  "bg-cyan-100 border-cyan-300 text-cyan-800",
-  "bg-purple-100 border-purple-300 text-purple-800",
-  "bg-green-100 border-green-300 text-green-800",
-  "bg-amber-100 border-amber-300 text-amber-800",
-  "bg-blue-100 border-blue-300 text-blue-800",
-];
+const EXCLUSIVE_STYLE = "bg-pink-100 border-pink-400 text-pink-900";
+const NON_EXCLUSIVE_STYLE = "bg-cyan-100 border-cyan-400 text-cyan-900";
+const DEFAULT_STYLE = "bg-purple-100 border-purple-300 text-purple-800";
 
-function getColor(i: number) {
-  return COLORS[i % COLORS.length];
+function getBookingStyle(b: Transaction): string {
+  if (b.booking_type === "Exclusive") return EXCLUSIVE_STYLE;
+  if (b.booking_type === "Non-Exclusive") return NON_EXCLUSIVE_STYLE;
+  return DEFAULT_STYLE;
 }
 
 /** Return array of day-of-month numbers a booking spans within [monthStart, monthEnd] */
@@ -55,30 +52,23 @@ export default function ReservationBoard() {
   const toDate = new Date(year, month + 1, 0).toISOString().slice(0, 10);
 
   const loadBookings = () => {
-    getTransactions({ module: "Booking", dateFrom: fromDate, dateTo: toDate }).then(setBookings);
+    getTransactions({ module: "Booking", dateFrom: fromDate, dateTo: toDate }).then(txns => {
+      // Exclude cancelled bookings from the board
+      setBookings(txns.filter(t => t.status !== "Cancelled"));
+    });
   };
 
   useEffect(() => { loadBookings(); }, [fromDate, toDate]);
 
   const { startDay, totalDays } = getMonthDays(year, month);
 
-  // Build color map
-  let colorIdx = 0;
-  const colorMap = new Map<number, string>();
-  bookings.forEach(b => {
-    if (b.id && !colorMap.has(b.id)) {
-      colorMap.set(b.id, getColor(colorIdx++));
-    }
-  });
-
-  // Map bookings to days (supports multi-day spans)
+  // Map bookings to days (supports multi-day spans, deduped per day by booking id)
   const bookingsByDay = useMemo(() => {
     const map: Record<number, Transaction[]> = {};
     bookings.forEach((b) => {
       const days = getBookingDays(b, year, month, totalDays);
       days.forEach(d => {
         if (!map[d]) map[d] = [];
-        // avoid duplicates per day
         if (!map[d].some(x => x.id === b.id)) map[d].push(b);
       });
     });
