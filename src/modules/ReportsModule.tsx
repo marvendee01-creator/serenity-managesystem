@@ -520,14 +520,20 @@ export default function ReportsModule() {
             <select className="pos-input text-sm" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
               {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
-            <input type="date" className="pos-input text-sm" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} />
-            {moduleFilter !== "Games Rental" && <div />}
-            {moduleFilter === "Games Rental" && (
-              <select className="pos-input text-sm" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
+              <input type="date" className="pos-input text-sm" value={txnDateFrom} onChange={(e) => setTxnDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
+              <input type="date" className="pos-input text-sm" value={txnDateTo} onChange={(e) => setTxnDateTo(e.target.value)} />
+            </div>
+            {moduleFilter === "Games Rental" ? (
+              <select className="pos-input text-sm self-end" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)}>
                 <option value="">All Games</option>
                 {["Volleyball", "Dart", "Basketball", "Billiard"].map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
-            )}
+            ) : <div />}
           </div>
 
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -861,14 +867,17 @@ export default function ReportsModule() {
                       // Refresh data
                       const txns = await getTransactions({
                         module: moduleFilter === "All" ? undefined : moduleFilter,
-                        dateFrom: txnDate || undefined,
-                        dateTo: txnDate || undefined,
+                        dateFrom: txnDateFrom || undefined,
+                        dateTo: txnDateTo || undefined,
                         game_type: gameFilter || undefined,
                       });
+                      const fromMs = txnDateFrom ? new Date(txnDateFrom + "T00:00:00").getTime() : -Infinity;
+                      const toMs = txnDateTo ? new Date(txnDateTo + "T23:59:59").getTime() : Infinity;
                       const filtered = txns.filter(t => {
+                        if (t.status === "Cancelled") return false;
                         if (t.payment_status && t.payment_status !== "Fully Paid") return false;
-                        if (txnDate) return formatDate(t.date_time) === formatDate(txnDate + "T00:00:00");
-                        return true;
+                        const ts = new Date(t.date_time).getTime();
+                        return ts >= fromMs && ts <= toMs;
                       });
                       setData(filtered);
                     } catch { toast.error("Failed to update"); }
