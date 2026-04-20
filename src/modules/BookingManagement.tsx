@@ -177,7 +177,15 @@ export default function BookingManagement() {
                 <div>
                   <p className="font-bold" style={{ color: cardStyle.color || "inherit" }}>{b.customer_name || "Walk-in"}</p>
                   <p className="text-xs opacity-70">{formatDate(b.date_time)} • {b.booking_type}</p>
+                  {(b.check_in || b.check_out) && (
+                    <p className="text-xs opacity-70">
+                      {b.check_in ? new Date(b.check_in).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                      {" → "}
+                      {b.check_out ? new Date(b.check_out).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                    </p>
+                  )}
                   {b.room_type && <p className="text-xs opacity-70">{b.room_type}</p>}
+                  {b.date_settled && <p className="text-xs opacity-70">Fully paid: {formatDate(b.date_settled + "T00:00:00")}</p>}
                 </div>
                 <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${badge.className}`}>
                   {badge.icon}
