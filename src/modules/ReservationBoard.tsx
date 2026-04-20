@@ -26,12 +26,34 @@ function getBookingStyle(b: Transaction): string {
   return DEFAULT_STYLE;
 }
 
-/** Return array of day-of-month numbers a booking spans within [monthStart, monthEnd] */
+/** Strip time → local date at 00:00 */
+function dateOnly(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** Normalize a booking's date range: swap if reversed, default end to start if missing */
+function getNormalizedRange(b: Transaction): { start: Date; end: Date } {
+  const rawStart = b.check_in ? new Date(b.check_in) : new Date(b.date_time);
+  let start = dateOnly(rawStart);
+  let end: Date;
+  if (!b.check_out) {
+    end = start;
+  } else {
+    end = dateOnly(new Date(b.check_out));
+  }
+  if (end < start) {
+    [start, end] = [end, start];
+  }
+  return { start, end };
+}
+
+/** Return array of day-of-month numbers a booking spans within [monthStart, monthEnd] (continuous span, deduped per day) */
 function getBookingDays(b: Transaction, year: number, month: number, totalDays: number): number[] {
-  const start = b.check_in ? new Date(b.check_in) : new Date(b.date_time);
-  const end = b.check_out ? new Date(b.check_out) : start;
-  const monthStart = new Date(year, month, 1);
-  const monthEnd = new Date(year, month, totalDays, 23, 59, 59);
+  const { start, end } = getNormalizedRange(b);
+  const monthStart = dateOnly(new Date(year, month, 1));
+  const monthEnd = dateOnly(new Date(year, month, totalDays));
+
+  if (end < monthStart || start > monthEnd) return [];
 
   const from = start < monthStart ? 1 : start.getDate();
   const to = end > monthEnd ? totalDays : end.getDate();
@@ -179,7 +201,6 @@ export default function ReservationBoard() {
                                   className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[10px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
                                 >
                                   <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
-                                  <p className="opacity-70">{b.booking_type || "Booking"}</p>
                                 </button>
                               );
                             })}
