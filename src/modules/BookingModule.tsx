@@ -234,12 +234,12 @@ export default function BookingModule() {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-sm font-medium block mb-1">Check-in</label>
-            <input type="date" className="pos-input w-full" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+            <label className="text-sm font-medium block mb-1">Check-in Date & Time</label>
+            <input type="datetime-local" className="pos-input w-full" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
           </div>
           <div>
-            <label className="text-sm font-medium block mb-1">Check-out</label>
-            <input type="date" className="pos-input w-full" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+            <label className="text-sm font-medium block mb-1">Check-out Date & Time</label>
+            <input type="datetime-local" className="pos-input w-full" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
           </div>
         </div>
 

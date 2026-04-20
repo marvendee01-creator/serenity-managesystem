@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ClipboardList, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban } from "lucide-react";
 import { getTransactions, updateTransaction, type Transaction } from "@/lib/db";
 import { toast } from "sonner";
 
@@ -39,10 +39,26 @@ export default function BookingManagement() {
 
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
-      const sorted = txns.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
+      const active = txns.filter(t => t.status !== "Cancelled");
+      const sorted = active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
       setBookings(sorted);
     });
   }, []);
+
+  const handleCancelBooking = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    if (!confirm(`Cancel booking for ${booking.customer_name || "this guest"}? This will exclude it from reports and the reservation board.`)) return;
+    try {
+      await updateTransaction(booking.id, {
+        status: "Cancelled",
+        comments: `Booking cancelled on ${new Date().toISOString().slice(0, 10)}.`,
+      });
+      toast.success(`Booking for ${booking.customer_name || "guest"} cancelled`);
+      loadBookings();
+    } catch {
+      toast.error("Failed to cancel booking");
+    }
+  }, [loadBookings]);
 
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
