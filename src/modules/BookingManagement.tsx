@@ -3,7 +3,7 @@ import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban } from "lucide-
 import { getTransactions, updateTransaction, type Transaction } from "@/lib/db";
 import { toast } from "sonner";
 
-type PaymentFilter = "all" | "Unpaid" | "Partially Paid" | "Fully Paid";
+type PaymentFilter = "ALL" | "Unpaid" | "Partially Paid" | "Fully Paid";
 
 function getCardStyle(status?: string) {
   switch (status) {
@@ -33,7 +33,7 @@ function getStatusBadge(status?: string) {
 
 export default function BookingManagement() {
   const [bookings, setBookings] = useState<Transaction[]>([]);
-  const [filter, setFilter] = useState<PaymentFilter>("all");
+  const [filter, setFilter] = useState<PaymentFilter>("ALL");
   const [settlingId, setSettlingId] = useState<number | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
 
@@ -62,8 +62,8 @@ export default function BookingManagement() {
 
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
-  const filtered = filter === "all"
-    ? bookings.filter(b => b.payment_status !== "Fully Paid")
+  const filtered = filter === "ALL"
+    ? bookings
     : bookings.filter(b => b.payment_status === filter);
 
   const handleSettlePayment = useCallback(async (booking: Transaction) => {
@@ -95,9 +95,6 @@ export default function BookingManagement() {
       );
       setSettlingId(null);
       setSettleAmount("");
-      if (newStatus === "Fully Paid") {
-        setFilter("Fully Paid");
-      }
       loadBookings();
     } catch {
       toast.error("Failed to update");
@@ -117,7 +114,6 @@ export default function BookingManagement() {
         comments: `Marked as Fully Paid on ${today}.`,
       });
       toast.success(`${booking.customer_name || "Booking"} marked as Fully Paid!`);
-      setFilter("Fully Paid");
       loadBookings();
     } catch {
       toast.error("Failed to update");
@@ -151,13 +147,13 @@ export default function BookingManagement() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 border-b border-border pb-1">
-        {(["all", "Unpaid", "Partially Paid", "Fully Paid"] as const).map(f => (
+        {(["ALL", "Unpaid", "Partially Paid", "Fully Paid"] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={`flex-1 h-10 rounded-t-lg text-xs font-medium transition-all ${filter === f ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
           >
-            {f === "all" ? `All (${bookings.filter(b => b.payment_status !== "Fully Paid").length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
+            {f === "ALL" ? `ALL (${bookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
           </button>
         ))}
       </div>
