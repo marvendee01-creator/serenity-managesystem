@@ -201,7 +201,6 @@ export default function ReservationBoard() {
                                   className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[10px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
                                 >
                                   <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
-                                  <p className="opacity-70">{b.booking_type || "Booking"}</p>
                                 </button>
                               );
                             })}
