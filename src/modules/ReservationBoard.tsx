@@ -97,6 +97,21 @@ export default function ReservationBoard() {
     return map;
   }, [bookings, year, month, totalDays]);
 
+  // Conflict detection: days where 2+ exclusive bookings overlap, OR exclusive overlaps with any other
+  const conflictDays = useMemo(() => {
+    const conflicts = new Set<number>();
+    Object.entries(bookingsByDay).forEach(([day, bs]) => {
+      if (bs.length < 2) return;
+      const hasExclusive = bs.some(b => b.booking_type === "Exclusive");
+      if (hasExclusive) conflicts.add(Number(day));
+    });
+    return conflicts;
+  }, [bookingsByDay]);
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+  const todayDate = isCurrentMonth ? today.getDate() : -1;
+
   const cells: (number | null)[] = [];
   for (let i = 0; i < startDay; i++) cells.push(null);
   for (let d = 1; d <= totalDays; d++) cells.push(d);
@@ -183,11 +198,23 @@ export default function ReservationBoard() {
               <tr key={wi}>
                 {week.map((day, di) => {
                   const dayBookings = day ? (bookingsByDay[day] || []) : [];
+                  const isToday = day === todayDate;
+                  const hasConflict = day ? conflictDays.has(day) : false;
+                  const cellStyle: React.CSSProperties = {};
+                  if (isToday) {
+                    cellStyle.border = "2px solid #ff9800";
+                    cellStyle.backgroundColor = "#fff3cd";
+                  }
                   return (
-                    <td key={di} className="border border-border p-1 align-top h-24 relative">
+                    <td key={di} className="border border-border p-1 align-top h-24 relative" style={cellStyle}>
                       {day && (
                         <>
-                          <span className="text-xs font-medium text-muted-foreground">{day}</span>
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs font-medium ${isToday ? "text-orange-700 font-bold" : "text-muted-foreground"}`}>{day}{isToday && " • TODAY"}</span>
+                            {hasConflict && (
+                              <span title="⚠ Double booking detected on this date!" className="text-[9px] font-bold text-destructive bg-destructive/15 px-1 rounded">⚠</span>
+                            )}
+                          </div>
                           <div className="mt-0.5 space-y-0.5">
                             {dayBookings.map((b, bi) => {
                               const ttCheckIn = b.check_in ? new Date(b.check_in).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
