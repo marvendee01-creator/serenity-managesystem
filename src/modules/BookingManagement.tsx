@@ -213,18 +213,37 @@ export default function BookingManagement() {
               )}
 
               {(b.payment_status === "Unpaid" || b.payment_status === "Partially Paid") && !isSettling && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => { setSettlingId(b.id!); setSettleAmount(currentBalance.toString()); }}
-                    className="flex-1 h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
+                    className="flex-1 min-w-[120px] h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all"
                   >
                     Settle Payment
                   </button>
                   <button
                     onClick={() => handleMarkFullyPaid(b)}
-                    className="flex-1 h-10 rounded-lg text-sm font-medium bg-success/20 text-success hover:bg-success/30 active:scale-[0.97] transition-all"
+                    className="flex-1 min-w-[120px] h-10 rounded-lg text-sm font-medium bg-success/20 text-success hover:bg-success/30 active:scale-[0.97] transition-all"
                   >
                     Mark as Fully Paid
+                  </button>
+                  <button
+                    onClick={() => handleCancelBooking(b)}
+                    className="h-10 px-3 rounded-lg text-sm font-medium bg-destructive/15 text-destructive hover:bg-destructive/25 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Cancel booking"
+                  >
+                    <Ban size={14} /> Cancel
+                  </button>
+                </div>
+              )}
+
+              {b.payment_status === "Fully Paid" && !isSettling && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleCancelBooking(b)}
+                    className="h-9 px-3 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Cancel booking"
+                  >
+                    <Ban size={12} /> Cancel Booking
                   </button>
                 </div>
               )}
