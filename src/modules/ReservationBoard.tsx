@@ -131,10 +131,14 @@ export default function ReservationBoard() {
       </div>
 
       {/* Month Nav */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button onClick={prevMonth} className="px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">← Prev</button>
         <span className="text-sm font-semibold text-foreground">{monthLabel}</span>
         <button onClick={nextMonth} className="px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">Next →</button>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-pink-200 border border-pink-400" /> Exclusive</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-cyan-200 border border-cyan-400" /> Non-Exclusive</span>
+        </div>
         <span className="text-sm text-muted-foreground ml-auto">{bookings.length} reservations</span>
       </div>
 
