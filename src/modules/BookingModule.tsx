@@ -129,22 +129,30 @@ export default function BookingModule() {
     if (!checkIn || !checkOut) return { conflict: false, message: "" };
     const newIn = new Date(checkIn).getTime();
     const newOut = new Date(checkOut).getTime();
-    // Block if exclusive and date already has an exclusive booking
-    if (isExclusive) {
-      const exclusiveConflict = existingBookings.some(b => {
-        if (!b.check_in || !b.check_out || b.booking_type !== "Exclusive") return false;
-        return newIn < new Date(b.check_out).getTime() && newOut > new Date(b.check_in).getTime();
-      });
-      if (exclusiveConflict) return { conflict: true, message: "Date already booked for Exclusive. Please choose another date." };
-    }
-    // General overlap check
-    const overlap = existingBookings.some(b => {
+    const overlaps = (b: { check_in?: string; check_out?: string }) => {
       if (!b.check_in || !b.check_out) return false;
       return newIn < new Date(b.check_out).getTime() && newOut > new Date(b.check_in).getTime();
-    });
-    if (overlap) return { conflict: true, message: "Selected date range overlaps with an existing booking. Please choose another date." };
+    };
+    // Exclusive blocks against any other booking on the same dates
+    if (isExclusive) {
+      if (existingBookings.some(b => overlaps(b))) {
+        return { conflict: true, message: "Exclusive booking conflicts with an existing reservation on these dates." };
+      }
+    } else {
+      // Non-exclusive: blocked by any existing Exclusive on overlapping dates
+      if (existingBookings.some(b => b.booking_type === "Exclusive" && overlaps(b))) {
+        return { conflict: true, message: "Selected dates are reserved as Exclusive. Please choose another date." };
+      }
+    }
+    // Per-room conflict: only block when SAME room type overlaps
+    if (addOnRoom === "Kubo Room" && existingBookings.some(b => b.room_type === "Kubo Room" && overlaps(b))) {
+      return { conflict: true, message: "Kubo Room already booked on selected date!" };
+    }
+    if (addOnRoom === "Barkada Room" && existingBookings.some(b => b.room_type === "Barkada Room" && overlaps(b))) {
+      return { conflict: true, message: "Barkada Room already booked on selected date!" };
+    }
     return { conflict: false, message: "" };
-  }, [checkIn, checkOut, existingBookings, isExclusive]);
+  }, [checkIn, checkOut, existingBookings, isExclusive, addOnRoom]);
 
   const handleSave = useCallback(async () => {
     if (total === 0) { toast.error("Enter amount"); return; }
