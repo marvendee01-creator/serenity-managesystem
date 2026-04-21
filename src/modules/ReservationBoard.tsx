@@ -216,7 +216,7 @@ export default function ReservationBoard() {
                       {day && (
                         <>
                           <div className="flex items-center justify-between">
-                            <span className={`text-xs font-medium ${isToday ? "text-orange-700 font-bold" : "text-muted-foreground"}`}>{day}{isToday && " • TODAY"}</span>
+                            <span className={`text-xs font-medium ${isToday ? "text-sky-700 font-bold" : "text-muted-foreground"}`}>{day}{isToday && " • TODAY"}</span>
                             {hasConflict && (
                               <span title="⚠ Double booking detected on this date!" className="text-[9px] font-bold text-destructive bg-destructive/15 px-1 rounded">⚠</span>
                             )}
@@ -231,9 +231,13 @@ export default function ReservationBoard() {
                                   key={bi}
                                   onClick={() => setSelected(b)}
                                   title={tooltip}
-                                  className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[10px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
+                                  className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[9px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
                                 >
                                   <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
+                                  <p className="truncate">A:{b.adults || 0} | K8+:{b.kids_8_above || 0}</p>
+                                  <p className="truncate">K5-7:{b.kids_5_7 || 0} | K4↓:{b.kids_4_below || 0}</p>
+                                  {b.room_type && <p className="truncate">Room: {b.room_type}</p>}
+                                  {b.number_of_tables ? <p className="truncate">Tables: {b.number_of_tables}</p> : null}
                                 </button>
                               );
                             })}
