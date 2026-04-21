@@ -180,6 +180,13 @@ function AnalyticsDashboard() {
     </div>
   );
 }
+interface PettyMonitorRow {
+  date: string;
+  income: number;
+  expenses: number;
+  net: number;
+}
+
 function PettyCashMonitoring() {
   const [rows, setRows] = useState<PettyMonitorRow[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
