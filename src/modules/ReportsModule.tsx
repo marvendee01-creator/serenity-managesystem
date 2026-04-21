@@ -28,7 +28,122 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring" | "analytics";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring" | "analytics" | "monthly-sales";
+
+function MonthlySalesReport() {
+  const [sourceModule, setSourceModule] = useState<"Entrance" | "Store">("Entrance");
+  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+  const [rows, setRows] = useState<{ date: string; total: number }[]>([]);
+
+  useEffect(() => {
+    getTransactions({ module: sourceModule }).then(txns => {
+      const filtered = txns.filter(t => {
+        if (t.status === "Cancelled") return false;
+        return t.date_time.slice(0, 7) === monthFilter;
+      });
+      const map = new Map<string, number>();
+      for (const t of filtered) {
+        const key = t.date_time.slice(0, 10); // YYYY-MM-DD
+        map.set(key, (map.get(key) || 0) + (t.amount_paid || 0));
+      }
+      const result = Array.from(map.entries())
+        .map(([date, total]) => ({ date, total }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      setRows(result);
+    });
+  }, [sourceModule, monthFilter]);
+
+  const monthlyTotal = rows.reduce((s, r) => s + r.total, 0);
+  const monthLabel = (() => {
+    const [y, m] = monthFilter.split("-");
+    return `${m}/${y}`;
+  })();
+
+  const exportCSV = () => {
+    const headers = ["Date", "Module", `Daily Total ${sourceModule} Sales`];
+    const csvRows = rows.map(r => [formatDate(r.date + "T00:00:00"), sourceModule, r.total.toFixed(2)]);
+    csvRows.push(["", "TOTAL", monthlyTotal.toFixed(2)]);
+    const csv = [headers, ...csvRows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${sourceModule.toLowerCase()}_sales_${monthFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(`<html><head><title>Total ${sourceModule} Sales (Monthly)</title>
+      <style>body{font-family:Arial;font-size:12px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid #999;padding:6px 8px}th{background:#f0f0f0}.right{text-align:right}.total{background:#f9f9e0;font-weight:bold}</style>
+      </head><body>
+      <h2>TOTAL ${sourceModule.toUpperCase()} SALES (MONTHLY)</h2>
+      <p style="text-align:center">Month: ${monthLabel}</p>
+      <table>
+        <tr><th>Date</th><th>Module</th><th class="right">Daily Total ${sourceModule} Sales</th></tr>
+        ${rows.map(r => `<tr><td>${formatDate(r.date + "T00:00:00")}</td><td>${sourceModule}</td><td class="right">${formatPeso(r.total)}</td></tr>`).join("")}
+        <tr class="total"><td colspan="2">Total ${sourceModule} Sales for ${monthLabel}</td><td class="right">${formatPeso(monthlyTotal)}</td></tr>
+      </table>
+      </body></html>`);
+    w.document.close();
+    w.print();
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <select className="pos-input text-sm" value={sourceModule} onChange={e => setSourceModule(e.target.value as "Entrance" | "Store")}>
+          <option value="Entrance">Entrance</option>
+          <option value="Store">Store</option>
+        </select>
+        <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+        <button onClick={exportCSV} className="flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+          <Download size={16} /> Export CSV
+        </button>
+        <button onClick={handlePrint} className="flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+          <Printer size={16} /> Print
+        </button>
+      </div>
+
+      <div className="pos-card text-center mb-4">
+        <p className="text-xs text-muted-foreground">Total {sourceModule} Sales for {monthLabel}</p>
+        <p className="text-2xl font-bold tabular-nums text-primary">{formatPeso(monthlyTotal)}</p>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-left px-3 py-2 font-medium">Module</th>
+              <th className="text-right px-3 py-2 font-medium">Daily Total {sourceModule} Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No {sourceModule.toLowerCase()} sales for this month</td></tr>
+            )}
+            {rows.map(r => (
+              <tr key={r.date} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2">{formatDate(r.date + "T00:00:00")}</td>
+                <td className="px-3 py-2">{sourceModule}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(r.total)}</td>
+              </tr>
+            ))}
+            {rows.length > 0 && (
+              <tr className="bg-primary/5 border-t-2 border-primary/20">
+                <td className="px-3 py-2 font-bold" colSpan={2}>Total {sourceModule} Sales for {monthLabel}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-bold">{formatPeso(monthlyTotal)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 interface PettyMonitorRow {
   date: string;
@@ -518,6 +633,7 @@ export default function ReportsModule() {
           { key: "cashier" as Tab, label: "Cashier Store", icon: <Banknote size={14} /> as React.ReactNode },
           { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
           { key: "petty-monitoring" as Tab, label: "Petty Cash Monitor", icon: <ClipboardList size={14} /> as React.ReactNode },
+          { key: "monthly-sales" as Tab, label: "Monthly Sales", icon: <TrendingUp size={14} /> as React.ReactNode },
           { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
           { key: "analytics" as Tab, label: "Analytics", icon: <BarChart3 size={14} /> as React.ReactNode },
         ]).map(t => (
@@ -801,6 +917,8 @@ export default function ReportsModule() {
       {tab === "petty-monitoring" && <PettyCashMonitoring />}
 
       {tab === "analytics" && <AnalyticsDashboard />}
+
+      {tab === "monthly-sales" && <MonthlySalesReport />}
 
       {/* Edit Transaction Dialog */}
       <Dialog open={!!editingTxn} onOpenChange={(open) => { if (!open) setEditingTxn(null); }}>
