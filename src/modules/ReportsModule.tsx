@@ -28,7 +28,211 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring" | "analytics" | "monthly-sales";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring" | "analytics" | "monthly-sales" | "master-sales";
+
+const MASTER_MODULE_MAP: Record<string, string> = {
+  "Entrance": "Entrance",
+  "Sales": "Store",
+  "Store": "Store",
+  "Booking": "Booking",
+  "Room": "Room",
+  "Games Rental": "Games",
+  "Games": "Games",
+  "Table Rent": "Table Rent",
+};
+const MASTER_MODULE_COLORS: Record<string, string> = {
+  "Entrance": "#4CAF50",
+  "Store": "#FF9800",
+  "Booking": "#2196F3",
+  "Room": "#9C27B0",
+  "Games": "#F44336",
+  "Table Rent": "#00BCD4",
+};
+
+function MasterSalesReport() {
+  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+  const [yearFilter, setYearFilter] = useState(() => new Date().getFullYear().toString());
+  const [allTxns, setAllTxns] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    getTransactions({}).then(setAllTxns);
+  }, []);
+
+  const normalized = allTxns
+    .filter(t => t.status !== "Cancelled")
+    .map(t => ({ ...t, module_name: MASTER_MODULE_MAP[t.module] || t.module }));
+
+  // Grouped table for selected month
+  const monthTxns = normalized.filter(t => t.date_time.slice(0, 7) === monthFilter);
+  const groupMap = new Map<string, { date: string; module_name: string; total: number }>();
+  for (const t of monthTxns) {
+    const dateKey = t.date_time.slice(0, 10);
+    const k = `${dateKey}|${t.module_name}`;
+    const prev = groupMap.get(k) || { date: dateKey, module_name: t.module_name, total: 0 };
+    prev.total += (t.amount_paid || 0);
+    groupMap.set(k, prev);
+  }
+  const groupedRows = Array.from(groupMap.values()).sort((a, b) => a.date.localeCompare(b.date) || a.module_name.localeCompare(b.module_name));
+
+  const moduleTotals = new Map<string, number>();
+  for (const r of groupedRows) {
+    moduleTotals.set(r.module_name, (moduleTotals.get(r.module_name) || 0) + r.total);
+  }
+  const grandTotal = groupedRows.reduce((s, r) => s + r.total, 0);
+  const monthLabel = (() => {
+    const [y, m] = monthFilter.split("-");
+    return `${m}/${y}`;
+  })();
+
+  // Yearly comparison chart - monthly totals for selected year
+  const yearTxns = normalized.filter(t => t.date_time.slice(0, 4) === yearFilter);
+  const monthlyChartMap = new Map<string, number>();
+  for (let m = 1; m <= 12; m++) {
+    monthlyChartMap.set(`${m.toString().padStart(2, "0")}/${yearFilter}`, 0);
+  }
+  for (const t of yearTxns) {
+    const mm = t.date_time.slice(5, 7);
+    const key = `${mm}/${yearFilter}`;
+    monthlyChartMap.set(key, (monthlyChartMap.get(key) || 0) + (t.amount_paid || 0));
+  }
+  const chartData = Array.from(monthlyChartMap.entries()).map(([month, total]) => ({ month, total }));
+
+  const yearOptions = (() => {
+    const years = new Set<string>();
+    const cy = new Date().getFullYear();
+    years.add(cy.toString());
+    for (const t of allTxns) years.add(t.date_time.slice(0, 4));
+    return Array.from(years).sort();
+  })();
+
+  const exportCSV = () => {
+    const headers = ["Date", "Module", "Daily Total Sales"];
+    const csvRows = groupedRows.map(r => [formatDate(r.date + "T00:00:00"), r.module_name, r.total.toFixed(2)]);
+    csvRows.push(["", "GRAND TOTAL", grandTotal.toFixed(2)]);
+    const csv = [headers, ...csvRows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `master_sales_${monthFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    const summaryRows = Array.from(moduleTotals.entries())
+      .map(([mod, tot]) => `<tr><td>Total ${mod} Sales</td><td class="right">${formatPeso(tot)}</td></tr>`).join("");
+    w.document.write(`<html><head><title>Master Sales Report</title>
+      <style>body{font-family:Arial;font-size:12px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid #999;padding:6px 8px}th{background:#f0f0f0}.right{text-align:right}.total{background:#f9f9e0;font-weight:bold}.grand{background:#e8f5e9;font-weight:bold;font-size:13px}</style>
+      </head><body>
+      <h2>MASTER SALES REPORT</h2>
+      <p style="text-align:center">Month: ${monthLabel}</p>
+      <table>
+        <tr><th>Date</th><th>Module</th><th class="right">Daily Total Sales</th></tr>
+        ${groupedRows.map(r => `<tr><td>${formatDate(r.date + "T00:00:00")}</td><td>${r.module_name}</td><td class="right">${formatPeso(r.total)}</td></tr>`).join("")}
+      </table>
+      <h3 style="margin-top:18px">Summary</h3>
+      <table>${summaryRows}<tr class="grand"><td>GRAND TOTAL SALES</td><td class="right">${formatPeso(grandTotal)}</td></tr></table>
+      </body></html>`);
+    w.document.close();
+    w.print();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
+          <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Year (Chart)</label>
+          <select className="pos-input text-sm" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
+            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <button onClick={exportCSV} className="flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all self-end">
+          <Download size={16} /> Export CSV
+        </button>
+        <button onClick={handlePrint} className="flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all self-end">
+          <Printer size={16} /> Print
+        </button>
+      </div>
+
+      <div className="pos-card text-center">
+        <p className="text-xs text-muted-foreground">GRAND TOTAL SALES — {monthLabel}</p>
+        <p className="text-3xl font-bold tabular-nums text-primary">{formatPeso(grandTotal)}</p>
+      </div>
+
+      {/* Per-module summary cards */}
+      {moduleTotals.size > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          {Array.from(moduleTotals.entries()).map(([mod, tot]) => (
+            <div key={mod} className="pos-card text-center">
+              <p className="text-xs text-muted-foreground">Total {mod}</p>
+              <p className="text-base font-bold tabular-nums" style={{ color: MASTER_MODULE_COLORS[mod] || "hsl(var(--primary))" }}>{formatPeso(tot)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Grouped table */}
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-left px-3 py-2 font-medium">Module</th>
+              <th className="text-right px-3 py-2 font-medium">Daily Total Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groupedRows.length === 0 && (
+              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No sales for this month</td></tr>
+            )}
+            {groupedRows.map(r => (
+              <tr key={`${r.date}-${r.module_name}`} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2">{formatDate(r.date + "T00:00:00")}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: MASTER_MODULE_COLORS[r.module_name] || "#999" }} />
+                    {r.module_name}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(r.total)}</td>
+              </tr>
+            ))}
+            {groupedRows.length > 0 && (
+              <tr className="bg-primary/5 border-t-2 border-primary/20">
+                <td className="px-3 py-2 font-bold" colSpan={2}>GRAND TOTAL SALES</td>
+                <td className="px-3 py-2 text-right tabular-nums font-bold">{formatPeso(grandTotal)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Yearly comparison chart */}
+      <div className="pos-card">
+        <h3 className="text-sm font-bold flex items-center gap-2 mb-3">
+          <BarChart3 size={16} /> Compare Monthly Sales (All Modules) — {yearFilter}
+        </h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip formatter={(value: number) => [formatPeso(value), "Total Sales"]} />
+            <Legend />
+            <Bar dataKey="total" name="Total Sales (₱)" fill="#4CAF50" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
 
 function MonthlySalesReport() {
   const [sourceModule, setSourceModule] = useState<"Entrance" | "Store">("Entrance");
@@ -634,6 +838,7 @@ export default function ReportsModule() {
           { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
           { key: "petty-monitoring" as Tab, label: "Petty Cash Monitor", icon: <ClipboardList size={14} /> as React.ReactNode },
           { key: "monthly-sales" as Tab, label: "Monthly Sales", icon: <TrendingUp size={14} /> as React.ReactNode },
+          { key: "master-sales" as Tab, label: "Master Sales", icon: <Trophy size={14} /> as React.ReactNode },
           { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
           { key: "analytics" as Tab, label: "Analytics", icon: <BarChart3 size={14} /> as React.ReactNode },
         ]).map(t => (
@@ -919,6 +1124,8 @@ export default function ReportsModule() {
       {tab === "analytics" && <AnalyticsDashboard />}
 
       {tab === "monthly-sales" && <MonthlySalesReport />}
+
+      {tab === "master-sales" && <MasterSalesReport />}
 
       {/* Edit Transaction Dialog */}
       <Dialog open={!!editingTxn} onOpenChange={(open) => { if (!open) setEditingTxn(null); }}>
