@@ -7,7 +7,7 @@ import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReport
 import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
 import { toast } from "sonner";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
 function formatDateTime(iso: string) {
@@ -139,17 +139,34 @@ function AnalyticsDashboard() {
           <h3 className="text-sm font-bold flex items-center gap-2"><BarChart3 size={16} /> Daily Headcount</h3>
           <input type="month" className="pos-input text-sm w-auto" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
         </div>
-        {dailyData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={dailyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(value: number) => [value, "Headcount"]} />
-              <Bar dataKey="headcount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
+        {dailyData.length > 0 ? (() => {
+          const counts = dailyData.map(d => d.headcount);
+          const maxV = Math.max(...counts);
+          const minV = Math.min(...counts);
+          const sorted = [...counts].sort((a, b) => a - b);
+          const mid = sorted.length % 2 === 0
+            ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+            : sorted[Math.floor(sorted.length / 2)];
+          const colorFor = (v: number) => {
+            if (v === maxV && maxV !== minV) return "#4CAF50";
+            if (v === minV && maxV !== minV) return "#F44336";
+            if (v === mid) return "#9E9E9E";
+            return "#81D4FA";
+          };
+          return (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={dailyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(value: number) => [value, "Headcount"]} />
+                <Bar dataKey="headcount" radius={[4, 4, 0, 0]}>
+                  {dailyData.map((d, i) => <Cell key={i} fill={colorFor(d.headcount)} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        })() : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
       </div>
 
       {/* Monthly Sales vs Headcount */}
@@ -162,10 +179,10 @@ function AnalyticsDashboard() {
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(value: number, name: string) => [name === "sales" ? formatPeso(value) : value, name === "sales" ? "Sales (₱)" : "Headcount"]} />
+              <Tooltip formatter={(value: number, name: string) => [name === "Sales (₱)" ? formatPeso(value) : value, name]} />
               <Legend />
-              <Bar yAxisId="left" dataKey="sales" name="Sales (₱)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              <Bar yAxisId="right" dataKey="headcount" name="Headcount" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="left" dataKey="sales" name="Sales (₱)" fill="#4CAF50" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="right" dataKey="headcount" name="Headcount" fill="#81D4FA" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : <p className="text-center text-sm text-muted-foreground py-8">No data available</p>}
