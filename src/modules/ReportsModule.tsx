@@ -279,21 +279,24 @@ function MonthlySalesReport() {
   const [rows, setRows] = useState<{ date: string; total: number }[]>([]);
 
   useEffect(() => {
-    getTransactions({ module: sourceModule }).then(txns => {
-      const filtered = txns.filter(t => {
-        if (t.status === "Cancelled") return false;
-        return t.date_time.slice(0, 7) === monthFilter;
-      });
-      const map = new Map<string, number>();
-      for (const t of filtered) {
-        const key = t.date_time.slice(0, 10); // YYYY-MM-DD
-        map.set(key, (map.get(key) || 0) + (t.amount_paid || 0));
+    const load = async () => {
+      let raw: { date: string; total: number }[] = [];
+      if (sourceModule === "Entrance") {
+        const reports = await getCashierReports();
+        raw = reports.map(r => ({ date: toLocalDateKey(r.date), total: Number(r.sales) || 0 }));
+      } else {
+        const reports = await loadBookingCashierReports();
+        raw = reports.map(r => ({ date: toLocalDateKey(r.report_date), total: Number(r.entranceSales ?? r.entrance_sales ?? 0) }));
       }
+      const filtered = raw.filter(r => r.date.slice(0, 7) === monthFilter && r.total > 0);
+      const map = new Map<string, number>();
+      for (const r of filtered) map.set(r.date, (map.get(r.date) || 0) + r.total);
       const result = Array.from(map.entries())
         .map(([date, total]) => ({ date, total }))
         .sort((a, b) => a.date.localeCompare(b.date));
       setRows(result);
-    });
+    };
+    load();
   }, [sourceModule, monthFilter]);
 
   const monthlyTotal = rows.reduce((s, r) => s + r.total, 0);
