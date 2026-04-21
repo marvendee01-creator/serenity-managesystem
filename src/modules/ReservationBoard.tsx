@@ -208,8 +208,8 @@ export default function ReservationBoard() {
                   const hasConflict = day ? conflictDays.has(day) : false;
                   const cellStyle: React.CSSProperties = {};
                   if (isToday) {
-                    cellStyle.border = "2px solid #ff9800";
-                    cellStyle.backgroundColor = "#fff3cd";
+                    cellStyle.border = "2px solid hsl(200 90% 50%)";
+                    cellStyle.backgroundColor = "hsl(200 90% 92%)";
                   }
                   return (
                     <td key={di} className="border border-border p-1 align-top h-24 relative" style={cellStyle}>
