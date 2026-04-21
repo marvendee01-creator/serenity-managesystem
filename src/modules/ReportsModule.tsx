@@ -181,10 +181,11 @@ function AnalyticsDashboard() {
   );
 }
 interface PettyMonitorRow {
-  date: string;
-  income: number;
-  expenses: number;
-  net: number;
+  customer: string;
+  sourceModule: string;
+  amount: number;
+  cashOnHand: number;
+  runningBalance: number;
 }
 
 function PettyCashMonitoring() {
