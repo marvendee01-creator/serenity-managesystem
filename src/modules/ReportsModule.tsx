@@ -49,27 +49,66 @@ const MASTER_MODULE_COLORS: Record<string, string> = {
   "Table Rent": "#00BCD4",
 };
 
+// Convert any date-ish string to local YYYY-MM-DD
+function toLocalDateKey(s: string): string {
+  if (!s) return "";
+  // Plain date "YYYY-MM-DD"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s.slice(0, 10);
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+interface MasterRow {
+  date: string;            // YYYY-MM-DD (local)
+  module_name: string;
+  total: number;
+}
+
 function MasterSalesReport() {
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
   const [yearFilter, setYearFilter] = useState(() => new Date().getFullYear().toString());
   const [allTxns, setAllTxns] = useState<Transaction[]>([]);
+  const [cashierReports, setCashierReports] = useState<CashierReport[]>([]);
+  const [bookingReports, setBookingReports] = useState<BookingCashierReport[]>([]);
 
   useEffect(() => {
     getTransactions({}).then(setAllTxns);
+    getCashierReports().then(setCashierReports);
+    loadBookingCashierReports().then(setBookingReports);
   }, []);
 
-  const normalized = allTxns
-    .filter(t => t.status !== "Cancelled")
-    .map(t => ({ ...t, module_name: MASTER_MODULE_MAP[t.module] || t.module }));
+  // Build unified rows from Daily Cashier Reports + transactions (Booking/Room/Games only)
+  const allRows: MasterRow[] = [
+    // Entrance ← Daily Cashier Report (sales)
+    ...cashierReports.map(r => ({
+      date: toLocalDateKey(r.date),
+      module_name: "Entrance",
+      total: Number(r.sales) || 0,
+    })),
+    // Store ← Daily Cashier Report - BOOKING (entrance_sales field stores total store sales)
+    ...bookingReports.map(r => ({
+      date: toLocalDateKey(r.report_date),
+      module_name: "Store",
+      total: Number(r.entranceSales ?? r.entrance_sales ?? 0),
+    })),
+    // Booking / Room / Games ← transactions
+    ...allTxns
+      .filter(t => t.status !== "Cancelled")
+      .map(t => ({ date: toLocalDateKey(t.date_time), module_name: MASTER_MODULE_MAP[t.module] || t.module, total: Number(t.amount_paid) || 0 }))
+      .filter(r => ["Booking", "Room", "Games"].includes(r.module_name)),
+  ].filter(r => r.total > 0);
 
   // Grouped table for selected month
-  const monthTxns = normalized.filter(t => t.date_time.slice(0, 7) === monthFilter);
-  const groupMap = new Map<string, { date: string; module_name: string; total: number }>();
-  for (const t of monthTxns) {
-    const dateKey = t.date_time.slice(0, 10);
-    const k = `${dateKey}|${t.module_name}`;
-    const prev = groupMap.get(k) || { date: dateKey, module_name: t.module_name, total: 0 };
-    prev.total += (t.amount_paid || 0);
+  const monthRows = allRows.filter(r => r.date.slice(0, 7) === monthFilter);
+  const groupMap = new Map<string, MasterRow>();
+  for (const r of monthRows) {
+    const k = `${r.date}|${r.module_name}`;
+    const prev = groupMap.get(k) || { date: r.date, module_name: r.module_name, total: 0 };
+    prev.total += r.total;
     groupMap.set(k, prev);
   }
   const groupedRows = Array.from(groupMap.values()).sort((a, b) => a.date.localeCompare(b.date) || a.module_name.localeCompare(b.module_name));
@@ -85,15 +124,15 @@ function MasterSalesReport() {
   })();
 
   // Yearly comparison chart - monthly totals for selected year
-  const yearTxns = normalized.filter(t => t.date_time.slice(0, 4) === yearFilter);
+  const yearRows = allRows.filter(r => r.date.slice(0, 4) === yearFilter);
   const monthlyChartMap = new Map<string, number>();
   for (let m = 1; m <= 12; m++) {
     monthlyChartMap.set(`${m.toString().padStart(2, "0")}/${yearFilter}`, 0);
   }
-  for (const t of yearTxns) {
-    const mm = t.date_time.slice(5, 7);
+  for (const r of yearRows) {
+    const mm = r.date.slice(5, 7);
     const key = `${mm}/${yearFilter}`;
-    monthlyChartMap.set(key, (monthlyChartMap.get(key) || 0) + (t.amount_paid || 0));
+    monthlyChartMap.set(key, (monthlyChartMap.get(key) || 0) + r.total);
   }
   const chartData = Array.from(monthlyChartMap.entries()).map(([month, total]) => ({ month, total }));
 
@@ -101,7 +140,7 @@ function MasterSalesReport() {
     const years = new Set<string>();
     const cy = new Date().getFullYear();
     years.add(cy.toString());
-    for (const t of allTxns) years.add(t.date_time.slice(0, 4));
+    for (const r of allRows) years.add(r.date.slice(0, 4));
     return Array.from(years).sort();
   })();
 
@@ -240,21 +279,24 @@ function MonthlySalesReport() {
   const [rows, setRows] = useState<{ date: string; total: number }[]>([]);
 
   useEffect(() => {
-    getTransactions({ module: sourceModule }).then(txns => {
-      const filtered = txns.filter(t => {
-        if (t.status === "Cancelled") return false;
-        return t.date_time.slice(0, 7) === monthFilter;
-      });
-      const map = new Map<string, number>();
-      for (const t of filtered) {
-        const key = t.date_time.slice(0, 10); // YYYY-MM-DD
-        map.set(key, (map.get(key) || 0) + (t.amount_paid || 0));
+    const load = async () => {
+      let raw: { date: string; total: number }[] = [];
+      if (sourceModule === "Entrance") {
+        const reports = await getCashierReports();
+        raw = reports.map(r => ({ date: toLocalDateKey(r.date), total: Number(r.sales) || 0 }));
+      } else {
+        const reports = await loadBookingCashierReports();
+        raw = reports.map(r => ({ date: toLocalDateKey(r.report_date), total: Number(r.entranceSales ?? r.entrance_sales ?? 0) }));
       }
+      const filtered = raw.filter(r => r.date.slice(0, 7) === monthFilter && r.total > 0);
+      const map = new Map<string, number>();
+      for (const r of filtered) map.set(r.date, (map.get(r.date) || 0) + r.total);
       const result = Array.from(map.entries())
         .map(([date, total]) => ({ date, total }))
         .sort((a, b) => a.date.localeCompare(b.date));
       setRows(result);
-    });
+    };
+    load();
   }, [sourceModule, monthFilter]);
 
   const monthlyTotal = rows.reduce((s, r) => s + r.total, 0);
