@@ -26,12 +26,19 @@ export default function WelcomePopup({ onClose }: { onClose: () => void }) {
   const [visible, setVisible] = useState(true);
   const [todayCount, setTodayCount] = useState(0);
   const [expectedGuests, setExpectedGuests] = useState(0);
+  const [entranceGuestsToday, setEntranceGuestsToday] = useState(0);
 
   useEffect(() => {
     getTransactions({ module: "Booking" }).then(txns => {
       const todays = txns.filter(t => t.status !== "Cancelled" && isToday(t.check_in));
       setTodayCount(todays.length);
       setExpectedGuests(todays.reduce((sum, t) => sum + (t.total_headcount || 0), 0));
+    }).catch(() => {});
+
+    getTransactions({ module: "Entrance" }).then(txns => {
+      const todays = txns.filter(t => isToday(t.date_time));
+      const total = todays.reduce((sum, t) => sum + (t.adults || 0) + (t.kids_8_above || 0) + (t.kids_5_7 || 0) + (t.kids_4_below || 0), 0);
+      setEntranceGuestsToday(total);
     }).catch(() => {});
 
     try {
@@ -62,6 +69,7 @@ export default function WelcomePopup({ onClose }: { onClose: () => void }) {
           <p className="text-xs text-muted-foreground">Today's Schedule</p>
           <p className="text-sm font-semibold text-foreground">📅 Today Bookings: <span className="text-primary">{todayCount}</span></p>
           <p className="text-sm font-semibold text-foreground">👥 Expected Guests: <span className="text-primary">{expectedGuests} pax</span></p>
+          <p className="text-sm font-semibold text-foreground">🎟️ Entrance Guests Today: <span className="text-primary">{entranceGuestsToday} pax</span></p>
         </div>
         <button
           onClick={() => { setVisible(false); onClose(); }}

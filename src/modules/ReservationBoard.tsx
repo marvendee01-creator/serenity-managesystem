@@ -70,24 +70,30 @@ export default function ReservationBoard() {
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [selected, setSelected] = useState<Transaction | null>(null);
 
-  const fromDate = new Date(year, month, 1).toISOString().slice(0, 10);
-  const toDate = new Date(year, month + 1, 0).toISOString().slice(0, 10);
-
-  const loadBookings = () => {
-    getTransactions({ module: "Booking", dateFrom: fromDate, dateTo: toDate }).then(txns => {
-      // Exclude cancelled bookings from the board
-      setBookings(txns.filter(t => t.status !== "Cancelled"));
+  // Load ALL bookings once (with both check_in & check_out); filter by visible month client-side
+  // so multi-month spans render correctly when navigating prev/next.
+  useEffect(() => {
+    getTransactions({ module: "Booking" }).then(txns => {
+      setBookings(txns.filter(t => t.status !== "Cancelled" && t.check_in && t.check_out));
     });
-  };
+  }, []);
 
-  useEffect(() => { loadBookings(); }, [fromDate, toDate]);
+  // Filter bookings whose date range intersects the visible month
+  const visibleBookings = useMemo(() => {
+    const monthStart = dateOnly(new Date(year, month, 1));
+    const monthEnd = dateOnly(new Date(year, month + 1, 0));
+    return bookings.filter(b => {
+      const { start, end } = getNormalizedRange(b);
+      return start <= monthEnd && end >= monthStart;
+    });
+  }, [bookings, year, month]);
 
   const { startDay, totalDays } = getMonthDays(year, month);
 
   // Map bookings to days (supports multi-day spans, deduped per day by booking id)
   const bookingsByDay = useMemo(() => {
     const map: Record<number, Transaction[]> = {};
-    bookings.forEach((b) => {
+    visibleBookings.forEach((b) => {
       const days = getBookingDays(b, year, month, totalDays);
       days.forEach(d => {
         if (!map[d]) map[d] = [];
@@ -95,7 +101,7 @@ export default function ReservationBoard() {
       });
     });
     return map;
-  }, [bookings, year, month, totalDays]);
+  }, [visibleBookings, year, month, totalDays]);
 
   // Conflict detection: days where 2+ exclusive bookings overlap, OR exclusive overlaps with any other
   const conflictDays = useMemo(() => {
@@ -176,7 +182,7 @@ export default function ReservationBoard() {
           <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-pink-200 border border-pink-400" /> Exclusive</span>
           <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-cyan-200 border border-cyan-400" /> Non-Exclusive</span>
         </div>
-        <span className="text-sm text-muted-foreground ml-auto">{bookings.length} reservations</span>
+        <span className="text-sm text-muted-foreground ml-auto">{visibleBookings.length} reservations this month</span>
       </div>
 
       {/* Calendar Grid */}
