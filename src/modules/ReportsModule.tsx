@@ -98,11 +98,11 @@ function StoreSalesSummary() {
             )}
             {reports.map(r => (
               <tr key={r.id} className="border-t border-border hover:bg-muted/50">
-                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(r.reportDate + "T00:00:00")}</td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(r.date)}</td>
                 <td className="px-3 py-2">
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">Store</span>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(r.entranceSales || 0)}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(Number(r.sales) || 0)}</td>
               </tr>
             ))}
             {reports.length > 0 && (
