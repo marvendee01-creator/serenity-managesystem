@@ -31,23 +31,28 @@ function formatDate(iso: string) {
 type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "reservation" | "petty-monitoring" | "analytics";
 
 function StoreSalesSummary() {
-  const [reports, setReports] = useState<BookingCashierReport[]>([]);
+  const [reports, setReports] = useState<CashierReport[]>([]);
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
 
   useEffect(() => {
-    loadBookingCashierReports().then(all => {
-      const filtered = all.filter(r => r.reportDate.slice(0, 7) === monthFilter);
-      filtered.sort((a, b) => a.reportDate.localeCompare(b.reportDate));
+    getCashierReports().then(all => {
+      const filtered = all.filter(r => {
+        // r.date may be ISO timestamp or YYYY-MM-DD; derive local YYYY-MM
+        const d = new Date(r.date);
+        const ym = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        return ym === monthFilter;
+      });
+      filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setReports(filtered);
     });
   }, [monthFilter]);
 
-  const total = reports.reduce((s, r) => s + (r.entranceSales || 0), 0);
+  const total = reports.reduce((s, r) => s + (Number(r.sales) || 0), 0);
   const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
 
   const exportCSV = () => {
     const headers = ["Date", "Module", "Daily Total Store Sales"];
-    const rows = reports.map(r => [formatDate(r.reportDate + "T00:00:00"), "Store", (r.entranceSales || 0).toFixed(2)]);
+    const rows = reports.map(r => [formatDate(r.date), "Store", (Number(r.sales) || 0).toFixed(2)]);
     rows.push(["", "TOTAL", total.toFixed(2)]);
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
