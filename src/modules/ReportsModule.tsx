@@ -28,7 +28,90 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "reservation" | "petty-monitoring" | "analytics";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "reservation" | "petty-monitoring" | "analytics";
+
+function StoreSalesSummary() {
+  const [reports, setReports] = useState<BookingCashierReport[]>([]);
+  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+
+  useEffect(() => {
+    loadBookingCashierReports().then(all => {
+      const filtered = all.filter(r => r.reportDate.slice(0, 7) === monthFilter);
+      filtered.sort((a, b) => a.reportDate.localeCompare(b.reportDate));
+      setReports(filtered);
+    });
+  }, [monthFilter]);
+
+  const total = reports.reduce((s, r) => s + (r.entranceSales || 0), 0);
+  const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  const exportCSV = () => {
+    const headers = ["Date", "Module", "Daily Total Store Sales"];
+    const rows = reports.map(r => [formatDate(r.reportDate + "T00:00:00"), "Store", (r.entranceSales || 0).toFixed(2)]);
+    rows.push(["", "TOTAL", total.toFixed(2)]);
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `store_sales_summary_${monthFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
+          <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+        </div>
+        <div className="md:col-start-3 self-end">
+          <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="pos-card text-center mb-4">
+        <p className="text-xs text-muted-foreground">Total Store Sales for {monthLabel}</p>
+        <p className="text-2xl font-bold tabular-nums text-primary">{formatPeso(total)}</p>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-left px-3 py-2 font-medium">Module</th>
+              <th className="text-right px-3 py-2 font-medium">Daily Total Store Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reports.length === 0 && (
+              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No store sales for this month</td></tr>
+            )}
+            {reports.map(r => (
+              <tr key={r.id} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(r.reportDate + "T00:00:00")}</td>
+                <td className="px-3 py-2">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">Store</span>
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(r.entranceSales || 0)}</td>
+              </tr>
+            ))}
+            {reports.length > 0 && (
+              <tr className="border-t-2 border-border bg-accent/30 font-bold">
+                <td className="px-3 py-2" colSpan={2}>TOTAL</td>
+                <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function AnalyticsDashboard() {
   const [txns, setTxns] = useState<Transaction[]>([]);
@@ -517,6 +600,7 @@ export default function ReportsModule() {
           { key: "transactions" as Tab, label: "Transactions", icon: null as React.ReactNode },
           { key: "cashier" as Tab, label: "Cashier Store", icon: <Banknote size={14} /> as React.ReactNode },
           { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
+          { key: "store-sales" as Tab, label: "Store Sales Summary", icon: <TrendingUp size={14} /> as React.ReactNode },
           { key: "petty-monitoring" as Tab, label: "Petty Cash Monitor", icon: <ClipboardList size={14} /> as React.ReactNode },
           { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
           { key: "analytics" as Tab, label: "Analytics", icon: <BarChart3 size={14} /> as React.ReactNode },
@@ -797,6 +881,8 @@ export default function ReportsModule() {
       )}
 
       {tab === "reservation" && <ReservationBoard />}
+
+      {tab === "store-sales" && <StoreSalesSummary />}
 
       {tab === "petty-monitoring" && <PettyCashMonitoring />}
 

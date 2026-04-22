@@ -26,6 +26,7 @@ export default function WelcomePopup({ onClose }: { onClose: () => void }) {
   const [visible, setVisible] = useState(true);
   const [todayCount, setTodayCount] = useState(0);
   const [expectedGuests, setExpectedGuests] = useState(0);
+  const [roomsToday, setRoomsToday] = useState<string[]>([]);
   const [entranceGuestsToday, setEntranceGuestsToday] = useState(0);
 
   useEffect(() => {
@@ -33,6 +34,8 @@ export default function WelcomePopup({ onClose }: { onClose: () => void }) {
       const todays = txns.filter(t => t.status !== "Cancelled" && isToday(t.check_in));
       setTodayCount(todays.length);
       setExpectedGuests(todays.reduce((sum, t) => sum + (t.total_headcount || 0), 0));
+      const rooms = todays.map(t => t.room_type).filter((r): r is string => !!r);
+      setRoomsToday(rooms);
     }).catch(() => {});
 
     getTransactions({ module: "Entrance" }).then(txns => {
@@ -56,6 +59,8 @@ export default function WelcomePopup({ onClose }: { onClose: () => void }) {
 
   if (!visible) return null;
 
+  const roomsLabel = roomsToday.length ? roomsToday.join(", ") : "None";
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => { setVisible(false); onClose(); }}>
       <div className="bg-card rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center animate-bounce-in" onClick={e => e.stopPropagation()}>
@@ -65,10 +70,14 @@ export default function WelcomePopup({ onClose }: { onClose: () => void }) {
         <p className="text-sm text-muted-foreground mb-4">
           Please greet the customer properly.
         </p>
+        <div className="bg-muted/50 rounded-lg p-3 mb-2 text-left space-y-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Today's Bookings</p>
+          <p className="text-sm font-semibold text-foreground">📅 Bookings: <span className="text-primary">{todayCount}</span></p>
+          <p className="text-sm font-semibold text-foreground">👥 Total Guests (Booking): <span className="text-primary">{expectedGuests} pax</span></p>
+          <p className="text-sm font-semibold text-foreground">🏠 Room Booked Today: <span className="text-primary">{roomsLabel}</span></p>
+        </div>
         <div className="bg-muted/50 rounded-lg p-3 mb-6 text-left space-y-1">
-          <p className="text-xs text-muted-foreground">Today's Schedule</p>
-          <p className="text-sm font-semibold text-foreground">📅 Today Bookings: <span className="text-primary">{todayCount}</span></p>
-          <p className="text-sm font-semibold text-foreground">👥 Expected Guests: <span className="text-primary">{expectedGuests} pax</span></p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Entrance</p>
           <p className="text-sm font-semibold text-foreground">🎟️ Entrance Guests Today: <span className="text-primary">{entranceGuestsToday} pax</span></p>
         </div>
         <button

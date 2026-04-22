@@ -153,7 +153,7 @@ export default function BookingManagement() {
             onClick={() => setFilter(f)}
             className={`flex-1 h-10 rounded-t-lg text-xs font-medium transition-all ${filter === f ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
           >
-            {f === "ALL" ? `ALL (${bookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
+            {f === "ALL" ? `All (${bookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
           </button>
         ))}
       </div>

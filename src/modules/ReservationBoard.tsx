@@ -16,8 +16,8 @@ function getMonthDays(year: number, month: number) {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const EXCLUSIVE_STYLE = "bg-pink-100 border-pink-400 text-pink-900";
-const NON_EXCLUSIVE_STYLE = "bg-cyan-100 border-cyan-400 text-cyan-900";
+const EXCLUSIVE_STYLE = "bg-red-100 border-red-400 text-red-900";
+const NON_EXCLUSIVE_STYLE = "bg-blue-100 border-blue-400 text-blue-900";
 const DEFAULT_STYLE = "bg-purple-100 border-purple-300 text-purple-800";
 
 function getBookingStyle(b: Transaction): string {
@@ -179,8 +179,8 @@ export default function ReservationBoard() {
         <span className="text-sm font-semibold text-foreground">{monthLabel}</span>
         <button onClick={nextMonth} className="px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">Next →</button>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-pink-200 border border-pink-400" /> Exclusive</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-cyan-200 border border-cyan-400" /> Non-Exclusive</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-red-200 border border-red-400" /> Exclusive</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-blue-200 border border-blue-400" /> Non-Exclusive</span>
         </div>
         <span className="text-sm text-muted-foreground ml-auto">{visibleBookings.length} reservations this month</span>
       </div>
