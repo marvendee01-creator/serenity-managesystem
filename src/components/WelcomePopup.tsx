@@ -72,7 +72,6 @@ export default function WelcomePopup({ onClose }: { onClose: () => void }) {
         </p>
         <div className="bg-muted/50 rounded-lg p-3 mb-2 text-left space-y-1">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Today's Bookings</p>
-          <p className="text-sm font-semibold text-foreground">📅 Bookings: <span className="text-primary">{todayCount}</span></p>
           <p className="text-sm font-semibold text-foreground">👥 Total Guests (Booking): <span className="text-primary">{expectedGuests} pax</span></p>
           <p className="text-sm font-semibold text-foreground">🏠 Room Booked Today: <span className="text-primary">{roomsLabel}</span></p>
         </div>
