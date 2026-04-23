@@ -222,6 +222,8 @@ function AnalyticsDashboard() {
   const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
 
   return (
+    <div className="space-y-6">
+      {/* Top Revenue Day Card */}
       <div className="pos-card bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
         <div className="flex items-center gap-2 mb-2">
           <Trophy size={18} className="text-primary" />
