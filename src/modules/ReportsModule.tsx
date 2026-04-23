@@ -7,7 +7,7 @@ import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReport
 import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
 import { toast } from "sonner";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
 function formatDateTime(iso: string) {
@@ -207,10 +207,14 @@ function StoreSalesSummary() {
 
 function AnalyticsDashboard() {
   const [txns, setTxns] = useState<Transaction[]>([]);
+  const [storeReports, setStoreReports] = useState<CashierReport[]>([]);
+  const [bookingReports, setBookingReports] = useState<BookingCashierReport[]>([]);
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
 
   useEffect(() => {
     getTransactions({}).then(setTxns);
+    getCashierReports().then(setStoreReports);
+    loadBookingCashierReports().then(setBookingReports);
   }, []);
 
   const toDateKey = (iso: string) => {
@@ -334,24 +338,51 @@ function AnalyticsDashboard() {
         })() : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
       </div>
 
-      {/* Monthly Sales vs Headcount */}
-      <div className="pos-card">
-        <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><TrendingUp size={16} /> Monthly Sales vs Headcount</h3>
-        {monthlyData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(value: number, name: string) => [name === "Sales (₱)" ? formatPeso(value) : value, name]} />
-              <Legend />
-              <Bar yAxisId="left" dataKey="sales" name="Sales (₱)" fill="#4CAF50" radius={[4, 4, 0, 0]} />
-              <Bar yAxisId="right" dataKey="headcount" name="Headcount" fill="#81D4FA" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : <p className="text-center text-sm text-muted-foreground py-8">No data available</p>}
-      </div>
+      {/* Daily Store vs Entrance Sales */}
+      {(() => {
+        const ymOf = (s: string) => {
+          const d = new Date(s);
+          return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        };
+        const dayKey = (s: string) => {
+          const d = new Date(s);
+          return `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getDate().toString().padStart(2, "0")}`;
+        };
+        const map = new Map<string, { date: string; store: number; entrance: number }>();
+        for (const r of storeReports) {
+          if (ymOf(r.date) !== monthFilter) continue;
+          const k = dayKey(r.date);
+          const prev = map.get(k) || { date: k, store: 0, entrance: 0 };
+          prev.store += Number(r.sales) || 0;
+          map.set(k, prev);
+        }
+        for (const r of bookingReports) {
+          if (ymOf(r.report_date) !== monthFilter) continue;
+          const k = dayKey(r.report_date);
+          const prev = map.get(k) || { date: k, store: 0, entrance: 0 };
+          prev.entrance += Number(r.entrance_sales) || 0;
+          map.set(k, prev);
+        }
+        const data = Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+        return (
+          <div className="pos-card">
+            <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><TrendingUp size={16} /> Daily Store Sales vs Entrance Sales</h3>
+            {data.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(value: number, name: string) => [formatPeso(value), name]} />
+                  <Legend />
+                  <Line type="monotone" dataKey="store" name="Store Sales" stroke="#4CAF50" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="entrance" name="Entrance Sales" stroke="#F44336" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
+          </div>
+        );
+      })()}
     </div>
   );
 }
