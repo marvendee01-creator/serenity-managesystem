@@ -207,10 +207,14 @@ function StoreSalesSummary() {
 
 function AnalyticsDashboard() {
   const [txns, setTxns] = useState<Transaction[]>([]);
+  const [storeReports, setStoreReports] = useState<CashierReport[]>([]);
+  const [bookingReports, setBookingReports] = useState<BookingCashierReport[]>([]);
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
 
   useEffect(() => {
     getTransactions({}).then(setTxns);
+    getCashierReports().then(setStoreReports);
+    loadBookingCashierReports().then(setBookingReports);
   }, []);
 
   const toDateKey = (iso: string) => {
