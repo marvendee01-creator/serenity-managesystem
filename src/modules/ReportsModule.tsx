@@ -28,7 +28,94 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "reservation" | "petty-monitoring" | "analytics";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "reservation" | "petty-monitoring" | "analytics";
+
+function EntranceSalesSummary() {
+  const [reports, setReports] = useState<BookingCashierReport[]>([]);
+  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+
+  useEffect(() => {
+    loadBookingCashierReports().then(all => {
+      const filtered = all.filter(r => {
+        const d = new Date(r.report_date);
+        const ym = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        return ym === monthFilter;
+      });
+      filtered.sort((a, b) => new Date(a.report_date).getTime() - new Date(b.report_date).getTime());
+      setReports(filtered);
+    });
+  }, [monthFilter]);
+
+  const total = reports.reduce((s, r) => s + (Number(r.entrance_sales) || 0), 0);
+  const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  const exportCSV = () => {
+    const headers = ["Date", "Module", "Daily Total Entrance Sales"];
+    const rows = reports.map(r => [formatDate(r.report_date), "Entrance / Booking", (Number(r.entrance_sales) || 0).toFixed(2)]);
+    rows.push(["", "TOTAL", total.toFixed(2)]);
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `entrance_sales_summary_${monthFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
+          <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+        </div>
+        <div className="md:col-start-3 self-end">
+          <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="pos-card text-center mb-4">
+        <p className="text-xs text-muted-foreground">Total Entrance Sales for {monthLabel}</p>
+        <p className="text-2xl font-bold tabular-nums text-primary">{formatPeso(total)}</p>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-left px-3 py-2 font-medium">Module</th>
+              <th className="text-right px-3 py-2 font-medium">Daily Total Entrance Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reports.length === 0 && (
+              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No entrance sales for this month</td></tr>
+            )}
+            {reports.map(r => (
+              <tr key={r.id} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(r.report_date)}</td>
+                <td className="px-3 py-2">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">Entrance / Booking</span>
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(Number(r.entrance_sales) || 0)}</td>
+              </tr>
+            ))}
+            {reports.length > 0 && (
+              <tr className="border-t-2 border-border bg-accent/30 font-bold">
+                <td className="px-3 py-2" colSpan={2}>TOTAL</td>
+                <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function StoreSalesSummary() {
   const [reports, setReports] = useState<CashierReport[]>([]);
