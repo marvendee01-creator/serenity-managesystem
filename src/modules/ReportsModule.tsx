@@ -30,39 +30,65 @@ function formatDate(iso: string) {
 
 type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "reservation" | "petty-monitoring" | "analytics";
 
+type SalesRow = { date: string; module: string; daily_sales: number; key: string };
+
 function StoreSalesSummary() {
-  const [reports, setReports] = useState<CashierReport[]>([]);
+  const [rows, setRows] = useState<SalesRow[]>([]);
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
 
   useEffect(() => {
-    getCashierReports().then(all => {
+    loadBookingCashierReports().then((all: BookingCashierReport[]) => {
       const filtered = all.filter(r => {
-        // r.date may be ISO timestamp or YYYY-MM-DD; derive local YYYY-MM
-        const d = new Date(r.date);
+        const d = new Date(r.report_date);
         const ym = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
         return ym === monthFilter;
       });
-      filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      setReports(filtered);
+
+      const out: SalesRow[] = [];
+      for (const r of filtered) {
+        const dateLabel = formatDate(r.report_date);
+        const entranceSales = Number(r.entrance_sales) || 0;
+        // booking_sales = actual_cash - beginning_cash - entrance_sales (excludes beginning balance)
+        const bookingSales = (Number(r.actual_cash) || 0) - (Number(r.beginning_cash) || 0) - entranceSales;
+
+        if (entranceSales > 0) {
+          out.push({ date: dateLabel, module: "Entrance", daily_sales: entranceSales, key: `${r.id}-E` });
+        }
+        if (bookingSales > 0) {
+          out.push({ date: dateLabel, module: "Booking", daily_sales: bookingSales, key: `${r.id}-B` });
+        }
+      }
+      out.sort((a, b) => {
+        const da = new Date(a.date).getTime();
+        const db = new Date(b.date).getTime();
+        if (da !== db) return da - db;
+        return a.module.localeCompare(b.module);
+      });
+      setRows(out);
     });
   }, [monthFilter]);
 
-  const total = reports.reduce((s, r) => s + (Number(r.sales) || 0), 0);
+  const total = rows.reduce((s, r) => s + r.daily_sales, 0);
   const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
 
   const exportCSV = () => {
     const headers = ["Date", "Module", "Daily Total Store Sales"];
-    const rows = reports.map(r => [formatDate(r.date), "Store", (Number(r.sales) || 0).toFixed(2)]);
-    rows.push(["", "TOTAL", total.toFixed(2)]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const csvRows = rows.map(r => [r.date, r.module, r.daily_sales.toFixed(2)]);
+    csvRows.push(["", "TOTAL", total.toFixed(2)]);
+    const csv = [headers, ...csvRows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `store_sales_summary_${monthFilter}.csv`;
+    a.download = `sales_summary_${monthFilter}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const moduleBadge = (m: string) =>
+    m === "Entrance"
+      ? "bg-success/10 text-success"
+      : "bg-primary/10 text-primary";
 
   return (
     <div>
@@ -93,19 +119,19 @@ function StoreSalesSummary() {
             </tr>
           </thead>
           <tbody>
-            {reports.length === 0 && (
-              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No store sales for this month</td></tr>
+            {rows.length === 0 && (
+              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No sales for this month</td></tr>
             )}
-            {reports.map(r => (
-              <tr key={r.id} className="border-t border-border hover:bg-muted/50">
-                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(r.date)}</td>
+            {rows.map(r => (
+              <tr key={r.key} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{r.date}</td>
                 <td className="px-3 py-2">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">Store</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${moduleBadge(r.module)}`}>{r.module}</span>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(Number(r.sales) || 0)}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(r.daily_sales)}</td>
               </tr>
             ))}
-            {reports.length > 0 && (
+            {rows.length > 0 && (
               <tr className="border-t-2 border-border bg-accent/30 font-bold">
                 <td className="px-3 py-2" colSpan={2}>TOTAL</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
