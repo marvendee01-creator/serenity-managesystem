@@ -295,6 +295,49 @@ function AnalyticsDashboard() {
         })() : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
       </div>
 
+      {/* Sales Distribution by Module */}
+      <div className="pos-card">
+        <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><BarChart3 size={16} /> Sales Distribution by Module</h3>
+        {pieData.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="module"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label={(entry: any) => `${entry.module} ${((entry.value / pieTotal) * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {pieData.map((d, i) => (
+                    <Cell key={i} fill={MODULE_COLORS[d.module] || "#9E9E9E"} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number, name: string) => [formatPeso(value), name]} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="space-y-2">
+              {pieData.map(d => (
+                <div key={d.module} className="flex items-center justify-between text-sm border-b border-border pb-1">
+                  <span className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: MODULE_COLORS[d.module] }} />
+                    {d.module}
+                  </span>
+                  <span className="tabular-nums font-medium">{formatPeso(d.value)} <span className="text-xs text-muted-foreground">({((d.value/pieTotal)*100).toFixed(1)}%)</span></span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between text-sm font-bold pt-1">
+                <span>Total</span>
+                <span className="tabular-nums text-primary">{formatPeso(pieTotal)}</span>
+              </div>
+            </div>
+          </div>
+        ) : <p className="text-center text-sm text-muted-foreground py-8">No sales data available</p>}
+      </div>
+
       {/* Monthly Sales vs Headcount */}
       <div className="pos-card">
         <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><TrendingUp size={16} /> Monthly Sales vs Headcount</h3>
