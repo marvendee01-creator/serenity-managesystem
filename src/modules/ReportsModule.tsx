@@ -199,9 +199,29 @@ function AnalyticsDashboard() {
     if (amt > topRevAmount) { topRevDate = date; topRevAmount = amt; }
   }
 
+  // Sales Distribution by Module (all time, from transactions)
+  const MODULE_COLORS: Record<string, string> = {
+    Entrance: "#22c55e",
+    Room: "#3b82f6",
+    Games: "#f97316",
+    Table: "#eab308",
+  };
+  const moduleSalesMap = new Map<string, number>();
+  for (const t of txns) {
+    let key: string | null = null;
+    if (t.module === "Entrance") key = "Entrance";
+    else if (t.module === "Room") key = "Room";
+    else if (t.module === "Games Rental") key = "Games";
+    else if (t.module === "Table Rent") key = "Table";
+    if (!key) continue;
+    moduleSalesMap.set(key, (moduleSalesMap.get(key) || 0) + (t.amount_paid || 0));
+  }
+  const pieData = Array.from(moduleSalesMap.entries())
+    .map(([module, value]) => ({ module, value }))
+    .filter(d => d.value > 0);
+  const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
+
   return (
-    <div className="space-y-6">
-      {/* Top Revenue Day Card */}
       <div className="pos-card bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
         <div className="flex items-center gap-2 mb-2">
           <Trophy size={18} className="text-primary" />
