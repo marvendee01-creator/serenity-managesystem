@@ -977,6 +977,8 @@ export default function ReportsModule() {
 
       {tab === "store-sales" && <StoreSalesSummary />}
 
+      {tab === "entrance-sales" && <EntranceSalesSummary />}
+
       {tab === "petty-monitoring" && <PettyCashMonitoring />}
 
       {tab === "analytics" && <AnalyticsDashboard />}
