@@ -509,6 +509,11 @@ export default function RoomModule() {
           <PaymentToggle value={payment} onChange={setPayment} />
         </div>
         <div>
+          <label className="text-sm font-medium block mb-1">Discount (₱)</label>
+          <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
+          {discountAmt > 0 && <p className="text-xs text-success mt-1">− {formatPeso(discountAmt)} off room rate</p>}
+        </div>
+        <div>
           <label className="text-sm font-medium block mb-1">Amount Received</label>
           <input type="number" step="0.01" className="pos-input w-full text-lg font-bold" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} placeholder="0.00" min="0" />
         </div>
