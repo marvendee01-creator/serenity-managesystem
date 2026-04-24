@@ -327,6 +327,7 @@ export default function RoomModule() {
         details: [
           { label: "Room Type", value: roomType },
           { label: "Room Rate", value: formatPeso(roomRate) },
+          ...(discountAmt > 0 ? [{ label: "Discount", value: `- ${formatPeso(discountAmt)}` }] : []),
           { label: "Check-in", value: `${checkInDate} ${checkInTime}` },
           { label: "Scheduled Check-out", value: `${checkOutDate} ${checkOutTime}` },
           ...(a > 0 ? [{ label: "Adults", value: `${a}` }] : []),
