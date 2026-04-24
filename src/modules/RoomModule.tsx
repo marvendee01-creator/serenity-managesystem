@@ -421,7 +421,8 @@ export default function RoomModule() {
           </div>
         </div>
         <div className="pos-card">
-          <p className="text-sm font-bold text-primary">Total: {formatPeso(roomRate)}</p>
+          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}</p>
+          <p className="text-sm font-bold text-primary mt-1">Total: {formatPeso(totalRoomAmount)}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: {formatPeso(EXTENSION_RATE_PER_HOUR)}/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
 
