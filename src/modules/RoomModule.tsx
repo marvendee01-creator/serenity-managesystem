@@ -341,13 +341,13 @@ export default function RoomModule() {
       setReceiptData(rData);
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
-      setAmountReceived(""); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
+      setAmountReceived(""); setDiscount(""); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
       setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
