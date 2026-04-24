@@ -207,6 +207,7 @@ export default function RoomModule() {
   const [checkOutTime, setCheckOutTime] = useState("17:00"); // default 5PM
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
+  const [discount, setDiscount] = useState("");
   const [roomRate, setRoomRate] = useState(0);
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
