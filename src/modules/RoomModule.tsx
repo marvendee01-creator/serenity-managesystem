@@ -290,7 +290,8 @@ export default function RoomModule() {
     return { durationHours, extensionHours, extensionFee };
   };
 
-  const totalRoomAmount = roomRate;
+  const discountAmt = Math.max(0, parseFloat(discount) || 0);
+  const totalRoomAmount = Math.max(0, roomRate - discountAmt);
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
