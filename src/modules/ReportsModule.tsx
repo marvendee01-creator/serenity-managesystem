@@ -7,7 +7,7 @@ import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReport
 import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
 import { toast } from "sonner";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
 function formatDateTime(iso: string) {
@@ -349,6 +349,92 @@ function AnalyticsDashboard() {
                 </LineChart>
               </ResponsiveContainer>
             ) : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
+          </div>
+        );
+      })()}
+
+      {/* Income vs Expense Pie Charts */}
+      {(() => {
+        const ymOf = (s: string) => {
+          const d = new Date(s);
+          return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        };
+        // Store: income = sales, expenses = sum of petty_items in store cashier reports for the month
+        let storeIncome = 0;
+        let storeExpense = 0;
+        for (const r of storeReports) {
+          if (ymOf(r.date) !== monthFilter) continue;
+          storeIncome += Number(r.sales) || 0;
+          for (const item of (r.petty_items || [])) {
+            storeExpense += Number(item.amount) || 0;
+          }
+        }
+        // Entrance: income = entrance_sales, expenses = sum of petty_items in booking cashier reports
+        let entranceIncome = 0;
+        let entranceExpense = 0;
+        for (const r of bookingReports) {
+          if (ymOf(r.report_date) !== monthFilter) continue;
+          entranceIncome += Number(r.entrance_sales) || 0;
+          for (const item of (r.petty_items || [])) {
+            entranceExpense += Number(item.amount) || 0;
+          }
+        }
+        const storeData = [
+          { name: "Income", value: storeIncome, fill: "#4CAF50" },
+          { name: "Expenses", value: storeExpense, fill: "#F44336" },
+        ];
+        const entranceData = [
+          { name: "Income", value: entranceIncome, fill: "#4CAF50" },
+          { name: "Expenses", value: entranceExpense, fill: "#F44336" },
+        ];
+        const renderPie = (title: string, data: typeof storeData, income: number, expense: number) => {
+          const hasData = income + expense > 0;
+          const net = income - expense;
+          return (
+            <div className="pos-card">
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><BarChart3 size={16} /> {title}</h3>
+              {hasData ? (
+                <>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <PieChart>
+                      <Pie
+                        data={data}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={85}
+                        label={(entry: { name: string; value: number }) => `${entry.name}: ${formatPeso(entry.value)}`}
+                      >
+                        {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => formatPeso(value)} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Income</p>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: "#4CAF50" }}>{formatPeso(income)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Expenses</p>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: "#F44336" }}>{formatPeso(expense)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Net</p>
+                      <p className={`text-sm font-bold tabular-nums ${net >= 0 ? "text-success" : "text-destructive"}`}>{formatPeso(net)}</p>
+                    </div>
+                  </div>
+                </>
+              ) : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
+            </div>
+          );
+        };
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {renderPie("Income vs Expense — Store", storeData, storeIncome, storeExpense)}
+            {renderPie("Income vs Expense — Entrance", entranceData, entranceIncome, entranceExpense)}
           </div>
         );
       })()}
