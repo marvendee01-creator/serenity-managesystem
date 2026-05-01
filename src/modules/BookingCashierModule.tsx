@@ -155,12 +155,15 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
     Promise.all([
       getTransactions({ module: "Entrance" }),
       getTransactions({ module: "Booking" }),
-    ]).then(([entranceTxns, bookingTxns]) => {
+      getTransactions({ module: "Tent" }),
+    ]).then(([entranceTxns, bookingTxns, tentTxns]) => {
       const entranceToday = entranceTxns.filter(t => t.date_time.slice(0, 10) === today);
       const bookingToday = bookingTxns.filter(t => t.date_time.slice(0, 10) === today);
+      const tentToday = tentTxns.filter(t => t.date_time.slice(0, 10) === today);
       const entranceTotal = entranceToday.reduce((s, t) => s + t.amount_paid, 0);
       const bookingTotal = bookingToday.reduce((s, t) => s + (t.deposit_amount || 0), 0);
-      const totalSales = entranceTotal + bookingTotal;
+      const tentTotal = tentToday.reduce((s, t) => s + t.amount_paid, 0);
+      const totalSales = entranceTotal + bookingTotal + tentTotal;
       if (totalSales > 0) setEntranceSales(totalSales.toString());
     });
   }, [editReport]);
