@@ -205,6 +205,114 @@ function StoreSalesSummary() {
   );
 }
 
+function ExpensesSummary({ source, title }: { source: "store" | "entrance"; title: string }) {
+  const [rows, setRows] = useState<{ date: string; amount: number }[]>([]);
+  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+
+  useEffect(() => {
+    const load = async () => {
+      const map = new Map<string, number>();
+      const ymOf = (s: string) => {
+        const d = new Date(s);
+        return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+      };
+      const dayKey = (s: string) => formatDate(s);
+      if (source === "store") {
+        const all = await getCashierReports();
+        for (const r of all) {
+          for (const item of (r.petty_items || [])) {
+            const itemDate = item.date || r.date;
+            if (ymOf(itemDate) !== monthFilter) continue;
+            const k = dayKey(itemDate);
+            map.set(k, (map.get(k) || 0) + (Number(item.amount) || 0));
+          }
+        }
+      } else {
+        const all = await getBookingCashierReports();
+        for (const r of all) {
+          for (const item of (r.petty_items || [])) {
+            const itemDate = item.date || r.report_date;
+            if (ymOf(itemDate) !== monthFilter) continue;
+            const k = dayKey(itemDate);
+            map.set(k, (map.get(k) || 0) + (Number(item.amount) || 0));
+          }
+        }
+      }
+      const out = Array.from(map.entries())
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setRows(out);
+    };
+    load();
+  }, [source, monthFilter]);
+
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  const exportCSV = () => {
+    const headers = ["Date", "Daily Total Expenses"];
+    const data = rows.map(r => [r.date, r.amount.toFixed(2)]);
+    data.push(["TOTAL", total.toFixed(2)]);
+    const csv = [headers, ...data].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `expenses_summary_${source}_${monthFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
+          <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+        </div>
+        <div className="md:col-start-3 self-end">
+          <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="pos-card text-center mb-4">
+        <p className="text-xs text-muted-foreground">Total {title} for {monthLabel}</p>
+        <p className="text-2xl font-bold tabular-nums text-destructive">{formatPeso(total)}</p>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-right px-3 py-2 font-medium">Daily Total Expenses</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={2} className="text-center py-8 text-muted-foreground">No expenses for this month</td></tr>
+            )}
+            {rows.map(r => (
+              <tr key={r.date} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{r.date}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium text-destructive">{formatPeso(r.amount)}</td>
+              </tr>
+            ))}
+            {rows.length > 0 && (
+              <tr className="border-t-2 border-border bg-accent/30 font-bold">
+                <td className="px-3 py-2">TOTAL</td>
+                <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function AnalyticsDashboard() {
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [storeReports, setStoreReports] = useState<CashierReport[]>([]);
