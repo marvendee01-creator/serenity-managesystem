@@ -889,6 +889,8 @@ export default function ReportsModule() {
           { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
           { key: "store-sales" as Tab, label: "Store Sales Summary", icon: <TrendingUp size={14} /> as React.ReactNode },
           { key: "entrance-sales" as Tab, label: "Entrance Sales Summary", icon: <TrendingUp size={14} /> as React.ReactNode },
+          { key: "expenses-store" as Tab, label: "Expenses Summary - Store", icon: <ClipboardList size={14} /> as React.ReactNode },
+          { key: "expenses-entrance" as Tab, label: "Expenses Summary - Entrance", icon: <ClipboardList size={14} /> as React.ReactNode },
           { key: "petty-monitoring" as Tab, label: "Petty Cash Monitor", icon: <ClipboardList size={14} /> as React.ReactNode },
           { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
           { key: "analytics" as Tab, label: "Analytics", icon: <BarChart3 size={14} /> as React.ReactNode },
@@ -1173,6 +1175,10 @@ export default function ReportsModule() {
       {tab === "store-sales" && <StoreSalesSummary />}
 
       {tab === "entrance-sales" && <EntranceSalesSummary />}
+
+      {tab === "expenses-store" && <ExpensesSummary source="store" title="Store Expenses" />}
+
+      {tab === "expenses-entrance" && <ExpensesSummary source="entrance" title="Entrance Expenses" />}
 
       {tab === "petty-monitoring" && <PettyCashMonitoring />}
 
