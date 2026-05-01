@@ -275,7 +275,21 @@ export default function ReservationBoard() {
               {selected.room_type && <div className="flex justify-between"><span className="text-muted-foreground">Room</span><span className="font-medium">{selected.room_type}</span></div>}
               {selected.number_of_tables && <div className="flex justify-between"><span className="text-muted-foreground">Tables</span><span className="font-medium">{selected.number_of_tables}</span></div>}
               {selected.corkage_fee && <div className="flex justify-between"><span className="text-muted-foreground">Corkage</span><span className="font-medium">₱{selected.corkage_fee.toLocaleString()}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="font-bold text-primary">₱{selected.amount_paid.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Total Amount</span><span className="font-bold text-primary">₱{(selected.amount_paid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+              {(() => {
+                const total = selected.amount_paid || 0;
+                const deposit = selected.deposit_amount ?? 0;
+                const balance = (selected.balance ?? Math.max(0, total - deposit));
+                const status = deposit <= 0 ? "Unpaid" : (balance > 0 ? "Partially Paid" : "Fully Paid");
+                const statusColor = status === "Fully Paid" ? "text-success" : status === "Partially Paid" ? "text-warning" : "text-destructive";
+                return (
+                  <>
+                    {deposit > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Deposit</span><span className="font-medium">₱{deposit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                    {balance > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Balance</span><span className="font-bold text-destructive">₱{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                    <div className="flex justify-between"><span className="text-muted-foreground">Payment Status</span><span className={`font-bold ${statusColor}`}>{status}</span></div>
+                  </>
+                );
+              })()}
               <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{selected.payment_method}</span></div>
             </div>
           </div>
