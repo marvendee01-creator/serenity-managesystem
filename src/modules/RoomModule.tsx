@@ -423,7 +423,7 @@ export default function RoomModule() {
           </div>
         </div>
         <div className="pos-card">
-          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}</p>
+          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}{manualExtraCharge > 0 && <span className="text-warning"> + {formatPeso(manualExtraCharge)} extra</span>}</p>
           <p className="text-sm font-bold text-primary mt-1">Total: {formatPeso(totalRoomAmount)}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: {formatPeso(EXTENSION_RATE_PER_HOUR)}/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
@@ -514,6 +514,37 @@ export default function RoomModule() {
           <label className="text-sm font-medium block mb-1">Discount (₱)</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
           {discountAmt > 0 && <p className="text-xs text-success mt-1">− {formatPeso(discountAmt)} off room rate</p>}
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Manual Extra Charge (₱)</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className="pos-input flex-1"
+              value={manualExtraCharge || ""}
+              onChange={(e) => setManualExtraCharge(Math.max(0, parseFloat(e.target.value) || 0))}
+              placeholder="0.00"
+            />
+            <button
+              type="button"
+              onClick={() => setManualExtraCharge((v) => v + 10)}
+              className="px-3 h-10 rounded-md bg-warning text-warning-foreground font-semibold text-sm hover:bg-warning/90 active:scale-95 transition-all"
+            >
+              + ₱10
+            </button>
+            {manualExtraCharge > 0 && (
+              <button
+                type="button"
+                onClick={() => setManualExtraCharge(0)}
+                className="px-3 h-10 rounded-md border border-border text-sm hover:bg-muted transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {manualExtraCharge > 0 && <p className="text-xs text-warning mt-1">+ {formatPeso(manualExtraCharge)} added to total</p>}
         </div>
         <div>
           <label className="text-sm font-medium block mb-1">Amount Received</label>
