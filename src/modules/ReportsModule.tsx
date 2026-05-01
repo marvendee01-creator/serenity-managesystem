@@ -825,7 +825,7 @@ export default function ReportsModule() {
             <div className="pos-card text-center">
               <p className="text-xs text-muted-foreground">Total Guests</p>
               <p className="text-lg font-bold tabular-nums">{totalAdults + totalChildren}</p>
-              <p className="text-xs text-muted-foreground">{totalAdults}A / {totalChildren}C</p>
+              
             </div>
             <div className="pos-card text-center">
               <p className="text-xs text-muted-foreground">Total Amount</p>
