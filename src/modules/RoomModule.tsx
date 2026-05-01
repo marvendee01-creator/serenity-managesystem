@@ -208,6 +208,7 @@ export default function RoomModule() {
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [discount, setDiscount] = useState("");
+  const [manualExtraCharge, setManualExtraCharge] = useState(0);
   const [roomRate, setRoomRate] = useState(0);
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
@@ -291,7 +292,7 @@ export default function RoomModule() {
   };
 
   const discountAmt = Math.max(0, parseFloat(discount) || 0);
-  const totalRoomAmount = Math.max(0, roomRate - discountAmt);
+  const totalRoomAmount = Math.max(0, roomRate - discountAmt + manualExtraCharge);
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
@@ -328,6 +329,7 @@ export default function RoomModule() {
           { label: "Room Type", value: roomType },
           { label: "Room Rate", value: formatPeso(roomRate) },
           ...(discountAmt > 0 ? [{ label: "Discount", value: `- ${formatPeso(discountAmt)}` }] : []),
+          ...(manualExtraCharge > 0 ? [{ label: "Extra Charge", value: `+ ${formatPeso(manualExtraCharge)}` }] : []),
           { label: "Check-in", value: `${checkInDate} ${checkInTime}` },
           { label: "Scheduled Check-out", value: `${checkOutDate} ${checkOutTime}` },
           ...(a > 0 ? [{ label: "Adults", value: `${a}` }] : []),
@@ -341,13 +343,13 @@ export default function RoomModule() {
       setReceiptData(rData);
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
-      setAmountReceived(""); setDiscount(""); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
+      setAmountReceived(""); setDiscount(""); setManualExtraCharge(0); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
       setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
@@ -421,7 +423,7 @@ export default function RoomModule() {
           </div>
         </div>
         <div className="pos-card">
-          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}</p>
+          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}{manualExtraCharge > 0 && <span className="text-warning"> + {formatPeso(manualExtraCharge)} extra</span>}</p>
           <p className="text-sm font-bold text-primary mt-1">Total: {formatPeso(totalRoomAmount)}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: {formatPeso(EXTENSION_RATE_PER_HOUR)}/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
@@ -512,6 +514,37 @@ export default function RoomModule() {
           <label className="text-sm font-medium block mb-1">Discount (₱)</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
           {discountAmt > 0 && <p className="text-xs text-success mt-1">− {formatPeso(discountAmt)} off room rate</p>}
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Manual Extra Charge (₱)</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className="pos-input flex-1"
+              value={manualExtraCharge || ""}
+              onChange={(e) => setManualExtraCharge(Math.max(0, parseFloat(e.target.value) || 0))}
+              placeholder="0.00"
+            />
+            <button
+              type="button"
+              onClick={() => setManualExtraCharge((v) => v + 10)}
+              className="px-3 h-10 rounded-md bg-warning text-warning-foreground font-semibold text-sm hover:bg-warning/90 active:scale-95 transition-all"
+            >
+              + ₱10
+            </button>
+            {manualExtraCharge > 0 && (
+              <button
+                type="button"
+                onClick={() => setManualExtraCharge(0)}
+                className="px-3 h-10 rounded-md border border-border text-sm hover:bg-muted transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {manualExtraCharge > 0 && <p className="text-xs text-warning mt-1">+ {formatPeso(manualExtraCharge)} added to total</p>}
         </div>
         <div>
           <label className="text-sm font-medium block mb-1">Amount Received</label>

@@ -41,6 +41,8 @@ export default function EntranceModule() {
   const [overnightAdultRate, setOvernightAdultRate] = useState(150);
   const [overnightKids8Rate, setOvernightKids8Rate] = useState(75);
   const [overnightKids5Rate, setOvernightKids5Rate] = useState(50);
+  const [tentRate, setTentRate] = useState(300);
+  const [withTent, setWithTent] = useState(false);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -52,6 +54,7 @@ export default function EntranceModule() {
       setOvernightAdultRate(s.adult_rate_night);
       setOvernightKids8Rate(s.kids_8_above_rate_night ?? s.child_rate_night);
       setOvernightKids5Rate(s.kids_5_7_rate_night ?? Math.round(s.child_rate_night * 0.6));
+      setTentRate(s.tent_rate ?? 300);
     });
   }, []);
 
@@ -92,7 +95,8 @@ export default function EntranceModule() {
     ? (a * dayAdultRate) + (k8 * dayKids8Rate) + (k5 * dayKids5Rate)
     : (a * overnightAdultRate) + (k8 * overnightKids8Rate) + (k5 * overnightKids5Rate);
 
-  const totalAmount = Math.max(0, baseAmount - discountVal);
+  const tentAddon = withTent ? tentRate : 0;
+  const totalAmount = Math.max(0, baseAmount + tentAddon - discountVal);
 
   const change = received - totalAmount;
 
@@ -130,6 +134,7 @@ export default function EntranceModule() {
         change: received >= totalAmount && received > 0 ? change : undefined,
         paymentMethod: payment,
         details: [
+          ...(withTent ? [{ label: "With Tent", value: `+${formatPeso(tentRate)}` }] : []),
           ...(discountVal > 0 ? [{ label: "Discount", value: `-${formatPeso(discountVal)}` }] : []),
         ],
       };
@@ -141,11 +146,12 @@ export default function EntranceModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setAmountReceived(""); setDiscount(""); setTourType(getAutoTourType());
+      setWithTent(false);
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, useManualDatetime, customDate, customTime]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, withTent, tentRate, useManualDatetime, customDate, customTime]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -233,6 +239,15 @@ export default function EntranceModule() {
           <p className="text-2xl font-bold tabular-nums">{headcount}</p>
         </div>
 
+        {/* With Tent */}
+        <div className="flex items-center justify-between gap-3 pos-card">
+          <div>
+            <Label htmlFor="with-tent" className="text-sm font-medium cursor-pointer">With Tent</Label>
+            <p className="text-xs text-muted-foreground">Adds {formatPeso(tentRate)} to total</p>
+          </div>
+          <Switch id="with-tent" checked={withTent} onCheckedChange={setWithTent} />
+        </div>
+
         {/* Discount */}
         <div>
           <label className="text-sm font-medium block mb-1">Discount</label>
@@ -248,6 +263,7 @@ export default function EntranceModule() {
             {k8 > 0 && <p>Kids 8+: {rateLabel(k8, isDayTour ? dayKids8Rate : overnightKids8Rate)}</p>}
             {k5 > 0 && <p>Kids 5-7: {rateLabel(k5, isDayTour ? dayKids5Rate : overnightKids5Rate)}</p>}
             {k4 > 0 && <p>Kids 4 & below: FREE</p>}
+            {withTent && <p>With Tent: +{formatPeso(tentRate)}</p>}
             {discountVal > 0 && <p className="text-success">Discount: -{formatPeso(discountVal)}</p>}
           </div>
         </div>

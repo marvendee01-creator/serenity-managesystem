@@ -12,6 +12,7 @@ import settingsIcon from "@/assets/icons/settings.png";
 import maintenanceIcon from "@/assets/icons/maintenance.png";
 import bookingMgmtIcon from "@/assets/icons/booking-mgmt.png";
 import bookingCashierIcon from "@/assets/icons/booking-cashier.png";
+import tentIcon from "@/assets/icons/tent.png";
 import SplashScreen from "@/components/SplashScreen";
 import PrismaticBurst from "@/components/PrismaticBurst";
 import WelcomePopup from "@/components/WelcomePopup";
@@ -27,9 +28,11 @@ import SettingsModule from "@/modules/SettingsModule";
 import MaintenanceModule from "@/modules/MaintenanceModule";
 import BookingManagement from "@/modules/BookingManagement";
 import BookingCashierModule from "@/modules/BookingCashierModule";
+import TentModule from "@/modules/TentModule";
 
 const MODULES = [
   { id: "entrance", label: "Entrance", icon: entranceIcon },
+  { id: "tent", label: "Tent", icon: tentIcon },
   { id: "room", label: "Room", icon: roomIcon },
   { id: "booking", label: "Booking", icon: bookingIcon },
   { id: "booking-mgmt", label: "Booking Mgmt", icon: bookingMgmtIcon },
@@ -47,6 +50,7 @@ type ModuleId = (typeof MODULES)[number]["id"];
 
 const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   entrance: EntranceModule,
+  tent: TentModule,
   room: RoomModule,
   booking: BookingModule,
   "booking-mgmt": BookingManagement,

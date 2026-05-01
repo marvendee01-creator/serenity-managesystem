@@ -7,7 +7,7 @@ import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReport
 import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
 import { toast } from "sonner";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
 
 function formatDateTime(iso: string) {
@@ -28,7 +28,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "reservation" | "petty-monitoring" | "analytics";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics";
 
 function EntranceSalesSummary() {
   const [reports, setReports] = useState<BookingCashierReport[]>([]);
@@ -205,6 +205,114 @@ function StoreSalesSummary() {
   );
 }
 
+function ExpensesSummary({ source, title }: { source: "store" | "entrance"; title: string }) {
+  const [rows, setRows] = useState<{ date: string; amount: number }[]>([]);
+  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+
+  useEffect(() => {
+    const load = async () => {
+      const map = new Map<string, number>();
+      const ymOf = (s: string) => {
+        const d = new Date(s);
+        return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+      };
+      const dayKey = (s: string) => formatDate(s);
+      if (source === "store") {
+        const all = await getCashierReports();
+        for (const r of all) {
+          for (const item of (r.petty_items || [])) {
+            const itemDate = item.date || r.date;
+            if (ymOf(itemDate) !== monthFilter) continue;
+            const k = dayKey(itemDate);
+            map.set(k, (map.get(k) || 0) + (Number(item.amount) || 0));
+          }
+        }
+      } else {
+        const all = await getBookingCashierReports();
+        for (const r of all) {
+          for (const item of (r.petty_items || [])) {
+            const itemDate = item.date || r.report_date;
+            if (ymOf(itemDate) !== monthFilter) continue;
+            const k = dayKey(itemDate);
+            map.set(k, (map.get(k) || 0) + (Number(item.amount) || 0));
+          }
+        }
+      }
+      const out = Array.from(map.entries())
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setRows(out);
+    };
+    load();
+  }, [source, monthFilter]);
+
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  const exportCSV = () => {
+    const headers = ["Date", "Daily Total Expenses"];
+    const data = rows.map(r => [r.date, r.amount.toFixed(2)]);
+    data.push(["TOTAL", total.toFixed(2)]);
+    const csv = [headers, ...data].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `expenses_summary_${source}_${monthFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
+          <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+        </div>
+        <div className="md:col-start-3 self-end">
+          <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="pos-card text-center mb-4">
+        <p className="text-xs text-muted-foreground">Total {title} for {monthLabel}</p>
+        <p className="text-2xl font-bold tabular-nums text-destructive">{formatPeso(total)}</p>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Date</th>
+              <th className="text-right px-3 py-2 font-medium">Daily Total Expenses</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={2} className="text-center py-8 text-muted-foreground">No expenses for this month</td></tr>
+            )}
+            {rows.map(r => (
+              <tr key={r.date} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{r.date}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium text-destructive">{formatPeso(r.amount)}</td>
+              </tr>
+            ))}
+            {rows.length > 0 && (
+              <tr className="border-t-2 border-border bg-accent/30 font-bold">
+                <td className="px-3 py-2">TOTAL</td>
+                <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function AnalyticsDashboard() {
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [storeReports, setStoreReports] = useState<CashierReport[]>([]);
@@ -352,6 +460,92 @@ function AnalyticsDashboard() {
           </div>
         );
       })()}
+
+      {/* Income vs Expense Pie Charts */}
+      {(() => {
+        const ymOf = (s: string) => {
+          const d = new Date(s);
+          return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        };
+        // Store: income = sales, expenses = sum of petty_items in store cashier reports for the month
+        let storeIncome = 0;
+        let storeExpense = 0;
+        for (const r of storeReports) {
+          if (ymOf(r.date) !== monthFilter) continue;
+          storeIncome += Number(r.sales) || 0;
+          for (const item of (r.petty_items || [])) {
+            storeExpense += Number(item.amount) || 0;
+          }
+        }
+        // Entrance: income = entrance_sales, expenses = sum of petty_items in booking cashier reports
+        let entranceIncome = 0;
+        let entranceExpense = 0;
+        for (const r of bookingReports) {
+          if (ymOf(r.report_date) !== monthFilter) continue;
+          entranceIncome += Number(r.entrance_sales) || 0;
+          for (const item of (r.petty_items || [])) {
+            entranceExpense += Number(item.amount) || 0;
+          }
+        }
+        const storeData = [
+          { name: "Income", value: storeIncome, fill: "#4CAF50" },
+          { name: "Expenses", value: storeExpense, fill: "#F44336" },
+        ];
+        const entranceData = [
+          { name: "Income", value: entranceIncome, fill: "#4CAF50" },
+          { name: "Expenses", value: entranceExpense, fill: "#F44336" },
+        ];
+        const renderPie = (title: string, data: typeof storeData, income: number, expense: number) => {
+          const hasData = income + expense > 0;
+          const net = income - expense;
+          return (
+            <div className="pos-card">
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><BarChart3 size={16} /> {title}</h3>
+              {hasData ? (
+                <>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <PieChart>
+                      <Pie
+                        data={data}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={85}
+                        label={(props: { name?: string; value?: number }) => `${props.name ?? ""}: ${formatPeso(Number(props.value) || 0)}`}
+                      >
+                        {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => formatPeso(value)} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Income</p>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: "#4CAF50" }}>{formatPeso(income)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Expenses</p>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: "#F44336" }}>{formatPeso(expense)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Net</p>
+                      <p className={`text-sm font-bold tabular-nums ${net >= 0 ? "text-success" : "text-destructive"}`}>{formatPeso(net)}</p>
+                    </div>
+                  </div>
+                </>
+              ) : <p className="text-center text-sm text-muted-foreground py-8">No data for this month</p>}
+            </div>
+          );
+        };
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {renderPie("Income vs Expense — Store", storeData, storeIncome, storeExpense)}
+            {renderPie("Income vs Expense — Entrance", entranceData, entranceIncome, entranceExpense)}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -395,6 +589,7 @@ function PettyCashMonitoring() {
         }
       }
       for (const t of bookings) {
+        if (t.status === "Cancelled") continue;
         const dep = t.deposit_amount ?? 0;
         if (dep > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Booking Guest", sourceModule: "Booking", amount: dep, expenses: 0 });
       }
@@ -694,6 +889,8 @@ export default function ReportsModule() {
           { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
           { key: "store-sales" as Tab, label: "Store Sales Summary", icon: <TrendingUp size={14} /> as React.ReactNode },
           { key: "entrance-sales" as Tab, label: "Entrance Sales Summary", icon: <TrendingUp size={14} /> as React.ReactNode },
+          { key: "expenses-store" as Tab, label: "Expenses Summary - Store", icon: <ClipboardList size={14} /> as React.ReactNode },
+          { key: "expenses-entrance" as Tab, label: "Expenses Summary - Entrance", icon: <ClipboardList size={14} /> as React.ReactNode },
           { key: "petty-monitoring" as Tab, label: "Petty Cash Monitor", icon: <ClipboardList size={14} /> as React.ReactNode },
           { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
           { key: "analytics" as Tab, label: "Analytics", icon: <BarChart3 size={14} /> as React.ReactNode },
@@ -738,7 +935,7 @@ export default function ReportsModule() {
             <div className="pos-card text-center">
               <p className="text-xs text-muted-foreground">Total Guests</p>
               <p className="text-lg font-bold tabular-nums">{totalAdults + totalChildren}</p>
-              <p className="text-xs text-muted-foreground">{totalAdults}A / {totalChildren}C</p>
+              
             </div>
             <div className="pos-card text-center">
               <p className="text-xs text-muted-foreground">Total Amount</p>
@@ -978,6 +1175,10 @@ export default function ReportsModule() {
       {tab === "store-sales" && <StoreSalesSummary />}
 
       {tab === "entrance-sales" && <EntranceSalesSummary />}
+
+      {tab === "expenses-store" && <ExpensesSummary source="store" title="Store Expenses" />}
+
+      {tab === "expenses-entrance" && <ExpensesSummary source="entrance" title="Entrance Expenses" />}
 
       {tab === "petty-monitoring" && <PettyCashMonitoring />}
 
