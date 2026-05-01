@@ -109,6 +109,7 @@ export type Database = {
           kids_8_above_rate_night: number | null
           kubo_room_rate: number
           table_rent_rate: number
+          tent_rate: number
           tin_number: string | null
           updated_at: string
           videoke_rate: number | null
@@ -133,6 +134,7 @@ export type Database = {
           kids_8_above_rate_night?: number | null
           kubo_room_rate?: number
           table_rent_rate?: number
+          tent_rate?: number
           tin_number?: string | null
           updated_at?: string
           videoke_rate?: number | null
@@ -157,6 +159,7 @@ export type Database = {
           kids_8_above_rate_night?: number | null
           kubo_room_rate?: number
           table_rent_rate?: number
+          tent_rate?: number
           tin_number?: string | null
           updated_at?: string
           videoke_rate?: number | null
