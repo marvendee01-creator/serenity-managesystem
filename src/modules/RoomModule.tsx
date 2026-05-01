@@ -208,6 +208,7 @@ export default function RoomModule() {
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [discount, setDiscount] = useState("");
+  const [manualExtraCharge, setManualExtraCharge] = useState(0);
   const [roomRate, setRoomRate] = useState(0);
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
@@ -291,7 +292,7 @@ export default function RoomModule() {
   };
 
   const discountAmt = Math.max(0, parseFloat(discount) || 0);
-  const totalRoomAmount = Math.max(0, roomRate - discountAmt);
+  const totalRoomAmount = Math.max(0, roomRate - discountAmt + manualExtraCharge);
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
@@ -328,6 +329,7 @@ export default function RoomModule() {
           { label: "Room Type", value: roomType },
           { label: "Room Rate", value: formatPeso(roomRate) },
           ...(discountAmt > 0 ? [{ label: "Discount", value: `- ${formatPeso(discountAmt)}` }] : []),
+          ...(manualExtraCharge > 0 ? [{ label: "Extra Charge", value: `+ ${formatPeso(manualExtraCharge)}` }] : []),
           { label: "Check-in", value: `${checkInDate} ${checkInTime}` },
           { label: "Scheduled Check-out", value: `${checkOutDate} ${checkOutTime}` },
           ...(a > 0 ? [{ label: "Adults", value: `${a}` }] : []),
@@ -341,13 +343,13 @@ export default function RoomModule() {
       setReceiptData(rData);
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
-      setAmountReceived(""); setDiscount(""); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
+      setAmountReceived(""); setDiscount(""); setManualExtraCharge(0); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
       setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
