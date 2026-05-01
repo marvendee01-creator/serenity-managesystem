@@ -41,6 +41,8 @@ export default function EntranceModule() {
   const [overnightAdultRate, setOvernightAdultRate] = useState(150);
   const [overnightKids8Rate, setOvernightKids8Rate] = useState(75);
   const [overnightKids5Rate, setOvernightKids5Rate] = useState(50);
+  const [tentRate, setTentRate] = useState(300);
+  const [withTent, setWithTent] = useState(false);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -52,6 +54,7 @@ export default function EntranceModule() {
       setOvernightAdultRate(s.adult_rate_night);
       setOvernightKids8Rate(s.kids_8_above_rate_night ?? s.child_rate_night);
       setOvernightKids5Rate(s.kids_5_7_rate_night ?? Math.round(s.child_rate_night * 0.6));
+      setTentRate(s.tent_rate ?? 300);
     });
   }, []);
 
@@ -92,7 +95,8 @@ export default function EntranceModule() {
     ? (a * dayAdultRate) + (k8 * dayKids8Rate) + (k5 * dayKids5Rate)
     : (a * overnightAdultRate) + (k8 * overnightKids8Rate) + (k5 * overnightKids5Rate);
 
-  const totalAmount = Math.max(0, baseAmount - discountVal);
+  const tentAddon = withTent ? tentRate : 0;
+  const totalAmount = Math.max(0, baseAmount + tentAddon - discountVal);
 
   const change = received - totalAmount;
 
