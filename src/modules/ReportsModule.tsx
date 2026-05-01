@@ -404,7 +404,7 @@ function AnalyticsDashboard() {
                         cx="50%"
                         cy="50%"
                         outerRadius={85}
-                        label={(entry: { name: string; value: number }) => `${entry.name}: ${formatPeso(entry.value)}`}
+                        label={(props: { name?: string; value?: number }) => `${props.name ?? ""}: ${formatPeso(Number(props.value) || 0)}`}
                       >
                         {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
                       </Pie>
