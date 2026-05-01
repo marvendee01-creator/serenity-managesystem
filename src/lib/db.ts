@@ -70,6 +70,7 @@ export interface Settings {
   videoke_rate?: number;
   dart_rate?: number;
   volleyball_rate?: number;
+  tent_rate?: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
