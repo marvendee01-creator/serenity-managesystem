@@ -395,6 +395,7 @@ function PettyCashMonitoring() {
         }
       }
       for (const t of bookings) {
+        if (t.status === "Cancelled") continue;
         const dep = t.deposit_amount ?? 0;
         if (dep > 0) allIncome.push({ date: t.date_time, customer: t.customer_name || "Booking Guest", sourceModule: "Booking", amount: dep, expenses: 0 });
       }
