@@ -134,6 +134,7 @@ export default function EntranceModule() {
         change: received >= totalAmount && received > 0 ? change : undefined,
         paymentMethod: payment,
         details: [
+          ...(withTent ? [{ label: "With Tent", value: `+${formatPeso(tentRate)}` }] : []),
           ...(discountVal > 0 ? [{ label: "Discount", value: `-${formatPeso(discountVal)}` }] : []),
         ],
       };
@@ -145,6 +146,7 @@ export default function EntranceModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setAmountReceived(""); setDiscount(""); setTourType(getAutoTourType());
+      setWithTent(false);
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
