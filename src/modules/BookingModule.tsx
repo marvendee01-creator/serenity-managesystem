@@ -88,8 +88,6 @@ export default function BookingModule() {
   const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
   const [dateConflictMessage, setDateConflictMessage] = useState("");
-  const [showActiveConflict, setShowActiveConflict] = useState(false);
-  const [pendingProceed, setPendingProceed] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string; booking_type?: string; room_type?: string }[]>([]);
   
   const [receiptData, setReceiptData] = useState<any>(null);
