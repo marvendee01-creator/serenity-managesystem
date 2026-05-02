@@ -37,8 +37,68 @@ export default function BookingManagement() {
   const [filter, setFilter] = useState<PaymentFilter>("ALL");
   const [settlingId, setSettlingId] = useState<number | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
+  const [editingBooking, setEditingBooking] = useState<Transaction | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Transaction>>({});
+  const [editSaving, setEditSaving] = useState(false);
 
-  const loadBookings = useCallback(() => {
+  const handleDeleteBooking = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    if (!confirm(`PERMANENTLY DELETE booking for ${booking.customer_name || "this guest"}? This cannot be undone.`)) return;
+    try {
+      await deleteTransaction(booking.id);
+      toast.success("Booking deleted");
+      getTransactions({ module: "Booking" }).then(txns => {
+        const active = txns.filter(t => t.status !== "Cancelled");
+        setBookings(active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime()));
+      });
+    } catch { toast.error("Failed to delete"); }
+  }, []);
+
+  const openEdit = useCallback((b: Transaction) => {
+    setEditingBooking(b);
+    setEditForm({
+      check_in: b.check_in,
+      check_out: b.check_out,
+      adults: b.adults,
+      kids_8_above: b.kids_8_above ?? 0,
+      kids_5_7: b.kids_5_7 ?? 0,
+      kids_4_below: b.kids_4_below ?? 0,
+      function_hall_fee: b.function_hall_fee ?? 0,
+      number_of_tables: b.number_of_tables ?? 0,
+      corkage_fee: b.corkage_fee ?? 0,
+    });
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editingBooking?.id) return;
+    setEditSaving(true);
+    try {
+      const a = editForm.adults ?? 0;
+      const k8 = editForm.kids_8_above ?? 0;
+      const k5 = editForm.kids_5_7 ?? 0;
+      const k4 = editForm.kids_4_below ?? 0;
+      await updateTransaction(editingBooking.id, {
+        check_in: editForm.check_in || undefined,
+        check_out: editForm.check_out || undefined,
+        adults: a,
+        kids_8_above: k8,
+        kids_5_7: k5,
+        kids_4_below: k4,
+        children: k8 + k5 + k4,
+        total_headcount: a + k8 + k5 + k4,
+        function_hall_fee: editForm.function_hall_fee ?? 0,
+        number_of_tables: editForm.number_of_tables ?? 0,
+        corkage_fee: editForm.corkage_fee ?? 0,
+      });
+      toast.success("Booking updated!");
+      setEditingBooking(null);
+      getTransactions({ module: "Booking" }).then(txns => {
+        const active = txns.filter(t => t.status !== "Cancelled");
+        setBookings(active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime()));
+      });
+    } catch { toast.error("Failed to update"); }
+    setEditSaving(false);
+  }, [editingBooking, editForm]);
     getTransactions({ module: "Booking" }).then(txns => {
       const active = txns.filter(t => t.status !== "Cancelled");
       const sorted = active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
