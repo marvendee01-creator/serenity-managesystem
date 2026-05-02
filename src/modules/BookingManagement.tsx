@@ -310,13 +310,27 @@ export default function BookingManagement() {
               )}
 
               {b.payment_status === "Fully Paid" && !isSettling && (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => openEdit(b)}
+                    className="h-9 px-3 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Edit booking"
+                  >
+                    <Pencil size={12} /> Edit
+                  </button>
                   <button
                     onClick={() => handleCancelBooking(b)}
                     className="h-9 px-3 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-[0.97] transition-all flex items-center gap-1"
                     title="Cancel booking"
                   >
-                    <Ban size={12} /> Cancel Booking
+                    <Ban size={12} /> Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDeleteBooking(b)}
+                    className="h-9 px-3 rounded-lg text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/80 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Delete booking permanently"
+                  >
+                    <Trash2 size={12} /> Delete
                   </button>
                 </div>
               )}
