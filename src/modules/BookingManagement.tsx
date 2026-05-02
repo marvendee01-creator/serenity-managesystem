@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban } from "lucide-react";
-import { getTransactions, updateTransaction, type Transaction } from "@/lib/db";
+import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban, Pencil, Trash2 } from "lucide-react";
+import { getTransactions, updateTransaction, deleteTransaction, type Transaction } from "@/lib/db";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 type PaymentFilter = "ALL" | "Unpaid" | "Partially Paid" | "Fully Paid";
