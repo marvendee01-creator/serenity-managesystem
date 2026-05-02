@@ -286,11 +286,25 @@ export default function BookingManagement() {
                     Mark as Fully Paid
                   </button>
                   <button
+                    onClick={() => openEdit(b)}
+                    className="h-10 px-3 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Edit booking"
+                  >
+                    <Pencil size={14} /> Edit
+                  </button>
+                  <button
                     onClick={() => handleCancelBooking(b)}
                     className="h-10 px-3 rounded-lg text-sm font-medium bg-destructive/15 text-destructive hover:bg-destructive/25 active:scale-[0.97] transition-all flex items-center gap-1"
                     title="Cancel booking"
                   >
                     <Ban size={14} /> Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDeleteBooking(b)}
+                    className="h-10 px-3 rounded-lg text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/80 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Delete booking permanently"
+                  >
+                    <Trash2 size={14} /> Delete
                   </button>
                 </div>
               )}
