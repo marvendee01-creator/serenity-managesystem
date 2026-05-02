@@ -206,12 +206,13 @@ function StoreSalesSummary() {
 }
 
 function ExpensesSummary({ source, title }: { source: "store" | "entrance"; title: string }) {
-  const [rows, setRows] = useState<{ date: string; amount: number }[]>([]);
+  const [rows, setRows] = useState<{ date: string; amount: number; reportIds: number[] }[]>([]);
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     const load = async () => {
-      const map = new Map<string, number>();
+      const map = new Map<string, { amount: number; reportIds: Set<number> }>();
       const ymOf = (s: string) => {
         const d = new Date(s);
         return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
@@ -224,7 +225,10 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
             const itemDate = item.date || r.date;
             if (ymOf(itemDate) !== monthFilter) continue;
             const k = dayKey(itemDate);
-            map.set(k, (map.get(k) || 0) + (Number(item.amount) || 0));
+            const cur = map.get(k) || { amount: 0, reportIds: new Set<number>() };
+            cur.amount += (Number(item.amount) || 0);
+            if (r.id) cur.reportIds.add(r.id);
+            map.set(k, cur);
           }
         }
       } else {
@@ -234,22 +238,35 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
             const itemDate = item.date || r.report_date;
             if (ymOf(itemDate) !== monthFilter) continue;
             const k = dayKey(itemDate);
-            map.set(k, (map.get(k) || 0) + (Number(item.amount) || 0));
+            const cur = map.get(k) || { amount: 0, reportIds: new Set<number>() };
+            cur.amount += (Number(item.amount) || 0);
+            if (r.id) cur.reportIds.add(r.id);
+            map.set(k, cur);
           }
         }
       }
       const out = Array.from(map.entries())
-        .map(([date, amount]) => ({ date, amount }))
+        .map(([date, v]) => ({ date, amount: v.amount, reportIds: Array.from(v.reportIds) }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setRows(out);
     };
     load();
-  }, [source, monthFilter]);
+  }, [source, monthFilter, refresh]);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
 
-  const exportCSV = () => {
+  const buildHTML = () => `
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h2{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #999;padding:6px 8px;font-size:11px}th{background:#f0f0f0;text-align:left}.right{text-align:right}.bold{font-weight:bold}</style>
+    <h2>SERENITY INLAND RESORT</h2>
+    <h2>${title} — ${monthLabel}</h2>
+    <table>
+      <tr><th>Date</th><th class="right">Daily Total Expenses</th></tr>
+      ${rows.map(r => `<tr><td>${r.date}</td><td class="right">₱${r.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`).join("")}
+      <tr class="bold"><td>TOTAL</td><td class="right">₱${total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+    </table>`;
+
+  const exportExcel = () => {
     const headers = ["Date", "Daily Total Expenses"];
     const data = rows.map(r => [r.date, r.amount.toFixed(2)]);
     data.push(["TOTAL", total.toFixed(2)]);
@@ -257,24 +274,55 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `expenses_summary_${source}_${monthFilter}.csv`;
-    a.click();
+    a.href = url; a.download = `expenses_summary_${source}_${monthFilter}.csv`; a.click();
     URL.revokeObjectURL(url);
+    toast.success("Excel exported");
+  };
+
+  const exportPDF = () => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(`<html><head><title>${title}</title></head><body>${buildHTML()}<script>window.print();</script></body></html>`);
+    w.document.close();
+    toast.success("PDF print dialog opened");
+  };
+
+  const printPreview = () => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(`<html><head><title>${title} — Preview</title></head><body>${buildHTML()}</body></html>`);
+    w.document.close();
+  };
+
+  const deleteRow = async (row: { date: string; reportIds: number[] }) => {
+    if (!confirm(`Delete all ${source === "store" ? "store cashier" : "booking cashier"} reports that contain expenses for ${row.date}? This will remove the parent reports entirely.`)) return;
+    try {
+      for (const id of row.reportIds) {
+        if (source === "store") await deleteCashierReport(id);
+        else await deleteBookingCashierReport(id);
+      }
+      toast.success("Records deleted");
+      setRefresh(k => k + 1);
+    } catch { toast.error("Failed to delete"); }
   };
 
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-        <div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div className="md:col-span-1">
           <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
           <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
         </div>
-        <div className="md:col-start-3 self-end">
-          <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
-            <Download size={16} /> Export CSV
-          </button>
-        </div>
+        <button onClick={exportExcel} className="self-end h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+          <Download size={14} /> Export Excel
+        </button>
+        <button onClick={exportPDF} className="self-end h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+          <Download size={14} /> Export PDF
+        </button>
+        <button onClick={printPreview} className="self-end h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+          <Eye size={14} /> Print Preview
+        </button>
+        <div className="self-end" />
       </div>
 
       <div className="pos-card text-center mb-4">
@@ -288,22 +336,29 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
             <tr className="bg-muted">
               <th className="text-left px-3 py-2 font-medium">Date</th>
               <th className="text-right px-3 py-2 font-medium">Daily Total Expenses</th>
+              <th className="text-center px-3 py-2 font-medium">Action</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={2} className="text-center py-8 text-muted-foreground">No expenses for this month</td></tr>
+              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No expenses for this month</td></tr>
             )}
             {rows.map(r => (
               <tr key={r.date} className="border-t border-border hover:bg-muted/50">
                 <td className="px-3 py-2 text-xs whitespace-nowrap">{r.date}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-medium text-destructive">{formatPeso(r.amount)}</td>
+                <td className="px-3 py-2 text-center">
+                  <button onClick={() => deleteRow(r)} className="w-8 h-8 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 flex items-center justify-center mx-auto active:scale-95 transition-all" title="Delete parent reports">
+                    <Trash2 size={14} />
+                  </button>
+                </td>
               </tr>
             ))}
             {rows.length > 0 && (
               <tr className="border-t-2 border-border bg-accent/30 font-bold">
                 <td className="px-3 py-2">TOTAL</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
+                <td />
               </tr>
             )}
           </tbody>
