@@ -189,6 +189,16 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
     setDenoms(prev => prev.map((d, idx) => idx === i ? { ...d, quantity: val } : d));
 
   const handleSave = useCallback(async () => {
+    if (reportDate) {
+      const d = new Date(reportDate + "T00:00:00");
+      const now = new Date();
+      const inputYM = d.getFullYear() * 12 + d.getMonth();
+      const curYM = now.getFullYear() * 12 + now.getMonth();
+      if (inputYM > curYM) {
+        toast.error("Invalid Date: Cannot record future month transactions.");
+        return;
+      }
+    }
     setSaving(true);
     try {
       await saveBookingCashierReport({
