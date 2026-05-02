@@ -369,8 +369,58 @@ export default function BookingManagement() {
               {b.comments && <p className="text-xs opacity-60 mt-2 italic">{b.comments}</p>}
             </div>
           );
-        })}
       </div>
+
+      <Dialog open={!!editingBooking} onOpenChange={(o) => { if (!o) setEditingBooking(null); }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Booking</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-medium block mb-1">Check-in</label>
+                <input type="datetime-local" className="pos-input w-full text-sm"
+                  value={editForm.check_in ? editForm.check_in.slice(0, 16) : ""}
+                  onChange={e => setEditForm(f => ({ ...f, check_in: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">Check-out</label>
+                <input type="datetime-local" className="pos-input w-full text-sm"
+                  value={editForm.check_out ? editForm.check_out.slice(0, 16) : ""}
+                  onChange={e => setEditForm(f => ({ ...f, check_out: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="text-xs font-medium block mb-1">Adults</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.adults ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, adults: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Kids 8+</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.kids_8_above ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, kids_8_above: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Kids 5-7</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.kids_5_7 ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, kids_5_7: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Kids 4↓</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.kids_4_below ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, kids_4_below: parseInt(e.target.value) || 0 }))} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div><label className="text-xs font-medium block mb-1">Function Hall Fee</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.function_hall_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, function_hall_fee: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Tables</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.number_of_tables ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, number_of_tables: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Corkage Fee</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.corkage_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, corkage_fee: parseFloat(e.target.value) || 0 }))} /></div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button onClick={() => setEditingBooking(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all">Cancel</button>
+              <button disabled={editSaving} onClick={saveEdit} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all disabled:opacity-50">{editSaving ? "Saving..." : "Save"}</button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
