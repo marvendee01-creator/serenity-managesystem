@@ -936,30 +936,33 @@ export default function ReportsModule() {
         <h2 className="text-xl font-bold" style={{ lineHeight: "1.2" }}>Reports</h2>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex gap-1 mb-4 overflow-x-auto">
-        {([
-          { key: "transactions" as Tab, label: "Transactions", icon: null as React.ReactNode },
-          { key: "cashier" as Tab, label: "Cashier Store", icon: <Banknote size={14} /> as React.ReactNode },
-          { key: "cashier-booking" as Tab, label: "Cashier Booking", icon: <Banknote size={14} /> as React.ReactNode },
-          { key: "store-sales" as Tab, label: "Store Sales Summary", icon: <TrendingUp size={14} /> as React.ReactNode },
-          { key: "entrance-sales" as Tab, label: "Entrance Sales Summary", icon: <TrendingUp size={14} /> as React.ReactNode },
-          { key: "expenses-store" as Tab, label: "Expenses Summary - Store", icon: <ClipboardList size={14} /> as React.ReactNode },
-          { key: "expenses-entrance" as Tab, label: "Expenses Summary - Entrance", icon: <ClipboardList size={14} /> as React.ReactNode },
-          { key: "petty-monitoring" as Tab, label: "Petty Cash Monitor", icon: <ClipboardList size={14} /> as React.ReactNode },
-          { key: "reservation" as Tab, label: "Reservations", icon: <CalendarDays size={14} /> as React.ReactNode },
-          { key: "analytics" as Tab, label: "Analytics", icon: <BarChart3 size={14} /> as React.ReactNode },
-        ]).map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex-1 h-10 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 whitespace-nowrap px-2 ${tab === t.key ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
-      </div>
-
+      {/* Menu navigation (replaces tab layout) */}
+      {(() => {
+        const items: { key: Tab; label: string }[] = [
+          { key: "transactions", label: "Transactions" },
+          { key: "cashier", label: "Cashier Store" },
+          { key: "cashier-booking", label: "Cashier Booking" },
+          { key: "store-sales", label: "Store Sales Summary" },
+          { key: "entrance-sales", label: "Entrance Sales Summary" },
+          { key: "expenses-store", label: "Expenses Summary - Store" },
+          { key: "expenses-entrance", label: "Expenses Summary - Entrance" },
+          { key: "petty-monitoring", label: "Petty Cash Monitor" },
+          { key: "reservation", label: "Reservations" },
+          { key: "analytics", label: "Analytics" },
+        ];
+        return (
+          <div className="mb-4">
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Report Menu</label>
+            <select
+              className="pos-input w-full text-sm font-medium"
+              value={tab}
+              onChange={(e) => setTab(e.target.value as Tab)}
+            >
+              {items.map(i => <option key={i.key} value={i.key}>{i.label}</option>)}
+            </select>
+          </div>
+        );
+      })()}
       {tab === "transactions" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
