@@ -255,6 +255,11 @@ export async function updateTransaction(id: number, updates: Partial<Transaction
   if (error) throw error;
 }
 
+export async function deleteTransaction(id: number): Promise<void> {
+  const { error } = await supabase.from("transactions").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function getTransactions(filter?: {
   module?: string;
   dateFrom?: string;
