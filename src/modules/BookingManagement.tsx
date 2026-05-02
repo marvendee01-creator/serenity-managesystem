@@ -99,6 +99,8 @@ export default function BookingManagement() {
     } catch { toast.error("Failed to update"); }
     setEditSaving(false);
   }, [editingBooking, editForm]);
+
+  const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
       const active = txns.filter(t => t.status !== "Cancelled");
       const sorted = active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
