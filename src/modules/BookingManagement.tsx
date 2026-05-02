@@ -369,6 +369,7 @@ export default function BookingManagement() {
               {b.comments && <p className="text-xs opacity-60 mt-2 italic">{b.comments}</p>}
             </div>
           );
+        })}
       </div>
 
       <Dialog open={!!editingBooking} onOpenChange={(o) => { if (!o) setEditingBooking(null); }}>
