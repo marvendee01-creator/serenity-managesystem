@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban } from "lucide-react";
-import { getTransactions, updateTransaction, type Transaction } from "@/lib/db";
+import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban, Pencil, Trash2 } from "lucide-react";
+import { getTransactions, updateTransaction, deleteTransaction, type Transaction } from "@/lib/db";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 type PaymentFilter = "ALL" | "Unpaid" | "Partially Paid" | "Fully Paid";
@@ -36,6 +37,68 @@ export default function BookingManagement() {
   const [filter, setFilter] = useState<PaymentFilter>("ALL");
   const [settlingId, setSettlingId] = useState<number | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
+  const [editingBooking, setEditingBooking] = useState<Transaction | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Transaction>>({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  const handleDeleteBooking = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    if (!confirm(`PERMANENTLY DELETE booking for ${booking.customer_name || "this guest"}? This cannot be undone.`)) return;
+    try {
+      await deleteTransaction(booking.id);
+      toast.success("Booking deleted");
+      getTransactions({ module: "Booking" }).then(txns => {
+        const active = txns.filter(t => t.status !== "Cancelled");
+        setBookings(active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime()));
+      });
+    } catch { toast.error("Failed to delete"); }
+  }, []);
+
+  const openEdit = useCallback((b: Transaction) => {
+    setEditingBooking(b);
+    setEditForm({
+      check_in: b.check_in,
+      check_out: b.check_out,
+      adults: b.adults,
+      kids_8_above: b.kids_8_above ?? 0,
+      kids_5_7: b.kids_5_7 ?? 0,
+      kids_4_below: b.kids_4_below ?? 0,
+      function_hall_fee: b.function_hall_fee ?? 0,
+      number_of_tables: b.number_of_tables ?? 0,
+      corkage_fee: b.corkage_fee ?? 0,
+    });
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editingBooking?.id) return;
+    setEditSaving(true);
+    try {
+      const a = editForm.adults ?? 0;
+      const k8 = editForm.kids_8_above ?? 0;
+      const k5 = editForm.kids_5_7 ?? 0;
+      const k4 = editForm.kids_4_below ?? 0;
+      await updateTransaction(editingBooking.id, {
+        check_in: editForm.check_in || undefined,
+        check_out: editForm.check_out || undefined,
+        adults: a,
+        kids_8_above: k8,
+        kids_5_7: k5,
+        kids_4_below: k4,
+        children: k8 + k5 + k4,
+        total_headcount: a + k8 + k5 + k4,
+        function_hall_fee: editForm.function_hall_fee ?? 0,
+        number_of_tables: editForm.number_of_tables ?? 0,
+        corkage_fee: editForm.corkage_fee ?? 0,
+      });
+      toast.success("Booking updated!");
+      setEditingBooking(null);
+      getTransactions({ module: "Booking" }).then(txns => {
+        const active = txns.filter(t => t.status !== "Cancelled");
+        setBookings(active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime()));
+      });
+    } catch { toast.error("Failed to update"); }
+    setEditSaving(false);
+  }, [editingBooking, editForm]);
 
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
@@ -223,23 +286,51 @@ export default function BookingManagement() {
                     Mark as Fully Paid
                   </button>
                   <button
+                    onClick={() => openEdit(b)}
+                    className="h-10 px-3 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Edit booking"
+                  >
+                    <Pencil size={14} /> Edit
+                  </button>
+                  <button
                     onClick={() => handleCancelBooking(b)}
                     className="h-10 px-3 rounded-lg text-sm font-medium bg-destructive/15 text-destructive hover:bg-destructive/25 active:scale-[0.97] transition-all flex items-center gap-1"
                     title="Cancel booking"
                   >
                     <Ban size={14} /> Cancel
                   </button>
+                  <button
+                    onClick={() => handleDeleteBooking(b)}
+                    className="h-10 px-3 rounded-lg text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/80 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Delete booking permanently"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
                 </div>
               )}
 
               {b.payment_status === "Fully Paid" && !isSettling && (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => openEdit(b)}
+                    className="h-9 px-3 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Edit booking"
+                  >
+                    <Pencil size={12} /> Edit
+                  </button>
                   <button
                     onClick={() => handleCancelBooking(b)}
                     className="h-9 px-3 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-[0.97] transition-all flex items-center gap-1"
                     title="Cancel booking"
                   >
-                    <Ban size={12} /> Cancel Booking
+                    <Ban size={12} /> Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDeleteBooking(b)}
+                    className="h-9 px-3 rounded-lg text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/80 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Delete booking permanently"
+                  >
+                    <Trash2 size={12} /> Delete
                   </button>
                 </div>
               )}
@@ -280,6 +371,57 @@ export default function BookingManagement() {
           );
         })}
       </div>
+
+      <Dialog open={!!editingBooking} onOpenChange={(o) => { if (!o) setEditingBooking(null); }}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Booking</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-medium block mb-1">Check-in</label>
+                <input type="datetime-local" className="pos-input w-full text-sm"
+                  value={editForm.check_in ? editForm.check_in.slice(0, 16) : ""}
+                  onChange={e => setEditForm(f => ({ ...f, check_in: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">Check-out</label>
+                <input type="datetime-local" className="pos-input w-full text-sm"
+                  value={editForm.check_out ? editForm.check_out.slice(0, 16) : ""}
+                  onChange={e => setEditForm(f => ({ ...f, check_out: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="text-xs font-medium block mb-1">Adults</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.adults ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, adults: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Kids 8+</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.kids_8_above ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, kids_8_above: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Kids 5-7</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.kids_5_7 ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, kids_5_7: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Kids 4↓</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.kids_4_below ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, kids_4_below: parseInt(e.target.value) || 0 }))} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div><label className="text-xs font-medium block mb-1">Function Hall Fee</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.function_hall_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, function_hall_fee: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Tables</label>
+                <input type="number" min="0" className="pos-input w-full" value={editForm.number_of_tables ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, number_of_tables: parseInt(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Corkage Fee</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.corkage_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, corkage_fee: parseFloat(e.target.value) || 0 }))} /></div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button onClick={() => setEditingBooking(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all">Cancel</button>
+              <button disabled={editSaving} onClick={saveEdit} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all disabled:opacity-50">{editSaving ? "Saving..." : "Save"}</button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

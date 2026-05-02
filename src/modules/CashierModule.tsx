@@ -159,6 +159,17 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
   });
 
   const handleSave = useCallback(async () => {
+    // Block future-month entries
+    if (reportDate) {
+      const d = new Date(reportDate + "T00:00:00");
+      const now = new Date();
+      const inputYM = d.getFullYear() * 12 + d.getMonth();
+      const curYM = now.getFullYear() * 12 + now.getMonth();
+      if (inputYM > curYM) {
+        toast.error("Invalid Date: Cannot record future month transactions.");
+        return;
+      }
+    }
     setSaving(true);
     try {
       await saveCashierReport(buildReportData());
@@ -172,7 +183,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
       if (onBack) onBack();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [bc, s, totalPettyCash, expected, totalActualCash, overShort, editReport, onBack]);
+  }, [bc, s, totalPettyCash, expected, totalActualCash, overShort, editReport, onBack, reportDate]);
 
   const handleDelete = useCallback(async () => {
     if (!editReport?.id) return;
