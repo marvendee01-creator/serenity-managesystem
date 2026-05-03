@@ -276,6 +276,18 @@ export default function BookingModule() {
           {isExclusive && <p className="text-xs text-muted-foreground mt-1">Exclusive Fee: {formatPeso(exclusiveFee)}</p>}
         </div>
 
+        {!isExclusive && (
+          <div>
+            <label className="text-sm font-medium block mb-2">Stay Type</label>
+            <div className="flex gap-2">
+              {(["Day Tour", "Overnight"] as const).map((t) => (
+                <button key={t} className={`toggle-btn flex-1 ${stayType === t ? "toggle-btn-active" : ""}`} onClick={() => setStayType(t)}>{t}</button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Auto Rate: {formatPeso(autoRate)}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">Check-in Date & Time</label>
