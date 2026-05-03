@@ -125,15 +125,19 @@ export default function BookingModule() {
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
 
+  const isDayTour = stayType === "Day Tour";
+  const adultRate = isDayTour ? dayAdultRate : nightAdultRate;
+  const kids8Rate = isDayTour ? dayKids8Rate : nightKids8Rate;
+  const kids5Rate = isDayTour ? dayKids5Rate : nightKids5Rate;
+
   const adultFee = a * adultRate;
   const childrenTotalFee = isExclusive ? 0 : (k8 * kids8Rate + k5 * kids5Rate);
   const personFee = adultFee + childrenTotalFee;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  const autoRate = !isExclusive ? (stayType === "Day Tour" ? dayTourRate : overnightRate) : 0;
   const total = isExclusive
     ? (exclusiveFee + roomFee + tableFee + funcHall + corkage)
-    : (personFee + roomFee + tableFee + funcHall + corkage + autoRate);
+    : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
