@@ -62,6 +62,7 @@ function DateConflictDialog({ message, onClose }: { message: string; onClose: ()
 export default function BookingModule() {
   const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
+  const [stayType, setStayType] = useState<"Day Tour" | "Overnight">("Day Tour");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [adults, setAdults] = useState("");
@@ -82,12 +83,16 @@ export default function BookingModule() {
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
+  const [dayTourRate, setDayTourRate] = useState(250);
+  const [overnightRate, setOvernightRate] = useState(350);
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
   const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
   const [dateConflictMessage, setDateConflictMessage] = useState("");
+  const [show8amWarning, setShow8amWarning] = useState(false);
+  const [pending8amProceed, setPending8amProceed] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string; booking_type?: string; room_type?: string }[]>([]);
   
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -99,6 +104,7 @@ export default function BookingModule() {
       setExclusiveFee(s.exclusive_fee); setAdultRate(s.adult_rate_day);
       setKids8Rate(s.kids_8_above_rate_day ?? 50); setKids5Rate(s.kids_5_7_rate_day ?? 30);
       setKuboRate(s.kubo_room_rate); setBarkadaRate(s.barkada_room_rate); setTableRate(s.table_rent_rate);
+      setDayTourRate(s.day_tour_rate ?? 250); setOvernightRate(s.overnight_rate ?? 350);
     });
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
