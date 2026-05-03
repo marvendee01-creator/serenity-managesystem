@@ -191,6 +191,8 @@ export async function saveSettings(settings: Settings): Promise<void> {
       dart_rate: settings.dart_rate ?? null,
       volleyball_rate: settings.volleyball_rate ?? null,
       tent_rate: settings.tent_rate ?? null,
+      day_tour_rate: settings.day_tour_rate ?? null,
+      overnight_rate: settings.overnight_rate ?? null,
       company_name: settings.company_name ?? null,
       company_address: settings.company_address ?? null,
       contact_number: settings.contact_number ?? null,
