@@ -77,14 +77,15 @@ export default function BookingModule() {
   const [depositAmount, setDepositAmount] = useState("");
 
   const [exclusiveFee, setExclusiveFee] = useState(5000);
-  const [adultRate, setAdultRate] = useState(100);
-  const [kids8Rate, setKids8Rate] = useState(50);
-  const [kids5Rate, setKids5Rate] = useState(30);
+  const [dayAdultRate, setDayAdultRate] = useState(100);
+  const [dayKids8Rate, setDayKids8Rate] = useState(50);
+  const [dayKids5Rate, setDayKids5Rate] = useState(30);
+  const [nightAdultRate, setNightAdultRate] = useState(150);
+  const [nightKids8Rate, setNightKids8Rate] = useState(75);
+  const [nightKids5Rate, setNightKids5Rate] = useState(50);
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
-  const [dayTourRate, setDayTourRate] = useState(250);
-  const [overnightRate, setOvernightRate] = useState(350);
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
@@ -101,10 +102,14 @@ export default function BookingModule() {
   useEffect(() => { firstRef.current?.focus(); }, []);
   useEffect(() => {
     getSettings().then((s) => {
-      setExclusiveFee(s.exclusive_fee); setAdultRate(s.adult_rate_day);
-      setKids8Rate(s.kids_8_above_rate_day ?? 50); setKids5Rate(s.kids_5_7_rate_day ?? 30);
+      setExclusiveFee(s.exclusive_fee);
+      setDayAdultRate(s.adult_rate_day);
+      setDayKids8Rate(s.kids_8_above_rate_day ?? 50);
+      setDayKids5Rate(s.kids_5_7_rate_day ?? 30);
+      setNightAdultRate(s.adult_rate_night);
+      setNightKids8Rate(s.kids_8_above_rate_night ?? 75);
+      setNightKids5Rate(s.kids_5_7_rate_night ?? 50);
       setKuboRate(s.kubo_room_rate); setBarkadaRate(s.barkada_room_rate); setTableRate(s.table_rent_rate);
-      setDayTourRate(s.day_tour_rate ?? 250); setOvernightRate(s.overnight_rate ?? 350);
     });
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
@@ -120,15 +125,19 @@ export default function BookingModule() {
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
 
+  const isDayTour = stayType === "Day Tour";
+  const adultRate = isDayTour ? dayAdultRate : nightAdultRate;
+  const kids8Rate = isDayTour ? dayKids8Rate : nightKids8Rate;
+  const kids5Rate = isDayTour ? dayKids5Rate : nightKids5Rate;
+
   const adultFee = a * adultRate;
   const childrenTotalFee = isExclusive ? 0 : (k8 * kids8Rate + k5 * kids5Rate);
   const personFee = adultFee + childrenTotalFee;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  const autoRate = !isExclusive ? (stayType === "Day Tour" ? dayTourRate : overnightRate) : 0;
   const total = isExclusive
     ? (exclusiveFee + roomFee + tableFee + funcHall + corkage)
-    : (personFee + roomFee + tableFee + funcHall + corkage + autoRate);
+    : (personFee + roomFee + tableFee + funcHall + corkage);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
@@ -284,7 +293,7 @@ export default function BookingModule() {
                 <button key={t} className={`toggle-btn flex-1 ${stayType === t ? "toggle-btn-active" : ""}`} onClick={() => setStayType(t)}>{t}</button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Auto Rate: {formatPeso(autoRate)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Using {stayType} rates from Entrance settings</p>
           </div>
         )}
 
@@ -362,7 +371,6 @@ export default function BookingModule() {
             {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
             {corkage > 0 && <p>+ Corkage: {formatPeso(corkage)}</p>}
-            {!isExclusive && autoRate > 0 && <p>+ {stayType} Rate: {formatPeso(autoRate)}</p>}
           </div>
         </div>
 
