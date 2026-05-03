@@ -245,6 +245,21 @@ export default function BookingModule() {
     <>
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <DateConflictDialog message={dateConflictMessage} onClose={() => setShowDateConflict(false)} />}
+      {show8amWarning && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShow8amWarning(false)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={40} className="text-warning" />
+            </div>
+            <h3 className="text-2xl font-bold text-foreground mb-3">⚠️ Booking Conflict</h3>
+            <p className="text-base text-muted-foreground mb-6">Existing booking active until 8:00 AM on this date. Proceed anyway?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShow8amWarning(false)} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold">Cancel</button>
+              <button onClick={() => { setShow8amWarning(false); setPending8amProceed(true); setTimeout(() => handleSave(), 0); }} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold">Proceed</button>
+            </div>
+          </div>
+        </div>
+      )}
       {receiptData && !showBalanceWarning && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
       <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
         <div>
