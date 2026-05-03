@@ -102,10 +102,14 @@ export default function BookingModule() {
   useEffect(() => { firstRef.current?.focus(); }, []);
   useEffect(() => {
     getSettings().then((s) => {
-      setExclusiveFee(s.exclusive_fee); setAdultRate(s.adult_rate_day);
-      setKids8Rate(s.kids_8_above_rate_day ?? 50); setKids5Rate(s.kids_5_7_rate_day ?? 30);
+      setExclusiveFee(s.exclusive_fee);
+      setDayAdultRate(s.adult_rate_day);
+      setDayKids8Rate(s.kids_8_above_rate_day ?? 50);
+      setDayKids5Rate(s.kids_5_7_rate_day ?? 30);
+      setNightAdultRate(s.adult_rate_night);
+      setNightKids8Rate(s.kids_8_above_rate_night ?? 75);
+      setNightKids5Rate(s.kids_5_7_rate_night ?? 50);
       setKuboRate(s.kubo_room_rate); setBarkadaRate(s.barkada_room_rate); setTableRate(s.table_rent_rate);
-      setDayTourRate(s.day_tour_rate ?? 250); setOvernightRate(s.overnight_rate ?? 350);
     });
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
