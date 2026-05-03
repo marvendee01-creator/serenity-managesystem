@@ -124,6 +124,8 @@ const DEFAULT_SETTINGS: Settings = {
   dart_rate: 100,
   volleyball_rate: 200,
   tent_rate: 300,
+  day_tour_rate: 250,
+  overnight_rate: 350,
   company_name: "SERENITY INLAND RESORT",
   company_address: "",
   contact_number: "",
