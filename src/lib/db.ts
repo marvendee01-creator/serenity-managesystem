@@ -160,6 +160,8 @@ export async function getSettings(): Promise<Settings> {
     dart_rate: (data as any).dart_rate != null ? Number((data as any).dart_rate) : 100,
     volleyball_rate: (data as any).volleyball_rate != null ? Number((data as any).volleyball_rate) : 200,
     tent_rate: (data as any).tent_rate != null ? Number((data as any).tent_rate) : 300,
+    day_tour_rate: (data as any).day_tour_rate != null ? Number((data as any).day_tour_rate) : 250,
+    overnight_rate: (data as any).overnight_rate != null ? Number((data as any).overnight_rate) : 350,
     company_name: data.company_name ?? "",
     company_address: data.company_address ?? "",
     contact_number: data.contact_number ?? "",
