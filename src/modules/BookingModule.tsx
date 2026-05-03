@@ -293,7 +293,7 @@ export default function BookingModule() {
                 <button key={t} className={`toggle-btn flex-1 ${stayType === t ? "toggle-btn-active" : ""}`} onClick={() => setStayType(t)}>{t}</button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Auto Rate: {formatPeso(autoRate)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Using {stayType} rates from Entrance settings</p>
           </div>
         )}
 
