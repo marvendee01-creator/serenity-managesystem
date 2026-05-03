@@ -232,7 +232,7 @@ export default function BookingModule() {
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate]);
+  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
