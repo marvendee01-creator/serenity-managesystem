@@ -331,6 +331,31 @@ export default function ReservationBoard() {
           </div>
         </div>
       )}
+
+      {dropConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setDropConfirm(null)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8" onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={40} className="text-warning" />
+            </div>
+            <h3 className="text-2xl font-bold text-center mb-3">
+              {dropConfirm.conflict ? "⚠️ Conflict Detected" : "Move Booking?"}
+            </h3>
+            <p className="text-base text-muted-foreground text-center mb-2">
+              Move <strong>{dropConfirm.booking.customer_name || "Guest"}</strong> to {formatDateLabel(dropConfirm.targetDate)}?
+            </p>
+            {dropConfirm.conflict && (
+              <p className="text-sm text-destructive text-center mb-4">⚠️ This date already has a booking. Proceed anyway?</p>
+            )}
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setDropConfirm(null)} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold">Cancel</button>
+              <button onClick={async () => { const d = dropConfirm; setDropConfirm(null); await performMove(d.booking, d.targetDate); }} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold">
+                {dropConfirm.conflict ? "Proceed Anyway" : "Proceed"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
