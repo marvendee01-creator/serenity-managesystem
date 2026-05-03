@@ -77,14 +77,15 @@ export default function BookingModule() {
   const [depositAmount, setDepositAmount] = useState("");
 
   const [exclusiveFee, setExclusiveFee] = useState(5000);
-  const [adultRate, setAdultRate] = useState(100);
-  const [kids8Rate, setKids8Rate] = useState(50);
-  const [kids5Rate, setKids5Rate] = useState(30);
+  const [dayAdultRate, setDayAdultRate] = useState(100);
+  const [dayKids8Rate, setDayKids8Rate] = useState(50);
+  const [dayKids5Rate, setDayKids5Rate] = useState(30);
+  const [nightAdultRate, setNightAdultRate] = useState(150);
+  const [nightKids8Rate, setNightKids8Rate] = useState(75);
+  const [nightKids5Rate, setNightKids5Rate] = useState(50);
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
-  const [dayTourRate, setDayTourRate] = useState(250);
-  const [overnightRate, setOvernightRate] = useState(350);
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
