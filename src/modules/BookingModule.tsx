@@ -177,6 +177,7 @@ export default function BookingModule() {
     if (total === 0) { toast.error("Enter amount"); return; }
     const conflict = hasDateConflict();
     if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
+    if (!pending8amProceed && has8amActiveConflict()) { setShow8amWarning(true); return; }
     
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
