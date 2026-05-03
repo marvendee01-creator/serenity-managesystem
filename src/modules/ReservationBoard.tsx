@@ -232,7 +232,20 @@ export default function ReservationBoard() {
                     cellStyle.backgroundColor = "hsl(200 90% 92%)";
                   }
                   return (
-                    <td key={di} className="border border-border p-1 align-top h-24 relative" style={cellStyle}>
+                    <td
+                      key={di}
+                      className="border border-border p-1 align-top h-24 relative"
+                      style={cellStyle}
+                      onDragOver={(e) => { if (day && dragging) e.preventDefault(); }}
+                      onDrop={(e) => {
+                        if (!day || !dragging) return;
+                        e.preventDefault();
+                        const target = new Date(year, month, day);
+                        const conflict = (bookingsByDay[day] || []).some(b => b.id !== dragging.id);
+                        setDropConfirm({ booking: dragging, targetDate: target, conflict });
+                        setDragging(null);
+                      }}
+                    >
                       {day && (
                         <>
                           <div className="flex items-center justify-between">
