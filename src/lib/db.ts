@@ -71,6 +71,8 @@ export interface Settings {
   dart_rate?: number;
   volleyball_rate?: number;
   tent_rate?: number;
+  day_tour_rate?: number;
+  overnight_rate?: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
