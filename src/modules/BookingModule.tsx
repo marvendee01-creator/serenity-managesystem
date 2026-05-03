@@ -125,11 +125,24 @@ export default function BookingModule() {
   const personFee = adultFee + childrenTotalFee;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
+  const autoRate = !isExclusive ? (stayType === "Day Tour" ? dayTourRate : overnightRate) : 0;
   const total = isExclusive
     ? (exclusiveFee + roomFee + tableFee + funcHall + corkage)
-    : (personFee + roomFee + tableFee + funcHall + corkage);
+    : (personFee + roomFee + tableFee + funcHall + corkage + autoRate);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
+
+  // Detect 8 AM active conflict: existing booking ends after 08:00 on the same day as new check-in
+  const has8amActiveConflict = useCallback(() => {
+    if (!checkIn) return false;
+    const newIn = new Date(checkIn);
+    const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    return existingBookings.some(b => {
+      if (!b.check_out) return false;
+      const co = new Date(b.check_out);
+      return sameDay(co, newIn) && (co.getHours() > 8 || (co.getHours() === 8 && co.getMinutes() > 0));
+    });
+  }, [checkIn, existingBookings]);
 
   const hasDateConflict = useCallback(() => {
     if (!checkIn || !checkOut) return { conflict: false, message: "" };
