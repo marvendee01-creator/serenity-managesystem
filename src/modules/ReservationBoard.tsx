@@ -70,6 +70,12 @@ export default function ReservationBoard() {
   const [month, setMonth] = useState(now.getMonth());
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const [dragging, setDragging] = useState<Transaction | null>(null);
+  const [dropConfirm, setDropConfirm] = useState<{ booking: Transaction; targetDate: Date; conflict: boolean } | null>(null);
+
+  const refresh = () => getTransactions({ module: "Booking" }).then(txns => {
+    setBookings(txns.filter(t => t.status !== "Cancelled" && t.check_in && t.check_out));
+  });
 
   // Load ALL bookings once (with both check_in & check_out); filter by visible month client-side
   // so multi-month spans render correctly when navigating prev/next.
