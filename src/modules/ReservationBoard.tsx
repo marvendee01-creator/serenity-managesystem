@@ -262,9 +262,12 @@ export default function ReservationBoard() {
                               return (
                                 <button
                                   key={bi}
+                                  draggable
+                                  onDragStart={() => setDragging(b)}
+                                  onDragEnd={() => setDragging(null)}
                                   onClick={() => setSelected(b)}
                                   title={tooltip}
-                                  className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[9px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
+                                  className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[9px] leading-tight cursor-move hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
                                 >
                                   <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
                                   <p className="truncate">A:{b.adults || 0} | K8+:{b.kids_8_above || 0}</p>
