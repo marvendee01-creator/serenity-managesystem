@@ -229,6 +229,7 @@ export default function BookingModule() {
       setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
       setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee("");
       getTransactions({ module: "Booking" }).then(setExistingBookings);
+      setPending8amProceed(false);
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
