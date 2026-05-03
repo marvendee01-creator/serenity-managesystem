@@ -371,7 +371,6 @@ export default function BookingModule() {
             {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
             {corkage > 0 && <p>+ Corkage: {formatPeso(corkage)}</p>}
-            {!isExclusive && autoRate > 0 && <p>+ {stayType} Rate: {formatPeso(autoRate)}</p>}
           </div>
         </div>
 
