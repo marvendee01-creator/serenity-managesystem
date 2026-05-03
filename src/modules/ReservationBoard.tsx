@@ -80,10 +80,23 @@ export default function ReservationBoard() {
   // Load ALL bookings once (with both check_in & check_out); filter by visible month client-side
   // so multi-month spans render correctly when navigating prev/next.
   useEffect(() => {
-    getTransactions({ module: "Booking" }).then(txns => {
-      setBookings(txns.filter(t => t.status !== "Cancelled" && t.check_in && t.check_out));
-    });
+    refresh();
   }, []);
+
+  const performMove = async (b: Transaction, targetDate: Date) => {
+    if (!b.id || !b.check_in || !b.check_out) return;
+    const oldIn = new Date(b.check_in);
+    const oldOut = new Date(b.check_out);
+    const duration = oldOut.getTime() - oldIn.getTime();
+    const newIn = new Date(targetDate);
+    newIn.setHours(oldIn.getHours(), oldIn.getMinutes(), 0, 0);
+    const newOut = new Date(newIn.getTime() + duration);
+    try {
+      await updateTransaction(b.id, { check_in: newIn.toISOString(), check_out: newOut.toISOString() });
+      toast.success("Booking moved");
+      refresh();
+    } catch { toast.error("Failed to move"); }
+  };
 
   // Filter bookings whose date range intersects the visible month
   const visibleBookings = useMemo(() => {
