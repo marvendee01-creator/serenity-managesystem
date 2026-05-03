@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { CalendarDays, Printer, X } from "lucide-react";
-import { getTransactions, type Transaction } from "@/lib/db";
+import { CalendarDays, Printer, X, AlertTriangle } from "lucide-react";
+import { getTransactions, updateTransaction, type Transaction } from "@/lib/db";
+import { toast } from "sonner";
 
 function formatDateLabel(d: Date) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
@@ -69,14 +70,33 @@ export default function ReservationBoard() {
   const [month, setMonth] = useState(now.getMonth());
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const [dragging, setDragging] = useState<Transaction | null>(null);
+  const [dropConfirm, setDropConfirm] = useState<{ booking: Transaction; targetDate: Date; conflict: boolean } | null>(null);
+
+  const refresh = () => getTransactions({ module: "Booking" }).then(txns => {
+    setBookings(txns.filter(t => t.status !== "Cancelled" && t.check_in && t.check_out));
+  });
 
   // Load ALL bookings once (with both check_in & check_out); filter by visible month client-side
   // so multi-month spans render correctly when navigating prev/next.
   useEffect(() => {
-    getTransactions({ module: "Booking" }).then(txns => {
-      setBookings(txns.filter(t => t.status !== "Cancelled" && t.check_in && t.check_out));
-    });
+    refresh();
   }, []);
+
+  const performMove = async (b: Transaction, targetDate: Date) => {
+    if (!b.id || !b.check_in || !b.check_out) return;
+    const oldIn = new Date(b.check_in);
+    const oldOut = new Date(b.check_out);
+    const duration = oldOut.getTime() - oldIn.getTime();
+    const newIn = new Date(targetDate);
+    newIn.setHours(oldIn.getHours(), oldIn.getMinutes(), 0, 0);
+    const newOut = new Date(newIn.getTime() + duration);
+    try {
+      await updateTransaction(b.id, { check_in: newIn.toISOString(), check_out: newOut.toISOString() });
+      toast.success("Booking moved");
+      refresh();
+    } catch { toast.error("Failed to move"); }
+  };
 
   // Filter bookings whose date range intersects the visible month
   const visibleBookings = useMemo(() => {
@@ -212,7 +232,20 @@ export default function ReservationBoard() {
                     cellStyle.backgroundColor = "hsl(200 90% 92%)";
                   }
                   return (
-                    <td key={di} className="border border-border p-1 align-top h-24 relative" style={cellStyle}>
+                    <td
+                      key={di}
+                      className="border border-border p-1 align-top h-24 relative"
+                      style={cellStyle}
+                      onDragOver={(e) => { if (day && dragging) e.preventDefault(); }}
+                      onDrop={(e) => {
+                        if (!day || !dragging) return;
+                        e.preventDefault();
+                        const target = new Date(year, month, day);
+                        const conflict = (bookingsByDay[day] || []).some(b => b.id !== dragging.id);
+                        setDropConfirm({ booking: dragging, targetDate: target, conflict });
+                        setDragging(null);
+                      }}
+                    >
                       {day && (
                         <>
                           <div className="flex items-center justify-between">
@@ -229,9 +262,12 @@ export default function ReservationBoard() {
                               return (
                                 <button
                                   key={bi}
+                                  draggable
+                                  onDragStart={() => setDragging(b)}
+                                  onDragEnd={() => setDragging(null)}
                                   onClick={() => setSelected(b)}
                                   title={tooltip}
-                                  className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[9px] leading-tight cursor-pointer hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
+                                  className={`block w-full text-left px-1.5 py-0.5 rounded border-l-[3px] text-[9px] leading-tight cursor-move hover:opacity-80 transition-opacity ${getBookingStyle(b)}`}
                                 >
                                   <p className="font-semibold truncate">{b.customer_name || "Guest"}</p>
                                   <p className="truncate">A:{b.adults || 0} | K8+:{b.kids_8_above || 0}</p>
@@ -291,6 +327,31 @@ export default function ReservationBoard() {
                 );
               })()}
               <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{selected.payment_method}</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dropConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setDropConfirm(null)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8" onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={40} className="text-warning" />
+            </div>
+            <h3 className="text-2xl font-bold text-center mb-3">
+              {dropConfirm.conflict ? "⚠️ Conflict Detected" : "Move Booking?"}
+            </h3>
+            <p className="text-base text-muted-foreground text-center mb-2">
+              Move <strong>{dropConfirm.booking.customer_name || "Guest"}</strong> to {formatDateLabel(dropConfirm.targetDate)}?
+            </p>
+            {dropConfirm.conflict && (
+              <p className="text-sm text-destructive text-center mb-4">⚠️ This date already has a booking. Proceed anyway?</p>
+            )}
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setDropConfirm(null)} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold">Cancel</button>
+              <button onClick={async () => { const d = dropConfirm; setDropConfirm(null); await performMove(d.booking, d.targetDate); }} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold">
+                {dropConfirm.conflict ? "Proceed Anyway" : "Proceed"}
+              </button>
             </div>
           </div>
         </div>

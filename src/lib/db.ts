@@ -71,6 +71,8 @@ export interface Settings {
   dart_rate?: number;
   volleyball_rate?: number;
   tent_rate?: number;
+  day_tour_rate?: number;
+  overnight_rate?: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
@@ -122,6 +124,8 @@ const DEFAULT_SETTINGS: Settings = {
   dart_rate: 100,
   volleyball_rate: 200,
   tent_rate: 300,
+  day_tour_rate: 250,
+  overnight_rate: 350,
   company_name: "SERENITY INLAND RESORT",
   company_address: "",
   contact_number: "",
@@ -156,6 +160,8 @@ export async function getSettings(): Promise<Settings> {
     dart_rate: (data as any).dart_rate != null ? Number((data as any).dart_rate) : 100,
     volleyball_rate: (data as any).volleyball_rate != null ? Number((data as any).volleyball_rate) : 200,
     tent_rate: (data as any).tent_rate != null ? Number((data as any).tent_rate) : 300,
+    day_tour_rate: (data as any).day_tour_rate != null ? Number((data as any).day_tour_rate) : 250,
+    overnight_rate: (data as any).overnight_rate != null ? Number((data as any).overnight_rate) : 350,
     company_name: data.company_name ?? "",
     company_address: data.company_address ?? "",
     contact_number: data.contact_number ?? "",
@@ -185,6 +191,8 @@ export async function saveSettings(settings: Settings): Promise<void> {
       dart_rate: settings.dart_rate ?? null,
       volleyball_rate: settings.volleyball_rate ?? null,
       tent_rate: settings.tent_rate ?? null,
+      day_tour_rate: settings.day_tour_rate ?? null,
+      overnight_rate: settings.overnight_rate ?? null,
       company_name: settings.company_name ?? null,
       company_address: settings.company_address ?? null,
       contact_number: settings.contact_number ?? null,

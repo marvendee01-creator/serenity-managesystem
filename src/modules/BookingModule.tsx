@@ -62,6 +62,7 @@ function DateConflictDialog({ message, onClose }: { message: string; onClose: ()
 export default function BookingModule() {
   const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
+  const [stayType, setStayType] = useState<"Day Tour" | "Overnight">("Day Tour");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [adults, setAdults] = useState("");
@@ -82,12 +83,16 @@ export default function BookingModule() {
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
+  const [dayTourRate, setDayTourRate] = useState(250);
+  const [overnightRate, setOvernightRate] = useState(350);
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
   const [savedBalance, setSavedBalance] = useState(0);
   const [showDateConflict, setShowDateConflict] = useState(false);
   const [dateConflictMessage, setDateConflictMessage] = useState("");
+  const [show8amWarning, setShow8amWarning] = useState(false);
+  const [pending8amProceed, setPending8amProceed] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string; booking_type?: string; room_type?: string }[]>([]);
   
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -99,6 +104,7 @@ export default function BookingModule() {
       setExclusiveFee(s.exclusive_fee); setAdultRate(s.adult_rate_day);
       setKids8Rate(s.kids_8_above_rate_day ?? 50); setKids5Rate(s.kids_5_7_rate_day ?? 30);
       setKuboRate(s.kubo_room_rate); setBarkadaRate(s.barkada_room_rate); setTableRate(s.table_rent_rate);
+      setDayTourRate(s.day_tour_rate ?? 250); setOvernightRate(s.overnight_rate ?? 350);
     });
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
@@ -119,11 +125,24 @@ export default function BookingModule() {
   const personFee = adultFee + childrenTotalFee;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
+  const autoRate = !isExclusive ? (stayType === "Day Tour" ? dayTourRate : overnightRate) : 0;
   const total = isExclusive
     ? (exclusiveFee + roomFee + tableFee + funcHall + corkage)
-    : (personFee + roomFee + tableFee + funcHall + corkage);
+    : (personFee + roomFee + tableFee + funcHall + corkage + autoRate);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
+
+  // Detect 8 AM active conflict: existing booking ends after 08:00 on the same day as new check-in
+  const has8amActiveConflict = useCallback(() => {
+    if (!checkIn) return false;
+    const newIn = new Date(checkIn);
+    const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    return existingBookings.some(b => {
+      if (!b.check_out) return false;
+      const co = new Date(b.check_out);
+      return sameDay(co, newIn) && (co.getHours() > 8 || (co.getHours() === 8 && co.getMinutes() > 0));
+    });
+  }, [checkIn, existingBookings]);
 
   const hasDateConflict = useCallback(() => {
     if (!checkIn || !checkOut) return { conflict: false, message: "" };
@@ -158,6 +177,7 @@ export default function BookingModule() {
     if (total === 0) { toast.error("Enter amount"); return; }
     const conflict = hasDateConflict();
     if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
+    if (!pending8amProceed && has8amActiveConflict()) { setShow8amWarning(true); return; }
     
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
@@ -209,10 +229,11 @@ export default function BookingModule() {
       setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
       setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee("");
       getTransactions({ module: "Booking" }).then(setExistingBookings);
+      setPending8amProceed(false);
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate]);
+  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -224,6 +245,21 @@ export default function BookingModule() {
     <>
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <DateConflictDialog message={dateConflictMessage} onClose={() => setShowDateConflict(false)} />}
+      {show8amWarning && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShow8amWarning(false)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={40} className="text-warning" />
+            </div>
+            <h3 className="text-2xl font-bold text-foreground mb-3">⚠️ Booking Conflict</h3>
+            <p className="text-base text-muted-foreground mb-6">Existing booking active until 8:00 AM on this date. Proceed anyway?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShow8amWarning(false)} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold">Cancel</button>
+              <button onClick={() => { setShow8amWarning(false); setPending8amProceed(true); setTimeout(() => handleSave(), 0); }} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold">Proceed</button>
+            </div>
+          </div>
+        </div>
+      )}
       {receiptData && !showBalanceWarning && <ReceiptPrintDialog data={receiptData} onClose={() => setReceiptData(null)} />}
       <ModuleShell title="Booking" icon={<CalendarDays size={20} />} onSave={handleSave} saveLabel="Record Booking" saving={saving}>
         <div>
@@ -239,6 +275,18 @@ export default function BookingModule() {
           </div>
           {isExclusive && <p className="text-xs text-muted-foreground mt-1">Exclusive Fee: {formatPeso(exclusiveFee)}</p>}
         </div>
+
+        {!isExclusive && (
+          <div>
+            <label className="text-sm font-medium block mb-2">Stay Type</label>
+            <div className="flex gap-2">
+              {(["Day Tour", "Overnight"] as const).map((t) => (
+                <button key={t} className={`toggle-btn flex-1 ${stayType === t ? "toggle-btn-active" : ""}`} onClick={() => setStayType(t)}>{t}</button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Auto Rate: {formatPeso(autoRate)}</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -314,6 +362,7 @@ export default function BookingModule() {
             {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
             {corkage > 0 && <p>+ Corkage: {formatPeso(corkage)}</p>}
+            {!isExclusive && autoRate > 0 && <p>+ {stayType} Rate: {formatPeso(autoRate)}</p>}
           </div>
         </div>
 

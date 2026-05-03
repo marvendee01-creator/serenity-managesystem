@@ -101,6 +101,7 @@ export type Database = {
           company_name: string | null
           contact_number: string | null
           dart_rate: number | null
+          day_tour_rate: number
           exclusive_fee: number
           id: string
           kids_5_7_rate_day: number | null
@@ -108,6 +109,7 @@ export type Database = {
           kids_8_above_rate_day: number | null
           kids_8_above_rate_night: number | null
           kubo_room_rate: number
+          overnight_rate: number
           table_rent_rate: number
           tent_rate: number
           tin_number: string | null
@@ -126,6 +128,7 @@ export type Database = {
           company_name?: string | null
           contact_number?: string | null
           dart_rate?: number | null
+          day_tour_rate?: number
           exclusive_fee?: number
           id?: string
           kids_5_7_rate_day?: number | null
@@ -133,6 +136,7 @@ export type Database = {
           kids_8_above_rate_day?: number | null
           kids_8_above_rate_night?: number | null
           kubo_room_rate?: number
+          overnight_rate?: number
           table_rent_rate?: number
           tent_rate?: number
           tin_number?: string | null
@@ -151,6 +155,7 @@ export type Database = {
           company_name?: string | null
           contact_number?: string | null
           dart_rate?: number | null
+          day_tour_rate?: number
           exclusive_fee?: number
           id?: string
           kids_5_7_rate_day?: number | null
@@ -158,6 +163,7 @@ export type Database = {
           kids_8_above_rate_day?: number | null
           kids_8_above_rate_night?: number | null
           kubo_room_rate?: number
+          overnight_rate?: number
           table_rent_rate?: number
           tent_rate?: number
           tin_number?: string | null
