@@ -310,7 +310,7 @@ export default function ReservationBoard() {
               <div className="flex justify-between"><span className="text-muted-foreground">Headcount</span><span className="font-medium">{selected.total_headcount}</span></div>
               {selected.room_type && <div className="flex justify-between"><span className="text-muted-foreground">Room</span><span className="font-medium">{selected.room_type}</span></div>}
               {selected.number_of_tables && <div className="flex justify-between"><span className="text-muted-foreground">Tables</span><span className="font-medium">{selected.number_of_tables}</span></div>}
-              {selected.corkage_fee && <div className="flex justify-between"><span className="text-muted-foreground">Corkage</span><span className="font-medium">₱{selected.corkage_fee.toLocaleString()}</span></div>}
+              {selected.corkage_fee && <div className="flex justify-between"><span className="text-muted-foreground">Maintenance</span><span className="font-medium">₱{selected.corkage_fee.toLocaleString()}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Total Amount</span><span className="font-bold text-primary">₱{(selected.amount_paid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               {(() => {
                 const total = selected.amount_paid || 0;
