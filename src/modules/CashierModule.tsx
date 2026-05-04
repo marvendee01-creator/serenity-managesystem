@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Banknote, Download, Plus, Trash2, Printer, Save, ArrowLeft } from "lucide-react";
-import { saveCashierReport, deleteCashierReport, getSystemConfig, setSystemConfig, type CashierReport } from "@/lib/db";
+import { saveCashierReport, deleteCashierReport, getCashierReports, getSystemConfig, setSystemConfig, type CashierReport } from "@/lib/db";
 import { toast } from "sonner";
 
 interface PettyItem {
@@ -172,6 +172,15 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
     }
     setSaving(true);
     try {
+      // Deduplicate: prevent saving multiple reports for the same date
+      if (!editReport) {
+        const existing = await getCashierReports();
+        if (existing.some(r => r.date.slice(0, 10) === reportDate)) {
+          toast.error("A cashier report for this date already exists. Edit the existing one instead.");
+          setSaving(false);
+          return;
+        }
+      }
       await saveCashierReport(buildReportData());
       toast.success("Cashier report saved!");
       if (!editReport) {
@@ -309,8 +318,14 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
                   <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
                 </div>
                 <div>
-                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
-                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" />
+                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Category</label>}
+                  <select className={`${inputClass} text-sm h-10`} value={["Utilities","Supplies","Maintenance Fee"].includes(item.particulars) ? item.particulars : ""} onChange={e => updatePetty(i, "particulars", e.target.value)}>
+                    <option value="">Custom…</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Supplies">Supplies</option>
+                    <option value="Maintenance Fee">Maintenance Fee</option>
+                  </select>
+                  <input type="text" className={`${inputClass} text-sm h-9 mt-1`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Particulars" />
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}

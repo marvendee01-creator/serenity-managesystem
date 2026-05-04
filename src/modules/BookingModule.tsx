@@ -73,6 +73,7 @@ export default function BookingModule() {
   const [functionHallFee, setFunctionHallFee] = useState("");
   const [addOnTables, setAddOnTables] = useState("");
   const [corkageFee, setCorkageFee] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
 
@@ -124,6 +125,7 @@ export default function BookingModule() {
   const corkage = parseFloat(corkageFee) || 0;
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
+  const discount = parseFloat(discountAmount) || 0;
 
   const isDayTour = stayType === "Day Tour";
   const adultRate = isDayTour ? dayAdultRate : nightAdultRate;
@@ -135,9 +137,10 @@ export default function BookingModule() {
   const personFee = adultFee + childrenTotalFee;
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
-  const total = isExclusive
+  const baseAmount = isExclusive
     ? (exclusiveFee + roomFee + tableFee + funcHall + corkage)
     : (personFee + roomFee + tableFee + funcHall + corkage);
+  const total = Math.max(0, baseAmount - discount);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
 
@@ -236,7 +239,7 @@ export default function BookingModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
-      setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee("");
+      setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee(""); setDiscountAmount("");
       getTransactions({ module: "Booking" }).then(setExistingBookings);
       setPending8amProceed(false);
       firstRef.current?.focus();
@@ -353,9 +356,15 @@ export default function BookingModule() {
           {numTables > 0 && <p className="text-xs text-muted-foreground mt-1">{numTables} × {formatPeso(tableRate)} = {formatPeso(tableFee)}</p>}
         </div>
 
-        <div>
-          <label className="text-sm font-medium block mb-1">Corkage Fee (Optional)</label>
-          <input type="number" step="0.01" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Maintenance Fee (Optional)</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Discount Amount</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} placeholder="0.00" min="0" />
+          </div>
         </div>
 
         <div className="pos-card border-primary/30">
@@ -370,7 +379,8 @@ export default function BookingModule() {
             {roomFee > 0 && <p>+ {addOnRoom}: {formatPeso(roomFee)}</p>}
             {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
-            {corkage > 0 && <p>+ Corkage: {formatPeso(corkage)}</p>}
+            {corkage > 0 && <p>+ Maintenance: {formatPeso(corkage)}</p>}
+            {discount > 0 && <p className="text-success">− Discount: {formatPeso(discount)}</p>}
           </div>
         </div>
 

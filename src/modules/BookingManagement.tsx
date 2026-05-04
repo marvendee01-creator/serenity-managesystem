@@ -411,7 +411,7 @@ export default function BookingManagement() {
               <div><label className="text-xs font-medium block mb-1">Tables</label>
                 <input type="number" min="0" className="pos-input w-full" value={editForm.number_of_tables ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, number_of_tables: parseInt(e.target.value) || 0 }))} /></div>
-              <div><label className="text-xs font-medium block mb-1">Corkage Fee</label>
+              <div><label className="text-xs font-medium block mb-1">Maintenance Fee</label>
                 <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.corkage_fee ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, corkage_fee: parseFloat(e.target.value) || 0 }))} /></div>
             </div>
