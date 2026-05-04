@@ -239,7 +239,7 @@ export default function BookingModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
-      setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee("");
+      setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee(""); setDiscountAmount("");
       getTransactions({ module: "Booking" }).then(setExistingBookings);
       setPending8amProceed(false);
       firstRef.current?.focus();
