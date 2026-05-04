@@ -172,6 +172,15 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
     }
     setSaving(true);
     try {
+      // Deduplicate: prevent saving multiple reports for the same date
+      if (!editReport) {
+        const existing = await getCashierReports();
+        if (existing.some(r => r.date.slice(0, 10) === reportDate)) {
+          toast.error("A cashier report for this date already exists. Edit the existing one instead.");
+          setSaving(false);
+          return;
+        }
+      }
       await saveCashierReport(buildReportData());
       toast.success("Cashier report saved!");
       if (!editReport) {
