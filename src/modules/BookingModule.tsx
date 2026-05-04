@@ -73,6 +73,7 @@ export default function BookingModule() {
   const [functionHallFee, setFunctionHallFee] = useState("");
   const [addOnTables, setAddOnTables] = useState("");
   const [corkageFee, setCorkageFee] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
 
