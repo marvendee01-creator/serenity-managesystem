@@ -356,9 +356,15 @@ export default function BookingModule() {
           {numTables > 0 && <p className="text-xs text-muted-foreground mt-1">{numTables} × {formatPeso(tableRate)} = {formatPeso(tableFee)}</p>}
         </div>
 
-        <div>
-          <label className="text-sm font-medium block mb-1">Corkage Fee (Optional)</label>
-          <input type="number" step="0.01" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Maintenance Fee (Optional)</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Discount Amount</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} placeholder="0.00" min="0" />
+          </div>
         </div>
 
         <div className="pos-card border-primary/30">
