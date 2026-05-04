@@ -122,13 +122,32 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
-  // Auto-fill beginning cash from previous day's expected ending cash
+  // Auto-fill beginning cash from the most recent cashier report BEFORE the selected report date.
+  // Re-runs whenever the user changes Report Date so each day carries forward correctly
+  // instead of inheriting a stale global value.
   useEffect(() => {
     if (editReport) return;
-    getSystemConfig("prev_ending_cash").then(val => {
-      if (val && !beginningCash) setBeginningCash(val);
+    if (!reportDate) return;
+    let cancelled = false;
+    getCashierReports().then(all => {
+      if (cancelled) return;
+      const target = reportDate; // YYYY-MM-DD
+      const earlier = all
+        .filter(r => r.date.slice(0, 10) < target)
+        .sort((a, b) => b.date.localeCompare(a.date));
+      const prev = earlier[0];
+      if (prev) {
+        setBeginningCash(String(prev.expected_ending_cash ?? 0));
+      } else {
+        // Fallback to last manually-closed value only when no prior report exists
+        getSystemConfig("prev_ending_cash").then(val => {
+          if (cancelled) return;
+          if (val) setBeginningCash(val);
+        });
+      }
     });
-  }, []);
+    return () => { cancelled = true; };
+  }, [reportDate, editReport]);
 
   const bc = parseFloat(beginningCash) || 0;
   const s = parseFloat(sales) || 0;
