@@ -379,7 +379,8 @@ export default function BookingModule() {
             {roomFee > 0 && <p>+ {addOnRoom}: {formatPeso(roomFee)}</p>}
             {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
-            {corkage > 0 && <p>+ Corkage: {formatPeso(corkage)}</p>}
+            {corkage > 0 && <p>+ Maintenance: {formatPeso(corkage)}</p>}
+            {discount > 0 && <p className="text-success">− Discount: {formatPeso(discount)}</p>}
           </div>
         </div>
 
