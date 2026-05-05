@@ -552,3 +552,136 @@ export async function resetAllData(): Promise<void> {
   // Re-insert default settings
   await supabase.from("settings").insert({ id: "default" });
 }
+
+// ─── Food POS Inventory ───
+
+export interface FoodInventoryItem {
+  id?: number;
+  item_name: string;
+  item_description?: string;
+  unit_cost: number;
+  selling_price: number;
+  stock_qty: number;
+}
+
+export async function getFoodInventory(): Promise<FoodInventoryItem[]> {
+  const { data, error } = await supabase
+    .from("food_inventory" as any)
+    .select("*")
+    .order("item_name", { ascending: true });
+  if (error) return [];
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    item_name: r.item_name,
+    item_description: r.item_description ?? undefined,
+    unit_cost: Number(r.unit_cost),
+    selling_price: Number(r.selling_price),
+    stock_qty: Number(r.stock_qty),
+  }));
+}
+
+export async function addFoodInventoryItem(item: Omit<FoodInventoryItem, "id">): Promise<number> {
+  const { data, error } = await supabase
+    .from("food_inventory" as any)
+    .insert({
+      item_name: item.item_name,
+      item_description: item.item_description ?? null,
+      unit_cost: item.unit_cost,
+      selling_price: item.selling_price,
+      stock_qty: item.stock_qty,
+    } as any)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return (data as any).id;
+}
+
+export async function updateFoodInventoryItem(id: number, updates: Partial<FoodInventoryItem>): Promise<void> {
+  const data: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const [k, v] of Object.entries(updates)) {
+    if (k === "id") continue;
+    data[k] = v ?? null;
+  }
+  const { error } = await supabase.from("food_inventory" as any).update(data as any).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteFoodInventoryItem(id: number): Promise<void> {
+  const { error } = await supabase.from("food_inventory" as any).delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Food Sales ───
+
+export interface FoodSale {
+  id?: number;
+  sale_date: string;
+  date_time: string;
+  customer_name?: string;
+  item_id?: number;
+  item_name: string;
+  qty: number;
+  unit_price: number;
+  discount: number;
+  total_sales: number;
+  cash_received: number;
+  change_amount: number;
+  capital: number;
+  profit: number;
+  commission_share: number;
+}
+
+export async function addFoodSale(sale: Omit<FoodSale, "id">): Promise<number> {
+  const { data, error } = await supabase
+    .from("food_sales" as any)
+    .insert({
+      sale_date: sale.sale_date,
+      date_time: sale.date_time,
+      customer_name: sale.customer_name ?? null,
+      item_id: sale.item_id ?? null,
+      item_name: sale.item_name,
+      qty: sale.qty,
+      unit_price: sale.unit_price,
+      discount: sale.discount,
+      total_sales: sale.total_sales,
+      cash_received: sale.cash_received,
+      change_amount: sale.change_amount,
+      capital: sale.capital,
+      profit: sale.profit,
+      commission_share: sale.commission_share,
+    } as any)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return (data as any).id;
+}
+
+export async function getFoodSales(filter?: { dateFrom?: string; dateTo?: string }): Promise<FoodSale[]> {
+  let q: any = supabase.from("food_sales" as any).select("*").order("date_time", { ascending: false });
+  if (filter?.dateFrom) q = q.gte("sale_date", filter.dateFrom);
+  if (filter?.dateTo) q = q.lte("sale_date", filter.dateTo);
+  const { data, error } = await q;
+  if (error) return [];
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    sale_date: r.sale_date,
+    date_time: r.date_time,
+    customer_name: r.customer_name ?? undefined,
+    item_id: r.item_id ?? undefined,
+    item_name: r.item_name,
+    qty: Number(r.qty),
+    unit_price: Number(r.unit_price),
+    discount: Number(r.discount),
+    total_sales: Number(r.total_sales),
+    cash_received: Number(r.cash_received),
+    change_amount: Number(r.change_amount),
+    capital: Number(r.capital),
+    profit: Number(r.profit),
+    commission_share: Number(r.commission_share),
+  }));
+}
+
+export async function deleteFoodSale(id: number): Promise<void> {
+  const { error } = await supabase.from("food_sales" as any).delete().eq("id", id);
+  if (error) throw error;
+}
