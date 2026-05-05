@@ -296,7 +296,9 @@ export default function RoomModule() {
   };
 
   const discountAmt = Math.max(0, parseFloat(discount) || 0);
-  const totalRoomAmount = Math.max(0, roomRate - discountAmt + manualExtraCharge);
+  const fhDays = Math.max(0, parseFloat(funcHallDays) || 0);
+  const functionHallTotal = withFunctionHall ? fhDays * funcHallRate : 0;
+  const totalRoomAmount = Math.max(0, roomRate - discountAmt + manualExtraCharge + functionHallTotal);
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
@@ -319,6 +321,10 @@ export default function RoomModule() {
         amount_paid: totalRoomAmount, payment_method: payment,
         entry_time: checkInDateTime, check_in: checkInDateTime,
         check_out: scheduledCheckOutISO,
+        with_function_hall: withFunctionHall,
+        function_hall_days: withFunctionHall ? fhDays : 0,
+        function_hall_rate: withFunctionHall ? funcHallRate : 0,
+        function_hall_total: functionHallTotal,
       });
       toast.success("Room check-in recorded!");
 
@@ -340,6 +346,7 @@ export default function RoomModule() {
           ...(k8 > 0 ? [{ label: "Kids 8+", value: `${k8}` }] : []),
           ...(k5 > 0 ? [{ label: "Kids 5-7", value: `${k5}` }] : []),
           ...(k4 > 0 ? [{ label: "Kids 4↓ FREE", value: `${k4}` }] : []),
+          ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays}d × ${formatPeso(funcHallRate)})`, value: `+ ${formatPeso(functionHallTotal)}` }] : []),
         ],
       };
 
@@ -350,10 +357,11 @@ export default function RoomModule() {
       setAmountReceived(""); setDiscount(""); setManualExtraCharge(0); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
       setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
+      setWithFunctionHall(false); setFuncHallDays("1");
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge, withFunctionHall, fhDays, funcHallRate, functionHallTotal]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
