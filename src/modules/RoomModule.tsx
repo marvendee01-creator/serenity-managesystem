@@ -240,6 +240,17 @@ export default function RoomModule() {
     });
   }, [roomType]);
 
+  // Auto-derive function hall days from check-in/check-out span
+  useEffect(() => {
+    if (!withFunctionHall) return;
+    if (!checkInDate || !checkOutDate) return;
+    const inMs = new Date(`${checkInDate}T00:00`).getTime();
+    const outMs = new Date(`${checkOutDate}T00:00`).getTime();
+    if (isNaN(inMs) || isNaN(outMs)) return;
+    const days = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)) || 1);
+    setFuncHallDays(days.toString());
+  }, [withFunctionHall, checkInDate, checkOutDate]);
+
   const loadActiveRooms = useCallback(async () => {
     const txs = await getTransactions({ module: "Room" });
     setActiveRooms(
