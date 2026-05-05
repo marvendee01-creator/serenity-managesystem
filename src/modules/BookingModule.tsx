@@ -131,6 +131,8 @@ export default function BookingModule() {
     const days = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
     setFunctionHallDays(days.toString());
   }, [withFunctionHall, checkIn, checkOut]);
+
+  const a = parseInt(adults) || 0;
   const k8 = parseInt(kids8Above) || 0;
   const k5 = parseInt(kids5to7) || 0;
   const k4 = parseInt(kids4Below) || 0;
