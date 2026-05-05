@@ -253,7 +253,13 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       extend_amount: t.extend_amount ?? 0,
       status: t.status ?? null,
       rate: t.rate ?? 0,
-    })
+      with_function_hall: t.with_function_hall ?? false,
+      function_hall_days: t.function_hall_days ?? 0,
+      function_hall_rate: t.function_hall_rate ?? 0,
+      function_hall_total: t.function_hall_total ?? 0,
+      additional_adult_fee: t.additional_adult_fee ?? 0,
+      maintenance_fee: t.maintenance_fee ?? 0,
+    } as any)
     .select("id")
     .single();
   if (error) throw error;
@@ -330,6 +336,12 @@ export async function getTransactions(filter?: {
     extend_amount: row.extend_amount != null ? Number(row.extend_amount) : undefined,
     status: row.status ?? undefined,
     rate: row.rate != null ? Number(row.rate) : undefined,
+    with_function_hall: (row as any).with_function_hall ?? undefined,
+    function_hall_days: (row as any).function_hall_days != null ? Number((row as any).function_hall_days) : undefined,
+    function_hall_rate: (row as any).function_hall_rate != null ? Number((row as any).function_hall_rate) : undefined,
+    function_hall_total: (row as any).function_hall_total != null ? Number((row as any).function_hall_total) : undefined,
+    additional_adult_fee: (row as any).additional_adult_fee != null ? Number((row as any).additional_adult_fee) : undefined,
+    maintenance_fee: (row as any).maintenance_fee != null ? Number((row as any).maintenance_fee) : undefined,
   }));
 }
 
