@@ -260,7 +260,24 @@ export default function EntranceModule() {
           <Switch id="with-tent" checked={withTent} onCheckedChange={setWithTent} />
         </div>
 
-        {/* Discount */}
+        {/* With Function Hall */}
+        <div className="pos-card space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label htmlFor="with-fh" className="text-sm font-medium cursor-pointer">With Function Hall</Label>
+              <p className="text-xs text-muted-foreground">Rate: {formatPeso(funcHallRate)}/day</p>
+            </div>
+            <Switch id="with-fh" checked={withFunctionHall} onCheckedChange={setWithFunctionHall} />
+          </div>
+          {withFunctionHall && (
+            <div>
+              <label className="text-xs font-medium block mb-1">Days</label>
+              <input type="number" min="0" step="1" className="pos-input w-full" value={funcHallDays} onChange={(e) => setFuncHallDays(e.target.value)} placeholder="1" />
+              <p className="text-xs text-primary mt-1">Function Hall Total: {formatPeso(functionHallTotal)}</p>
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="text-sm font-medium block mb-1">Discount</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
@@ -276,6 +293,7 @@ export default function EntranceModule() {
             {k5 > 0 && <p>Kids 5-7: {rateLabel(k5, isDayTour ? dayKids5Rate : overnightKids5Rate)}</p>}
             {k4 > 0 && <p>Kids 4 & below: FREE</p>}
             {withTent && <p>With Tent: +{formatPeso(tentRate)}</p>}
+            {functionHallTotal > 0 && <p>Function Hall ({fhDays}d × {formatPeso(funcHallRate)}): +{formatPeso(functionHallTotal)}</p>}
             {discountVal > 0 && <p className="text-success">Discount: -{formatPeso(discountVal)}</p>}
           </div>
         </div>
