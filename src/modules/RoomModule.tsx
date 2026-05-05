@@ -538,6 +538,24 @@ export default function RoomModule() {
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
           {discountAmt > 0 && <p className="text-xs text-success mt-1">− {formatPeso(discountAmt)} off room rate</p>}
         </div>
+
+        <div className="pos-card space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" className="w-4 h-4" checked={withFunctionHall} onChange={(e) => setWithFunctionHall(e.target.checked)} />
+            <span className="text-sm font-medium">With Function Hall</span>
+          </label>
+          {withFunctionHall && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">Days</label>
+                <input type="number" min="0" step="1" className="pos-input w-full" value={funcHallDays} onChange={(e) => setFuncHallDays(e.target.value)} />
+              </div>
+              <div className="flex items-end text-xs text-primary">
+                {fhDays} × {formatPeso(funcHallRate)} = <strong>&nbsp;{formatPeso(functionHallTotal)}</strong>
+              </div>
+            </div>
+          )}
+        </div>
         <div>
           <label className="text-sm font-medium block mb-1">Manual Extra Charge (₱)</label>
           <div className="flex gap-2">
