@@ -426,7 +426,8 @@ export default function BookingModule() {
             {!isExclusive && k5 > 0 && <p>Kids 5-7 ({k5}): {formatPeso(k5 * kids5Rate)}</p>}
             {k4 > 0 && <p>Kids 4↓ ({k4}): FREE</p>}
             {roomFee > 0 && <p>+ {addOnRoom}: {formatPeso(roomFee)}</p>}
-            {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
+            {funcHall > 0 && <p>+ Function Hall Fee: {formatPeso(funcHall)}</p>}
+            {functionHallTotal > 0 && <p>+ Function Hall ({fhDays}d × {formatPeso(fhRate)}): {formatPeso(functionHallTotal)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
             {corkage > 0 && <p>+ Maintenance: {formatPeso(corkage)}</p>}
             {discount > 0 && <p className="text-success">− Discount: {formatPeso(discount)}</p>}
