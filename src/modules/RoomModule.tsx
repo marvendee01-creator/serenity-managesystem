@@ -210,6 +210,9 @@ export default function RoomModule() {
   const [discount, setDiscount] = useState("");
   const [manualExtraCharge, setManualExtraCharge] = useState(0);
   const [roomRate, setRoomRate] = useState(0);
+  const [funcHallRate, setFuncHallRate] = useState(1500);
+  const [withFunctionHall, setWithFunctionHall] = useState(false);
+  const [funcHallDays, setFuncHallDays] = useState("1");
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -233,8 +236,20 @@ export default function RoomModule() {
   useEffect(() => {
     getSettings().then((s) => {
       setRoomRate(roomType === "Barkada Room" ? s.barkada_room_rate : s.kubo_room_rate);
+      setFuncHallRate(s.function_hall_rate_per_day ?? 1500);
     });
   }, [roomType]);
+
+  // Auto-derive function hall days from check-in/check-out span
+  useEffect(() => {
+    if (!withFunctionHall) return;
+    if (!checkInDate || !checkOutDate) return;
+    const inMs = new Date(`${checkInDate}T00:00`).getTime();
+    const outMs = new Date(`${checkOutDate}T00:00`).getTime();
+    if (isNaN(inMs) || isNaN(outMs)) return;
+    const days = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)) || 1);
+    setFuncHallDays(days.toString());
+  }, [withFunctionHall, checkInDate, checkOutDate]);
 
   const loadActiveRooms = useCallback(async () => {
     const txs = await getTransactions({ module: "Room" });
@@ -292,7 +307,9 @@ export default function RoomModule() {
   };
 
   const discountAmt = Math.max(0, parseFloat(discount) || 0);
-  const totalRoomAmount = Math.max(0, roomRate - discountAmt + manualExtraCharge);
+  const fhDays = Math.max(0, parseFloat(funcHallDays) || 0);
+  const functionHallTotal = withFunctionHall ? fhDays * funcHallRate : 0;
+  const totalRoomAmount = Math.max(0, roomRate - discountAmt + manualExtraCharge + functionHallTotal);
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
@@ -315,6 +332,10 @@ export default function RoomModule() {
         amount_paid: totalRoomAmount, payment_method: payment,
         entry_time: checkInDateTime, check_in: checkInDateTime,
         check_out: scheduledCheckOutISO,
+        with_function_hall: withFunctionHall,
+        function_hall_days: withFunctionHall ? fhDays : 0,
+        function_hall_rate: withFunctionHall ? funcHallRate : 0,
+        function_hall_total: functionHallTotal,
       });
       toast.success("Room check-in recorded!");
 
@@ -336,6 +357,7 @@ export default function RoomModule() {
           ...(k8 > 0 ? [{ label: "Kids 8+", value: `${k8}` }] : []),
           ...(k5 > 0 ? [{ label: "Kids 5-7", value: `${k5}` }] : []),
           ...(k4 > 0 ? [{ label: "Kids 4↓ FREE", value: `${k4}` }] : []),
+          ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays}d × ${formatPeso(funcHallRate)})`, value: `+ ${formatPeso(functionHallTotal)}` }] : []),
         ],
       };
 
@@ -346,10 +368,11 @@ export default function RoomModule() {
       setAmountReceived(""); setDiscount(""); setManualExtraCharge(0); setCheckInDate(getTodayDate()); setCheckInTime(getCurrentTime());
       setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
+      setWithFunctionHall(false); setFuncHallDays("1");
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge, withFunctionHall, fhDays, funcHallRate, functionHallTotal]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
@@ -514,6 +537,24 @@ export default function RoomModule() {
           <label className="text-sm font-medium block mb-1">Discount (₱)</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
           {discountAmt > 0 && <p className="text-xs text-success mt-1">− {formatPeso(discountAmt)} off room rate</p>}
+        </div>
+
+        <div className="pos-card space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" className="w-4 h-4" checked={withFunctionHall} onChange={(e) => setWithFunctionHall(e.target.checked)} />
+            <span className="text-sm font-medium">With Function Hall</span>
+          </label>
+          {withFunctionHall && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">Days</label>
+                <input type="number" min="0" step="1" className="pos-input w-full" value={funcHallDays} onChange={(e) => setFuncHallDays(e.target.value)} />
+              </div>
+              <div className="flex items-end text-xs text-primary">
+                {fhDays} × {formatPeso(funcHallRate)} = <strong>&nbsp;{formatPeso(functionHallTotal)}</strong>
+              </div>
+            </div>
+          )}
         </div>
         <div>
           <label className="text-sm font-medium block mb-1">Manual Extra Charge (₱)</label>

@@ -71,6 +71,9 @@ export default function BookingModule() {
   const [kids4Below, setKids4Below] = useState("");
   const [addOnRoom, setAddOnRoom] = useState<string>("None");
   const [functionHallFee, setFunctionHallFee] = useState("");
+  const [withFunctionHall, setWithFunctionHall] = useState(false);
+  const [functionHallDays, setFunctionHallDays] = useState("");
+  const [functionHallRate, setFunctionHallRate] = useState("");
   const [addOnTables, setAddOnTables] = useState("");
   const [corkageFee, setCorkageFee] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
@@ -87,6 +90,7 @@ export default function BookingModule() {
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
+  const [funcHallSettingRate, setFuncHallSettingRate] = useState(1500);
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
@@ -111,9 +115,22 @@ export default function BookingModule() {
       setNightKids8Rate(s.kids_8_above_rate_night ?? 75);
       setNightKids5Rate(s.kids_5_7_rate_night ?? 50);
       setKuboRate(s.kubo_room_rate); setBarkadaRate(s.barkada_room_rate); setTableRate(s.table_rent_rate);
+      setFuncHallSettingRate(s.function_hall_rate_per_day ?? 1500);
+      setFunctionHallRate((s.function_hall_rate_per_day ?? 1500).toString());
     });
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
+
+  // Auto-derive function hall days from check-in/out span (rounded up, min 1)
+  useEffect(() => {
+    if (!withFunctionHall) return;
+    if (!checkIn || !checkOut) return;
+    const inMs = new Date(checkIn).getTime();
+    const outMs = new Date(checkOut).getTime();
+    if (isNaN(inMs) || isNaN(outMs) || outMs <= inMs) return;
+    const days = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
+    setFunctionHallDays(days.toString());
+  }, [withFunctionHall, checkIn, checkOut]);
 
   const a = parseInt(adults) || 0;
   const k8 = parseInt(kids8Above) || 0;
@@ -126,6 +143,9 @@ export default function BookingModule() {
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
   const discount = parseFloat(discountAmount) || 0;
+  const fhDays = Math.max(0, parseFloat(functionHallDays) || 0);
+  const fhRate = Math.max(0, parseFloat(functionHallRate) || 0);
+  const functionHallTotal = withFunctionHall ? fhDays * fhRate : 0;
 
   const isDayTour = stayType === "Day Tour";
   const adultRate = isDayTour ? dayAdultRate : nightAdultRate;
@@ -138,8 +158,8 @@ export default function BookingModule() {
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
   const baseAmount = isExclusive
-    ? (exclusiveFee + roomFee + tableFee + funcHall + corkage)
-    : (personFee + roomFee + tableFee + funcHall + corkage);
+    ? (exclusiveFee + roomFee + tableFee + funcHall + functionHallTotal + corkage)
+    : (personFee + roomFee + tableFee + funcHall + functionHallTotal + corkage);
   const total = Math.max(0, baseAmount - discount);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
@@ -201,6 +221,10 @@ export default function BookingModule() {
         check_in: checkIn || undefined, check_out: checkOut || undefined,
         corkage_fee: corkage > 0 ? corkage : undefined,
         function_hall_fee: funcHall > 0 ? funcHall : undefined,
+        with_function_hall: withFunctionHall,
+        function_hall_days: withFunctionHall ? fhDays : 0,
+        function_hall_rate: withFunctionHall ? fhRate : 0,
+        function_hall_total: functionHallTotal,
         room_type: addOnRoom !== "None" ? addOnRoom : undefined,
         number_of_tables: numTables > 0 ? numTables : undefined,
         adults: a, children: k8 + k5 + k4,
@@ -225,6 +249,7 @@ export default function BookingModule() {
           ...(!isExclusive && k5 > 0 ? [{ label: `Kids 5-7 (${k5})`, value: `₱${(k5 * kids5Rate).toLocaleString()}` }] : []),
           ...(k4 > 0 ? [{ label: `Kids 4↓ FREE (${k4})`, value: "₱0" }] : []),
           ...(roomFee > 0 ? [{ label: "Room", value: `${addOnRoom} ₱${roomFee.toLocaleString()}` }] : []),
+          ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays} day${fhDays > 1 ? "s" : ""} × ₱${fhRate.toLocaleString()})`, value: `₱${functionHallTotal.toLocaleString()}` }] : []),
           { label: "Deposit", value: `₱${deposit.toLocaleString()}` },
           { label: "Balance", value: `₱${Math.max(0, balance).toLocaleString()}` },
         ],
@@ -240,12 +265,14 @@ export default function BookingModule() {
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
       setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee(""); setDiscountAmount("");
+      setWithFunctionHall(false); setFunctionHallDays("");
+      setFunctionHallRate(funcHallSettingRate.toString());
       getTransactions({ module: "Booking" }).then(setExistingBookings);
       setPending8amProceed(false);
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate]);
+  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -346,8 +373,30 @@ export default function BookingModule() {
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-1">Function Hall Fee (Optional)</label>
+          <label className="text-sm font-medium block mb-1">Function Hall Fee (Optional / one-off)</label>
           <input type="number" step="0.01" className="pos-input w-full" value={functionHallFee} onChange={(e) => setFunctionHallFee(e.target.value)} placeholder="0.00" min="0" />
+        </div>
+
+        <div className="pos-card border-primary/20 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" className="w-4 h-4" checked={withFunctionHall} onChange={(e) => setWithFunctionHall(e.target.checked)} />
+            <span className="text-sm font-medium">With Function Hall (per-day rental)</span>
+          </label>
+          {withFunctionHall && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">Days</label>
+                <input type="number" min="0" step="1" className="pos-input w-full" value={functionHallDays} onChange={(e) => setFunctionHallDays(e.target.value)} placeholder="Auto from dates" />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">Rate / day</label>
+                <input type="number" min="0" step="0.01" className="pos-input w-full" value={functionHallRate} onChange={(e) => setFunctionHallRate(e.target.value)} placeholder={funcHallSettingRate.toString()} />
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground">
+                Function Hall Total: <strong className="text-primary">{formatPeso(functionHallTotal)}</strong>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -377,7 +426,8 @@ export default function BookingModule() {
             {!isExclusive && k5 > 0 && <p>Kids 5-7 ({k5}): {formatPeso(k5 * kids5Rate)}</p>}
             {k4 > 0 && <p>Kids 4↓ ({k4}): FREE</p>}
             {roomFee > 0 && <p>+ {addOnRoom}: {formatPeso(roomFee)}</p>}
-            {funcHall > 0 && <p>+ Function Hall: {formatPeso(funcHall)}</p>}
+            {funcHall > 0 && <p>+ Function Hall Fee: {formatPeso(funcHall)}</p>}
+            {functionHallTotal > 0 && <p>+ Function Hall ({fhDays}d × {formatPeso(fhRate)}): {formatPeso(functionHallTotal)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
             {corkage > 0 && <p>+ Maintenance: {formatPeso(corkage)}</p>}
             {discount > 0 && <p className="text-success">− Discount: {formatPeso(discount)}</p>}
