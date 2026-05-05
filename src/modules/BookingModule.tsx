@@ -373,8 +373,30 @@ export default function BookingModule() {
         </div>
 
         <div>
-          <label className="text-sm font-medium block mb-1">Function Hall Fee (Optional)</label>
+          <label className="text-sm font-medium block mb-1">Function Hall Fee (Optional / one-off)</label>
           <input type="number" step="0.01" className="pos-input w-full" value={functionHallFee} onChange={(e) => setFunctionHallFee(e.target.value)} placeholder="0.00" min="0" />
+        </div>
+
+        <div className="pos-card border-primary/20 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" className="w-4 h-4" checked={withFunctionHall} onChange={(e) => setWithFunctionHall(e.target.checked)} />
+            <span className="text-sm font-medium">With Function Hall (per-day rental)</span>
+          </label>
+          {withFunctionHall && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">Days</label>
+                <input type="number" min="0" step="1" className="pos-input w-full" value={functionHallDays} onChange={(e) => setFunctionHallDays(e.target.value)} placeholder="Auto from dates" />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">Rate / day</label>
+                <input type="number" min="0" step="0.01" className="pos-input w-full" value={functionHallRate} onChange={(e) => setFunctionHallRate(e.target.value)} placeholder={funcHallSettingRate.toString()} />
+              </div>
+              <div className="col-span-2 text-xs text-muted-foreground">
+                Function Hall Total: <strong className="text-primary">{formatPeso(functionHallTotal)}</strong>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
