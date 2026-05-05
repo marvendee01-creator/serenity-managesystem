@@ -121,7 +121,16 @@ export default function BookingModule() {
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
 
-  const a = parseInt(adults) || 0;
+  // Auto-derive function hall days from check-in/out span (rounded up, min 1)
+  useEffect(() => {
+    if (!withFunctionHall) return;
+    if (!checkIn || !checkOut) return;
+    const inMs = new Date(checkIn).getTime();
+    const outMs = new Date(checkOut).getTime();
+    if (isNaN(inMs) || isNaN(outMs) || outMs <= inMs) return;
+    const days = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
+    setFunctionHallDays(days.toString());
+  }, [withFunctionHall, checkIn, checkOut]);
   const k8 = parseInt(kids8Above) || 0;
   const k5 = parseInt(kids5to7) || 0;
   const k4 = parseInt(kids4Below) || 0;
