@@ -40,6 +40,12 @@ export interface Transaction {
   extend_amount?: number;
   status?: string;
   rate?: number;
+  with_function_hall?: boolean;
+  function_hall_days?: number;
+  function_hall_rate?: number;
+  function_hall_total?: number;
+  additional_adult_fee?: number;
+  maintenance_fee?: number;
 }
 
 export interface BookingCashierEntry {
@@ -73,6 +79,7 @@ export interface Settings {
   tent_rate?: number;
   day_tour_rate?: number;
   overnight_rate?: number;
+  function_hall_rate_per_day?: number;
   company_name?: string;
   company_address?: string;
   contact_number?: string;
