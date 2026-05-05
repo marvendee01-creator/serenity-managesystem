@@ -89,6 +89,104 @@ export type Database = {
         }
         Relationships: []
       }
+      food_inventory: {
+        Row: {
+          created_at: string
+          id: number
+          item_description: string | null
+          item_name: string
+          selling_price: number
+          stock_qty: number
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          item_description?: string | null
+          item_name: string
+          selling_price?: number
+          stock_qty?: number
+          unit_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          item_description?: string | null
+          item_name?: string
+          selling_price?: number
+          stock_qty?: number
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      food_sales: {
+        Row: {
+          capital: number
+          cash_received: number
+          change_amount: number
+          commission_share: number
+          created_at: string
+          customer_name: string | null
+          date_time: string
+          discount: number
+          id: number
+          item_id: number | null
+          item_name: string
+          profit: number
+          qty: number
+          sale_date: string
+          total_sales: number
+          unit_price: number
+        }
+        Insert: {
+          capital?: number
+          cash_received?: number
+          change_amount?: number
+          commission_share?: number
+          created_at?: string
+          customer_name?: string | null
+          date_time?: string
+          discount?: number
+          id?: number
+          item_id?: number | null
+          item_name: string
+          profit?: number
+          qty?: number
+          sale_date?: string
+          total_sales?: number
+          unit_price?: number
+        }
+        Update: {
+          capital?: number
+          cash_received?: number
+          change_amount?: number
+          commission_share?: number
+          created_at?: string
+          customer_name?: string | null
+          date_time?: string
+          discount?: number
+          id?: number
+          item_id?: number | null
+          item_name?: string
+          profit?: number
+          qty?: number
+          sale_date?: string
+          total_sales?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_sales_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "food_inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           adult_rate_day: number
@@ -103,6 +201,7 @@ export type Database = {
           dart_rate: number | null
           day_tour_rate: number
           exclusive_fee: number
+          function_hall_rate_per_day: number
           id: string
           kids_5_7_rate_day: number | null
           kids_5_7_rate_night: number | null
@@ -130,6 +229,7 @@ export type Database = {
           dart_rate?: number | null
           day_tour_rate?: number
           exclusive_fee?: number
+          function_hall_rate_per_day?: number
           id?: string
           kids_5_7_rate_day?: number | null
           kids_5_7_rate_night?: number | null
@@ -157,6 +257,7 @@ export type Database = {
           dart_rate?: number | null
           day_tour_rate?: number
           exclusive_fee?: number
+          function_hall_rate_per_day?: number
           id?: string
           kids_5_7_rate_day?: number | null
           kids_5_7_rate_night?: number | null
@@ -193,6 +294,7 @@ export type Database = {
       }
       transactions: {
         Row: {
+          additional_adult_fee: number | null
           adults: number
           amount_paid: number
           balance: number | null
@@ -214,12 +316,16 @@ export type Database = {
           extend_amount: number | null
           extend_hours: number | null
           extension_fee: number | null
+          function_hall_days: number | null
           function_hall_fee: number | null
+          function_hall_rate: number | null
+          function_hall_total: number | null
           game_type: string | null
           id: number
           kids_4_below: number | null
           kids_5_7: number | null
           kids_8_above: number | null
+          maintenance_fee: number | null
           module: string
           number_of_tables: number | null
           pax: number | null
@@ -232,8 +338,10 @@ export type Database = {
           total_headcount: number
           tour_type: string | null
           transaction_no: string
+          with_function_hall: boolean | null
         }
         Insert: {
+          additional_adult_fee?: number | null
           adults?: number
           amount_paid?: number
           balance?: number | null
@@ -255,12 +363,16 @@ export type Database = {
           extend_amount?: number | null
           extend_hours?: number | null
           extension_fee?: number | null
+          function_hall_days?: number | null
           function_hall_fee?: number | null
+          function_hall_rate?: number | null
+          function_hall_total?: number | null
           game_type?: string | null
           id?: number
           kids_4_below?: number | null
           kids_5_7?: number | null
           kids_8_above?: number | null
+          maintenance_fee?: number | null
           module: string
           number_of_tables?: number | null
           pax?: number | null
@@ -273,8 +385,10 @@ export type Database = {
           total_headcount?: number
           tour_type?: string | null
           transaction_no: string
+          with_function_hall?: boolean | null
         }
         Update: {
+          additional_adult_fee?: number | null
           adults?: number
           amount_paid?: number
           balance?: number | null
@@ -296,12 +410,16 @@ export type Database = {
           extend_amount?: number | null
           extend_hours?: number | null
           extension_fee?: number | null
+          function_hall_days?: number | null
           function_hall_fee?: number | null
+          function_hall_rate?: number | null
+          function_hall_total?: number | null
           game_type?: string | null
           id?: number
           kids_4_below?: number | null
           kids_5_7?: number | null
           kids_8_above?: number | null
+          maintenance_fee?: number | null
           module?: string
           number_of_tables?: number | null
           pax?: number | null
@@ -314,6 +432,7 @@ export type Database = {
           total_headcount?: number
           tour_type?: string | null
           transaction_no?: string
+          with_function_hall?: boolean | null
         }
         Relationships: []
       }
