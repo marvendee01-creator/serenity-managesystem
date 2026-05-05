@@ -210,6 +210,9 @@ export default function RoomModule() {
   const [discount, setDiscount] = useState("");
   const [manualExtraCharge, setManualExtraCharge] = useState(0);
   const [roomRate, setRoomRate] = useState(0);
+  const [funcHallRate, setFuncHallRate] = useState(1500);
+  const [withFunctionHall, setWithFunctionHall] = useState(false);
+  const [funcHallDays, setFuncHallDays] = useState("1");
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -233,6 +236,7 @@ export default function RoomModule() {
   useEffect(() => {
     getSettings().then((s) => {
       setRoomRate(roomType === "Barkada Room" ? s.barkada_room_rate : s.kubo_room_rate);
+      setFuncHallRate(s.function_hall_rate_per_day ?? 1500);
     });
   }, [roomType]);
 
