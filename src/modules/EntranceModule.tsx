@@ -43,6 +43,9 @@ export default function EntranceModule() {
   const [overnightKids5Rate, setOvernightKids5Rate] = useState(50);
   const [tentRate, setTentRate] = useState(300);
   const [withTent, setWithTent] = useState(false);
+  const [funcHallRate, setFuncHallRate] = useState(1500);
+  const [withFunctionHall, setWithFunctionHall] = useState(false);
+  const [funcHallDays, setFuncHallDays] = useState("1");
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -55,6 +58,7 @@ export default function EntranceModule() {
       setOvernightKids8Rate(s.kids_8_above_rate_night ?? s.child_rate_night);
       setOvernightKids5Rate(s.kids_5_7_rate_night ?? Math.round(s.child_rate_night * 0.6));
       setTentRate(s.tent_rate ?? 300);
+      setFuncHallRate(s.function_hall_rate_per_day ?? 1500);
     });
   }, []);
 
@@ -96,7 +100,9 @@ export default function EntranceModule() {
     : (a * overnightAdultRate) + (k8 * overnightKids8Rate) + (k5 * overnightKids5Rate);
 
   const tentAddon = withTent ? tentRate : 0;
-  const totalAmount = Math.max(0, baseAmount + tentAddon - discountVal);
+  const fhDays = Math.max(0, parseFloat(funcHallDays) || 0);
+  const functionHallTotal = withFunctionHall ? fhDays * funcHallRate : 0;
+  const totalAmount = Math.max(0, baseAmount + tentAddon + functionHallTotal - discountVal);
 
   const change = received - totalAmount;
 
@@ -123,6 +129,10 @@ export default function EntranceModule() {
         kids_8_above: k8,
         kids_5_7: k5,
         kids_4_below: k4,
+        with_function_hall: withFunctionHall,
+        function_hall_days: withFunctionHall ? fhDays : 0,
+        function_hall_rate: withFunctionHall ? funcHallRate : 0,
+        function_hall_total: functionHallTotal,
       });
       toast.success("Entrance recorded!");
 
@@ -135,6 +145,7 @@ export default function EntranceModule() {
         paymentMethod: payment,
         details: [
           ...(withTent ? [{ label: "With Tent", value: `+${formatPeso(tentRate)}` }] : []),
+          ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays}d × ${formatPeso(funcHallRate)})`, value: `+${formatPeso(functionHallTotal)}` }] : []),
           ...(discountVal > 0 ? [{ label: "Discount", value: `-${formatPeso(discountVal)}` }] : []),
         ],
       };
@@ -147,11 +158,12 @@ export default function EntranceModule() {
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setAmountReceived(""); setDiscount(""); setTourType(getAutoTourType());
       setWithTent(false);
+      setWithFunctionHall(false); setFuncHallDays("1");
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, withTent, tentRate, useManualDatetime, customDate, customTime]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, withTent, tentRate, useManualDatetime, customDate, customTime, withFunctionHall, fhDays, funcHallRate, functionHallTotal]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
