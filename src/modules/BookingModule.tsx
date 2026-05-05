@@ -71,6 +71,9 @@ export default function BookingModule() {
   const [kids4Below, setKids4Below] = useState("");
   const [addOnRoom, setAddOnRoom] = useState<string>("None");
   const [functionHallFee, setFunctionHallFee] = useState("");
+  const [withFunctionHall, setWithFunctionHall] = useState(false);
+  const [functionHallDays, setFunctionHallDays] = useState("");
+  const [functionHallRate, setFunctionHallRate] = useState("");
   const [addOnTables, setAddOnTables] = useState("");
   const [corkageFee, setCorkageFee] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
@@ -87,6 +90,7 @@ export default function BookingModule() {
   const [kuboRate, setKuboRate] = useState(1000);
   const [barkadaRate, setBarkadaRate] = useState(1500);
   const [tableRate, setTableRate] = useState(200);
+  const [funcHallSettingRate, setFuncHallSettingRate] = useState(1500);
 
   const [saving, setSaving] = useState(false);
   const [showBalanceWarning, setShowBalanceWarning] = useState(false);
@@ -111,6 +115,8 @@ export default function BookingModule() {
       setNightKids8Rate(s.kids_8_above_rate_night ?? 75);
       setNightKids5Rate(s.kids_5_7_rate_night ?? 50);
       setKuboRate(s.kubo_room_rate); setBarkadaRate(s.barkada_room_rate); setTableRate(s.table_rent_rate);
+      setFuncHallSettingRate(s.function_hall_rate_per_day ?? 1500);
+      setFunctionHallRate((s.function_hall_rate_per_day ?? 1500).toString());
     });
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
