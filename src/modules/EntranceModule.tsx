@@ -288,6 +288,21 @@ export default function EntranceModule() {
           )}
         </div>
 
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-xs font-medium block mb-1">Maintenance Fee</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={maintenanceFee} onChange={(e) => setMaintenanceFee(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1">Drinks Corkage</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={drinksCorkage} onChange={(e) => setDrinksCorkage(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1">Liquor Corkage</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={liquorCorkage} onChange={(e) => setLiquorCorkage(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+        </div>
+
         <div>
           <label className="text-sm font-medium block mb-1">Discount</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
