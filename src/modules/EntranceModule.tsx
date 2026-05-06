@@ -139,6 +139,9 @@ export default function EntranceModule() {
         function_hall_days: withFunctionHall ? fhDays : 0,
         function_hall_rate: withFunctionHall ? funcHallRate : 0,
         function_hall_total: functionHallTotal,
+        maintenance_fee: maint,
+        drinks_corkage_fee: drinksCork,
+        liquor_corkage_fee: liquorCork,
       });
       toast.success("Entrance recorded!");
 
