@@ -948,6 +948,7 @@ export default function ReportsModule() {
           { key: "expenses-entrance", label: "Expenses Summary - Entrance" },
           { key: "petty-monitoring", label: "Petty Cash Monitor" },
           { key: "reservation", label: "Reservations" },
+          { key: "food-sales", label: "Food Sales (Commission)" },
           { key: "analytics", label: "Analytics" },
         ];
         return (
