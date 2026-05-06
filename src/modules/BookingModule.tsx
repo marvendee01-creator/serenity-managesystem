@@ -271,7 +271,7 @@ export default function BookingModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
-      setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee(""); setDiscountAmount("");
+      setCheckIn(""); setCheckOut(""); setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage(""); setFunctionHallFee(""); setDiscountAmount("");
       setWithFunctionHall(false); setFunctionHallDays("");
       setFunctionHallRate(funcHallSettingRate.toString());
       getTransactions({ module: "Booking" }).then(setExistingBookings);
