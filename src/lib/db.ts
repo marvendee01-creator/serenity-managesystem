@@ -46,6 +46,8 @@ export interface Transaction {
   function_hall_total?: number;
   additional_adult_fee?: number;
   maintenance_fee?: number;
+  drinks_corkage_fee?: number;
+  liquor_corkage_fee?: number;
 }
 
 export interface BookingCashierEntry {
