@@ -148,6 +148,10 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
     });
   }, []);
 
+  const [salesBreakdown, setSalesBreakdown] = useState({
+    main: 0, food: 0, maintenance: 0, drinks: 0, liquor: 0, functionHall: 0,
+  });
+
   // Auto-populate sales from today's entrance + booking deposits
   useEffect(() => {
     if (editReport) return;
@@ -156,14 +160,25 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
       getTransactions({ module: "Entrance" }),
       getTransactions({ module: "Booking" }),
       getTransactions({ module: "Tent" }),
-    ]).then(([entranceTxns, bookingTxns, tentTxns]) => {
+      getTransactions({ module: "Room" }),
+      import("@/lib/db").then(m => m.getFoodSales({ dateFrom: today, dateTo: today })),
+    ]).then(([entranceTxns, bookingTxns, tentTxns, roomTxns, foodSales]) => {
+      const all = [...entranceTxns, ...bookingTxns, ...tentTxns, ...roomTxns]
+        .filter(t => t.date_time.slice(0, 10) === today);
       const entranceToday = entranceTxns.filter(t => t.date_time.slice(0, 10) === today);
       const bookingToday = bookingTxns.filter(t => t.date_time.slice(0, 10) === today);
       const tentToday = tentTxns.filter(t => t.date_time.slice(0, 10) === today);
       const entranceTotal = entranceToday.reduce((s, t) => s + t.amount_paid, 0);
       const bookingTotal = bookingToday.reduce((s, t) => s + (t.deposit_amount || 0), 0);
       const tentTotal = tentToday.reduce((s, t) => s + t.amount_paid, 0);
-      const totalSales = entranceTotal + bookingTotal + tentTotal;
+      const main = entranceTotal + bookingTotal + tentTotal;
+      const food = foodSales.reduce((s, r) => s + r.total_sales, 0);
+      const maintenance = all.reduce((s, t) => s + (t.maintenance_fee || 0), 0);
+      const drinks = all.reduce((s, t) => s + (t.drinks_corkage_fee || 0), 0);
+      const liquor = all.reduce((s, t) => s + (t.liquor_corkage_fee || 0), 0);
+      const functionHall = all.reduce((s, t) => s + (t.function_hall_total || 0), 0);
+      setSalesBreakdown({ main, food, maintenance, drinks, liquor, functionHall });
+      const totalSales = main + food;
       if (totalSales > 0) setEntranceSales(totalSales.toString());
     });
   }, [editReport]);
