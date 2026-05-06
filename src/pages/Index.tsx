@@ -62,6 +62,7 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   reports: ReportsModule,
   cashier: CashierModule,
   "cashier-booking": BookingCashierModule,
+  "food-pos": FoodPOSModule,
   settings: SettingsModule,
   maintenance: MaintenanceModule,
 };
