@@ -314,6 +314,20 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
           <input ref={firstRef} type="date" className="pos-input w-full ring-2 ring-warning/50 bg-warning/5" value={reportDate} onChange={e => setReportDate(e.target.value)} />
         </div>
 
+        {/* SALES BREAKDOWN */}
+        <div className="pos-card space-y-2 border-primary/30">
+          <h3 className="text-sm font-bold tracking-wide">SALES BREAKDOWN (Today)</h3>
+          <div className="grid grid-cols-2 gap-1 text-xs">
+            <span className="text-muted-foreground">Room/Entrance/Booking</span><span className="text-right tabular-nums font-semibold">₱{salesBreakdown.main.toLocaleString()}</span>
+            <span className="text-muted-foreground">Food Sales</span><span className="text-right tabular-nums font-semibold">₱{salesBreakdown.food.toLocaleString()}</span>
+            <span className="text-muted-foreground">Maintenance Fee</span><span className="text-right tabular-nums">₱{salesBreakdown.maintenance.toLocaleString()}</span>
+            <span className="text-muted-foreground">Drinks Corkage</span><span className="text-right tabular-nums">₱{salesBreakdown.drinks.toLocaleString()}</span>
+            <span className="text-muted-foreground">Liquor Corkage</span><span className="text-right tabular-nums">₱{salesBreakdown.liquor.toLocaleString()}</span>
+            <span className="text-muted-foreground">Function Hall Rent</span><span className="text-right tabular-nums">₱{salesBreakdown.functionHall.toLocaleString()}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground italic">Maintenance/Corkage/Function Hall are included inside the main amount above (informational breakdown).</p>
+        </div>
+
         {/* A. CASH SUMMARY */}
         <div className="pos-card space-y-3">
           <h3 className="text-sm font-bold text-foreground tracking-wide">A. CASH SUMMARY</h3>
