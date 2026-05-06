@@ -319,6 +319,9 @@ export default function EntranceModule() {
             {k4 > 0 && <p>Kids 4 & below: FREE</p>}
             {withTent && <p>With Tent: +{formatPeso(tentRate)}</p>}
             {functionHallTotal > 0 && <p>Function Hall ({fhDays}d × {formatPeso(funcHallRate)}): +{formatPeso(functionHallTotal)}</p>}
+            {maint > 0 && <p>Maintenance: +{formatPeso(maint)}</p>}
+            {drinksCork > 0 && <p>Drinks Corkage: +{formatPeso(drinksCork)}</p>}
+            {liquorCork > 0 && <p>Liquor Corkage: +{formatPeso(liquorCork)}</p>}
             {discountVal > 0 && <p className="text-success">Discount: -{formatPeso(discountVal)}</p>}
           </div>
         </div>
