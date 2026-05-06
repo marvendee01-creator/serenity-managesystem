@@ -43,6 +43,7 @@ const MODULES = [
   { id: "reports", label: "Reports", icon: reportsIcon },
   { id: "cashier", label: "Cashier Store", icon: cashierIcon },
   { id: "cashier-booking", label: "Cashier Booking", icon: bookingCashierIcon },
+  { id: "food-pos", label: "Food POS", icon: cashierIcon },
   { id: "settings", label: "Settings", icon: settingsIcon },
   { id: "maintenance", label: "Maintenance", icon: maintenanceIcon },
 ] as const;
