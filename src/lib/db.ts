@@ -261,6 +261,8 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       function_hall_total: t.function_hall_total ?? 0,
       additional_adult_fee: t.additional_adult_fee ?? 0,
       maintenance_fee: t.maintenance_fee ?? 0,
+      drinks_corkage_fee: t.drinks_corkage_fee ?? 0,
+      liquor_corkage_fee: t.liquor_corkage_fee ?? 0,
     } as any)
     .select("id")
     .single();
