@@ -346,6 +346,8 @@ export async function getTransactions(filter?: {
     function_hall_total: (row as any).function_hall_total != null ? Number((row as any).function_hall_total) : undefined,
     additional_adult_fee: (row as any).additional_adult_fee != null ? Number((row as any).additional_adult_fee) : undefined,
     maintenance_fee: (row as any).maintenance_fee != null ? Number((row as any).maintenance_fee) : undefined,
+    drinks_corkage_fee: (row as any).drinks_corkage_fee != null ? Number((row as any).drinks_corkage_fee) : undefined,
+    liquor_corkage_fee: (row as any).liquor_corkage_fee != null ? Number((row as any).liquor_corkage_fee) : undefined,
   }));
 }
 
