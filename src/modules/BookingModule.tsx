@@ -141,7 +141,9 @@ export default function BookingModule() {
   const headcount = a + k8 + k5 + k4;
   const isExclusive = bookingType === "Exclusive";
   const numTables = parseInt(addOnTables) || 0;
-  const corkage = parseFloat(corkageFee) || 0;
+  const corkage = parseFloat(maintenanceFee) || 0;
+  const drinksCork = parseFloat(drinksCorkage) || 0;
+  const liquorCork = parseFloat(liquorCorkage) || 0;
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
   const discount = parseFloat(discountAmount) || 0;
