@@ -46,6 +46,9 @@ export default function EntranceModule() {
   const [funcHallRate, setFuncHallRate] = useState(1500);
   const [withFunctionHall, setWithFunctionHall] = useState(false);
   const [funcHallDays, setFuncHallDays] = useState("1");
+  const [maintenanceFee, setMaintenanceFee] = useState("");
+  const [drinksCorkage, setDrinksCorkage] = useState("");
+  const [liquorCorkage, setLiquorCorkage] = useState("");
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
