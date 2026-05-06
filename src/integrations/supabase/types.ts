@@ -311,6 +311,7 @@ export type Database = {
           date_time: string
           default_hours: number | null
           deposit_amount: number | null
+          drinks_corkage_fee: number | null
           end_time: string | null
           entry_time: string | null
           extend_amount: number | null
@@ -325,6 +326,7 @@ export type Database = {
           kids_4_below: number | null
           kids_5_7: number | null
           kids_8_above: number | null
+          liquor_corkage_fee: number | null
           maintenance_fee: number | null
           module: string
           number_of_tables: number | null
@@ -358,6 +360,7 @@ export type Database = {
           date_time?: string
           default_hours?: number | null
           deposit_amount?: number | null
+          drinks_corkage_fee?: number | null
           end_time?: string | null
           entry_time?: string | null
           extend_amount?: number | null
@@ -372,6 +375,7 @@ export type Database = {
           kids_4_below?: number | null
           kids_5_7?: number | null
           kids_8_above?: number | null
+          liquor_corkage_fee?: number | null
           maintenance_fee?: number | null
           module: string
           number_of_tables?: number | null
@@ -405,6 +409,7 @@ export type Database = {
           date_time?: string
           default_hours?: number | null
           deposit_amount?: number | null
+          drinks_corkage_fee?: number | null
           end_time?: string | null
           entry_time?: string | null
           extend_amount?: number | null
@@ -419,6 +424,7 @@ export type Database = {
           kids_4_below?: number | null
           kids_5_7?: number | null
           kids_8_above?: number | null
+          liquor_corkage_fee?: number | null
           maintenance_fee?: number | null
           module?: string
           number_of_tables?: number | null

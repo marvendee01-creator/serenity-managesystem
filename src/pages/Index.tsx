@@ -29,6 +29,7 @@ import MaintenanceModule from "@/modules/MaintenanceModule";
 import BookingManagement from "@/modules/BookingManagement";
 import BookingCashierModule from "@/modules/BookingCashierModule";
 import TentModule from "@/modules/TentModule";
+import FoodPOSModule from "@/modules/FoodPOSModule";
 
 const MODULES = [
   { id: "entrance", label: "Entrance", icon: entranceIcon },
@@ -42,6 +43,7 @@ const MODULES = [
   { id: "reports", label: "Reports", icon: reportsIcon },
   { id: "cashier", label: "Cashier Store", icon: cashierIcon },
   { id: "cashier-booking", label: "Cashier Booking", icon: bookingCashierIcon },
+  { id: "food-pos", label: "Food POS", icon: cashierIcon },
   { id: "settings", label: "Settings", icon: settingsIcon },
   { id: "maintenance", label: "Maintenance", icon: maintenanceIcon },
 ] as const;
@@ -60,6 +62,7 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   reports: ReportsModule,
   cashier: CashierModule,
   "cashier-booking": BookingCashierModule,
+  "food-pos": FoodPOSModule,
   settings: SettingsModule,
   maintenance: MaintenanceModule,
 };

@@ -46,6 +46,8 @@ export interface Transaction {
   function_hall_total?: number;
   additional_adult_fee?: number;
   maintenance_fee?: number;
+  drinks_corkage_fee?: number;
+  liquor_corkage_fee?: number;
 }
 
 export interface BookingCashierEntry {
@@ -259,6 +261,8 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       function_hall_total: t.function_hall_total ?? 0,
       additional_adult_fee: t.additional_adult_fee ?? 0,
       maintenance_fee: t.maintenance_fee ?? 0,
+      drinks_corkage_fee: t.drinks_corkage_fee ?? 0,
+      liquor_corkage_fee: t.liquor_corkage_fee ?? 0,
     } as any)
     .select("id")
     .single();
@@ -342,6 +346,8 @@ export async function getTransactions(filter?: {
     function_hall_total: (row as any).function_hall_total != null ? Number((row as any).function_hall_total) : undefined,
     additional_adult_fee: (row as any).additional_adult_fee != null ? Number((row as any).additional_adult_fee) : undefined,
     maintenance_fee: (row as any).maintenance_fee != null ? Number((row as any).maintenance_fee) : undefined,
+    drinks_corkage_fee: (row as any).drinks_corkage_fee != null ? Number((row as any).drinks_corkage_fee) : undefined,
+    liquor_corkage_fee: (row as any).liquor_corkage_fee != null ? Number((row as any).liquor_corkage_fee) : undefined,
   }));
 }
 

@@ -75,7 +75,9 @@ export default function BookingModule() {
   const [functionHallDays, setFunctionHallDays] = useState("");
   const [functionHallRate, setFunctionHallRate] = useState("");
   const [addOnTables, setAddOnTables] = useState("");
-  const [corkageFee, setCorkageFee] = useState("");
+  const [maintenanceFee, setMaintenanceFee] = useState("");
+  const [drinksCorkage, setDrinksCorkage] = useState("");
+  const [liquorCorkage, setLiquorCorkage] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
@@ -139,7 +141,9 @@ export default function BookingModule() {
   const headcount = a + k8 + k5 + k4;
   const isExclusive = bookingType === "Exclusive";
   const numTables = parseInt(addOnTables) || 0;
-  const corkage = parseFloat(corkageFee) || 0;
+  const corkage = parseFloat(maintenanceFee) || 0;
+  const drinksCork = parseFloat(drinksCorkage) || 0;
+  const liquorCork = parseFloat(liquorCorkage) || 0;
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
   const discount = parseFloat(discountAmount) || 0;
@@ -158,8 +162,8 @@ export default function BookingModule() {
   const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
   const tableFee = numTables * tableRate;
   const baseAmount = isExclusive
-    ? (exclusiveFee + roomFee + tableFee + funcHall + functionHallTotal + corkage)
-    : (personFee + roomFee + tableFee + funcHall + functionHallTotal + corkage);
+    ? (exclusiveFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork)
+    : (personFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork);
   const total = Math.max(0, baseAmount - discount);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
@@ -220,6 +224,9 @@ export default function BookingModule() {
         customer_name: customerName || undefined, booking_type: bookingType,
         check_in: checkIn || undefined, check_out: checkOut || undefined,
         corkage_fee: corkage > 0 ? corkage : undefined,
+        maintenance_fee: corkage > 0 ? corkage : 0,
+        drinks_corkage_fee: drinksCork,
+        liquor_corkage_fee: liquorCork,
         function_hall_fee: funcHall > 0 ? funcHall : undefined,
         with_function_hall: withFunctionHall,
         function_hall_days: withFunctionHall ? fhDays : 0,
@@ -264,7 +271,7 @@ export default function BookingModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
-      setCheckIn(""); setCheckOut(""); setCorkageFee(""); setFunctionHallFee(""); setDiscountAmount("");
+      setCheckIn(""); setCheckOut(""); setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage(""); setFunctionHallFee(""); setDiscountAmount("");
       setWithFunctionHall(false); setFunctionHallDays("");
       setFunctionHallRate(funcHallSettingRate.toString());
       getTransactions({ module: "Booking" }).then(setExistingBookings);
@@ -408,11 +415,22 @@ export default function BookingModule() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">Maintenance Fee (Optional)</label>
-            <input type="number" step="0.01" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
+            <input type="number" step="0.01" className="pos-input w-full" value={maintenanceFee} onChange={(e) => setMaintenanceFee(e.target.value)} placeholder="0.00" min="0" />
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Discount Amount</label>
             <input type="number" step="0.01" className="pos-input w-full" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Drinks Corkage Fee</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={drinksCorkage} onChange={(e) => setDrinksCorkage(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Liquor Corkage Fee</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={liquorCorkage} onChange={(e) => setLiquorCorkage(e.target.value)} placeholder="0.00" min="0" />
           </div>
         </div>
 
@@ -430,6 +448,8 @@ export default function BookingModule() {
             {functionHallTotal > 0 && <p>+ Function Hall ({fhDays}d × {formatPeso(fhRate)}): {formatPeso(functionHallTotal)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
             {corkage > 0 && <p>+ Maintenance: {formatPeso(corkage)}</p>}
+            {drinksCork > 0 && <p>+ Drinks Corkage: {formatPeso(drinksCork)}</p>}
+            {liquorCork > 0 && <p>+ Liquor Corkage: {formatPeso(liquorCork)}</p>}
             {discount > 0 && <p className="text-success">− Discount: {formatPeso(discount)}</p>}
           </div>
         </div>

@@ -46,6 +46,9 @@ export default function EntranceModule() {
   const [funcHallRate, setFuncHallRate] = useState(1500);
   const [withFunctionHall, setWithFunctionHall] = useState(false);
   const [funcHallDays, setFuncHallDays] = useState("1");
+  const [maintenanceFee, setMaintenanceFee] = useState("");
+  const [drinksCorkage, setDrinksCorkage] = useState("");
+  const [liquorCorkage, setLiquorCorkage] = useState("");
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -102,7 +105,10 @@ export default function EntranceModule() {
   const tentAddon = withTent ? tentRate : 0;
   const fhDays = Math.max(0, parseFloat(funcHallDays) || 0);
   const functionHallTotal = withFunctionHall ? fhDays * funcHallRate : 0;
-  const totalAmount = Math.max(0, baseAmount + tentAddon + functionHallTotal - discountVal);
+  const maint = parseFloat(maintenanceFee) || 0;
+  const drinksCork = parseFloat(drinksCorkage) || 0;
+  const liquorCork = parseFloat(liquorCorkage) || 0;
+  const totalAmount = Math.max(0, baseAmount + tentAddon + functionHallTotal + maint + drinksCork + liquorCork - discountVal);
 
   const change = received - totalAmount;
 
@@ -133,6 +139,9 @@ export default function EntranceModule() {
         function_hall_days: withFunctionHall ? fhDays : 0,
         function_hall_rate: withFunctionHall ? funcHallRate : 0,
         function_hall_total: functionHallTotal,
+        maintenance_fee: maint,
+        drinks_corkage_fee: drinksCork,
+        liquor_corkage_fee: liquorCork,
       });
       toast.success("Entrance recorded!");
 
@@ -159,11 +168,12 @@ export default function EntranceModule() {
       setAmountReceived(""); setDiscount(""); setTourType(getAutoTourType());
       setWithTent(false);
       setWithFunctionHall(false); setFuncHallDays("1");
+      setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage("");
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, withTent, tentRate, useManualDatetime, customDate, customTime, withFunctionHall, fhDays, funcHallRate, functionHallTotal]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, withTent, tentRate, useManualDatetime, customDate, customTime, withFunctionHall, fhDays, funcHallRate, functionHallTotal, maint, drinksCork, liquorCork]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -278,6 +288,21 @@ export default function EntranceModule() {
           )}
         </div>
 
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-xs font-medium block mb-1">Maintenance Fee</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={maintenanceFee} onChange={(e) => setMaintenanceFee(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1">Drinks Corkage</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={drinksCorkage} onChange={(e) => setDrinksCorkage(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1">Liquor Corkage</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={liquorCorkage} onChange={(e) => setLiquorCorkage(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+        </div>
+
         <div>
           <label className="text-sm font-medium block mb-1">Discount</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
@@ -294,6 +319,9 @@ export default function EntranceModule() {
             {k4 > 0 && <p>Kids 4 & below: FREE</p>}
             {withTent && <p>With Tent: +{formatPeso(tentRate)}</p>}
             {functionHallTotal > 0 && <p>Function Hall ({fhDays}d × {formatPeso(funcHallRate)}): +{formatPeso(functionHallTotal)}</p>}
+            {maint > 0 && <p>Maintenance: +{formatPeso(maint)}</p>}
+            {drinksCork > 0 && <p>Drinks Corkage: +{formatPeso(drinksCork)}</p>}
+            {liquorCork > 0 && <p>Liquor Corkage: +{formatPeso(liquorCork)}</p>}
             {discountVal > 0 && <p className="text-success">Discount: -{formatPeso(discountVal)}</p>}
           </div>
         </div>
