@@ -806,7 +806,67 @@ function PettyCashMonitoring() {
   );
 }
 
-export default function ReportsModule() {
+function FoodSalesReport() {
+  const [sales, setSales] = useState<FoodSale[]>([]);
+  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  useEffect(() => {
+    getFoodSales({ dateFrom: from || undefined, dateTo: to || undefined }).then(setSales);
+  }, [from, to]);
+  const totalSales = sales.reduce((s, r) => s + r.total_sales, 0);
+  const totalCapital = sales.reduce((s, r) => s + r.capital, 0);
+  const totalProfit = sales.reduce((s, r) => s + r.profit, 0);
+  const totalCommission = sales.reduce((s, r) => s + r.commission_share, 0);
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
+          <input type="date" className="pos-input text-sm w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
+          <input type="date" className="pos-input text-sm w-full" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Total Sales</p><p className="text-base font-bold tabular-nums">{formatPeso(totalSales)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Capital (÷1.6)</p><p className="text-base font-bold tabular-nums">{formatPeso(totalCapital)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Profit</p><p className="text-base font-bold tabular-nums">{formatPeso(totalProfit)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Commission</p><p className="text-base font-bold tabular-nums text-primary">{formatPeso(totalCommission)}</p></div>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left p-2">Date</th>
+              <th className="text-left p-2">Customer</th>
+              <th className="text-left p-2">Item</th>
+              <th className="text-right p-2">Qty</th>
+              <th className="text-right p-2">Total</th>
+              <th className="text-right p-2">Commission</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sales.length === 0 ? (
+              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No food sales for this range.</td></tr>
+            ) : sales.map((s) => (
+              <tr key={s.id} className="border-t border-border">
+                <td className="p-2">{formatDateTime(s.date_time)}</td>
+                <td className="p-2">{s.customer_name || "—"}</td>
+                <td className="p-2">{s.item_name}</td>
+                <td className="p-2 text-right tabular-nums">{s.qty}</td>
+                <td className="p-2 text-right tabular-nums">{formatPeso(s.total_sales)}</td>
+                <td className="p-2 text-right tabular-nums">{formatPeso(s.commission_share)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
   const [tab, setTab] = useState<Tab>("transactions");
   const [data, setData] = useState<Transaction[]>([]);
   const [moduleFilter, setModuleFilter] = useState("All");
