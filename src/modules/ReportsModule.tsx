@@ -867,6 +867,7 @@ function FoodSalesReport() {
   );
 }
 
+export default function ReportsModule() {
   const [tab, setTab] = useState<Tab>("transactions");
   const [data, setData] = useState<Transaction[]>([]);
   const [moduleFilter, setModuleFilter] = useState("All");
