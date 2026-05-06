@@ -168,11 +168,12 @@ export default function EntranceModule() {
       setAmountReceived(""); setDiscount(""); setTourType(getAutoTourType());
       setWithTent(false);
       setWithFunctionHall(false); setFuncHallDays("1");
+      setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage("");
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, withTent, tentRate, useManualDatetime, customDate, customTime, withFunctionHall, fhDays, funcHallRate, functionHallTotal]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, received, change, discountVal, withTent, tentRate, useManualDatetime, customDate, customTime, withFunctionHall, fhDays, funcHallRate, functionHallTotal, maint, drinksCork, liquorCork]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
