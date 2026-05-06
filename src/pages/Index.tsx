@@ -29,6 +29,7 @@ import MaintenanceModule from "@/modules/MaintenanceModule";
 import BookingManagement from "@/modules/BookingManagement";
 import BookingCashierModule from "@/modules/BookingCashierModule";
 import TentModule from "@/modules/TentModule";
+import FoodPOSModule from "@/modules/FoodPOSModule";
 
 const MODULES = [
   { id: "entrance", label: "Entrance", icon: entranceIcon },
