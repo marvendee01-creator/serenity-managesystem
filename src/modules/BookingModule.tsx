@@ -415,11 +415,22 @@ export default function BookingModule() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">Maintenance Fee (Optional)</label>
-            <input type="number" step="0.01" className="pos-input w-full" value={corkageFee} onChange={(e) => setCorkageFee(e.target.value)} placeholder="0.00" min="0" />
+            <input type="number" step="0.01" className="pos-input w-full" value={maintenanceFee} onChange={(e) => setMaintenanceFee(e.target.value)} placeholder="0.00" min="0" />
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Discount Amount</label>
             <input type="number" step="0.01" className="pos-input w-full" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Drinks Corkage Fee</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={drinksCorkage} onChange={(e) => setDrinksCorkage(e.target.value)} placeholder="0.00" min="0" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Liquor Corkage Fee</label>
+            <input type="number" step="0.01" className="pos-input w-full" value={liquorCorkage} onChange={(e) => setLiquorCorkage(e.target.value)} placeholder="0.00" min="0" />
           </div>
         </div>
 
@@ -437,6 +448,8 @@ export default function BookingModule() {
             {functionHallTotal > 0 && <p>+ Function Hall ({fhDays}d × {formatPeso(fhRate)}): {formatPeso(functionHallTotal)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}
             {corkage > 0 && <p>+ Maintenance: {formatPeso(corkage)}</p>}
+            {drinksCork > 0 && <p>+ Drinks Corkage: {formatPeso(drinksCork)}</p>}
+            {liquorCork > 0 && <p>+ Liquor Corkage: {formatPeso(liquorCork)}</p>}
             {discount > 0 && <p className="text-success">− Discount: {formatPeso(discount)}</p>}
           </div>
         </div>
