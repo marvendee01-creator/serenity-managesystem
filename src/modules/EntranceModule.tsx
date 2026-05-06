@@ -105,7 +105,10 @@ export default function EntranceModule() {
   const tentAddon = withTent ? tentRate : 0;
   const fhDays = Math.max(0, parseFloat(funcHallDays) || 0);
   const functionHallTotal = withFunctionHall ? fhDays * funcHallRate : 0;
-  const totalAmount = Math.max(0, baseAmount + tentAddon + functionHallTotal - discountVal);
+  const maint = parseFloat(maintenanceFee) || 0;
+  const drinksCork = parseFloat(drinksCorkage) || 0;
+  const liquorCork = parseFloat(liquorCorkage) || 0;
+  const totalAmount = Math.max(0, baseAmount + tentAddon + functionHallTotal + maint + drinksCork + liquorCork - discountVal);
 
   const change = received - totalAmount;
 
