@@ -1243,6 +1243,8 @@ export default function ReportsModule() {
 
       {tab === "analytics" && <AnalyticsDashboard />}
 
+      {tab === "food-sales" && <FoodSalesReport />}
+
       {/* Edit Transaction Dialog */}
       <Dialog open={!!editingTxn} onOpenChange={(open) => { if (!open) setEditingTxn(null); }}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
