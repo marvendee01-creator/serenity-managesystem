@@ -923,13 +923,21 @@ function FullyPaidBookingsReport() {
   useEffect(() => {
     setLoading(true);
     getTransactions({ dateFrom: from, dateTo: to }).then(all => {
-      const filtered = all.filter(t => 
-        (t.module === "Booking" || t.module === "Room") && 
-        t.payment_status === "Fully Paid" && 
-        t.status !== "Cancelled" &&
-        t.date_settled && t.date_settled >= from && t.date_settled <= to
-      );
-      setData(filtered.sort((a, b) => new Date(b.date_settled!).getTime() - new Date(a.date_settled!).getTime()));
+      const filtered = all.filter(t => {
+        const isPaid = t.payment_status === "Fully Paid" || (!t.payment_status && t.module === "Room");
+        const effectiveDate = (t.date_settled || t.date_time.slice(0, 10));
+        return (
+          (t.module === "Booking" || t.module === "Room") && 
+          isPaid && 
+          t.status !== "Cancelled" &&
+          effectiveDate >= from && effectiveDate <= to
+        );
+      });
+      setData(filtered.sort((a, b) => {
+        const dateA = a.date_settled || a.date_time.slice(0, 10);
+        const dateB = b.date_settled || b.date_time.slice(0, 10);
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      }));
       setLoading(false);
     });
   }, [from, to]);
@@ -977,7 +985,9 @@ function FullyPaidBookingsReport() {
             ) : (
               data.map(r => (
                 <tr key={r.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-4 text-xs font-medium">{r.date_settled ? formatDate(r.date_settled + "T00:00:00") : "—"}</td>
+                  <td className="px-4 py-4 text-xs font-medium">
+                    {r.date_settled ? formatDate(r.date_settled + "T00:00:00") : formatDate(r.date_time)}
+                  </td>
                   <td className="px-4 py-4 font-bold">{r.customer_name}</td>
                   <td className="px-4 py-4 text-xs text-muted-foreground">{r.booking_type} {r.room_type ? `(${r.room_type})` : ""}</td>
                   <td className="px-4 py-4 text-right tabular-nums font-black text-success">{formatPeso(r.amount_paid)}</td>
