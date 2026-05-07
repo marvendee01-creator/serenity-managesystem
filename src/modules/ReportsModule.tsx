@@ -207,45 +207,47 @@ function StoreSalesSummary() {
 
 function ExpensesSummary({ source, title }: { source: "store" | "entrance"; title: string }) {
   const [rows, setRows] = useState<{ date: string; particulars: string; receipt_no: string; amount: number; reportId: number }[]>([]);
-  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     const load = async () => {
       const allItems: any[] = [];
-      const ymOf = (s: string) => s.slice(0, 7);
       
       if (source === "store") {
         const all = await getCashierReports();
         for (const r of all) {
           for (const item of (r.petty_items || [])) {
-            const itemDate = item.date || r.date;
-            if (ymOf(itemDate) !== monthFilter) continue;
-            allItems.push({ ...item, date: itemDate, reportId: r.id });
+            const itemDate = (item.date || r.date).slice(0, 10);
+            if (itemDate >= from && itemDate <= to) {
+              allItems.push({ ...item, date: itemDate, reportId: r.id });
+            }
           }
         }
       } else {
         const all = await getBookingCashierReports();
         for (const r of all) {
           for (const item of (r.petty_items || [])) {
-            const itemDate = item.date || r.report_date;
-            if (ymOf(itemDate) !== monthFilter) continue;
-            allItems.push({ ...item, date: itemDate, reportId: r.id });
+            const itemDate = (item.date || r.report_date).slice(0, 10);
+            if (itemDate >= from && itemDate <= to) {
+              allItems.push({ ...item, date: itemDate, reportId: r.id });
+            }
           }
         }
       }
       setRows(allItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
     };
     load();
-  }, [source, monthFilter, refresh]);
+  }, [source, from, to, refresh]);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
-  const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+  const rangeLabel = from === to ? formatDate(from) : `${formatDate(from)} - ${formatDate(to)}`;
 
   const buildHTML = () => `
     <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h2{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #999;padding:6px 8px;font-size:11px}th{background:#f0f0f0;text-align:left}.right{text-align:right}.bold{font-weight:bold}</style>
     <h2>SERENITY INLAND RESORT</h2>
-    <h2>${title} Details — ${monthLabel}</h2>
+    <h2>${title} Details — ${rangeLabel}</h2>
     <table>
       <thead>
         <tr><th>Date</th><th>Particulars</th><th>Receipt No</th><th class="right">Amount</th></tr>
@@ -266,7 +268,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `expenses_detailed_${source}_${monthFilter}.csv`; a.click();
+    a.href = url; a.download = `expenses_detailed_${source}_${from}_${to}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -281,8 +283,12 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
         <div>
-          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
-          <input type="month" className="pos-input text-sm w-full" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
+          <input type="date" className="pos-input text-sm w-full" value={from} onChange={e => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
+          <input type="date" className="pos-input text-sm w-full" value={to} onChange={e => setTo(e.target.value)} />
         </div>
         <button onClick={exportExcel} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
           <Download size={14} /> Export Excel
@@ -293,7 +299,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
       </div>
 
       <div className="pos-card text-center mb-4 bg-destructive/5 border-destructive/20">
-        <p className="text-xs text-muted-foreground uppercase">Total Petty Cash Expenses for {monthLabel}</p>
+        <p className="text-xs text-muted-foreground uppercase">Total Petty Cash Expenses for {rangeLabel}</p>
         <p className="text-2xl font-black tabular-nums text-destructive">{formatPeso(total)}</p>
       </div>
 
