@@ -938,16 +938,19 @@ function DailyTransactionSummaryReport() {
       let othersCash = 0, othersGCash = 0;
       let tableRentCash = 0, tableRentGCash = 0;
       let tentRentCash = 0, tentRentGCash = 0;
-      let maintenanceFees = 0;
+      let maintCash = 0, maintGCash = 0;
 
       const filteredTxns = txns.filter(t => t.date_time && t.date_time.slice(0, 10) === selectedDate);
 
       for (const t of filteredTxns) {
         if (t.status === "Cancelled") continue;
-        if (t.maintenance_fee) maintenanceFees += t.maintenance_fee;
-
+        
         const isGCash = t.payment_method === "GCash";
         const mFee = t.maintenance_fee || 0;
+        
+        // Always track maintenance fee separately by payment method
+        if (isGCash) maintGCash += mFee;
+        else maintCash += mFee;
 
         if (t.module === "Table Rent") {
           const netAmt = t.amount_paid - mFee;
@@ -965,19 +968,15 @@ function DailyTransactionSummaryReport() {
 
         if (t.module === "Booking") {
           if (t.payment_status === "Partially Paid" || (t.deposit_amount && t.balance && t.balance > 0)) {
-            // Subtract maintenance fee proportionally or from the deposit
-            // For simplicity and since maintenance fee is usually fixed, we subtract it from the received amount
             const netAmt = (t.deposit_amount || 0) - mFee;
             if (isGCash) depositGCash += netAmt;
             else depositCash += netAmt;
-          }
-          if (t.payment_status === "Fully Paid" || (t.balance === 0)) {
+          } else if (t.payment_status === "Fully Paid" || (t.balance === 0)) {
             const netAmt = (t.deposit_amount || t.amount_paid) - mFee;
             if (isGCash) fullGCash += netAmt;
             else fullCash += netAmt;
           }
         } else if (t.module === "Entrance" || t.module === "Room") {
-          // Use Net amount (Gross minus Maintenance Fee) for module sales
           const netAmt = (t.amount_paid - mFee);
           if (isGCash) othersGCash += netAmt;
           else othersCash += netAmt;
@@ -1005,7 +1004,8 @@ function DailyTransactionSummaryReport() {
       if (foodCash > 0) pushRecord("FOOD SALES", "CASH", foodCash);
 
       // 4. MAINTENANCE FEE
-      if (maintenanceFees > 0) pushRecord("MAINTENANCE FEE", "CASH", maintenanceFees);
+      if (maintCash > 0) pushRecord("MAINTENANCE FEE", "CASH", maintCash);
+      if (maintGCash > 0) pushRecord("MAINTENANCE FEE", "GCASH", maintGCash);
       
       setData(records);
       setLoading(false);
