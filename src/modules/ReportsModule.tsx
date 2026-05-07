@@ -28,7 +28,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "room-stay" | "maint-monitoring" | "daily-summary" | "fully-paid" | "outstanding";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "room-stay" | "maint-monitoring" | "daily-summary" | "fully-paid";
 
 function EntranceSalesSummary() {
   const [reports, setReports] = useState<BookingCashierReport[]>([]);
@@ -991,71 +991,6 @@ function FullyPaidBookingsReport() {
   );
 }
 
-function OutstandingBookingsReport() {
-  const [data, setData] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    getTransactions().then(all => {
-      const filtered = all.filter(t => 
-        t.module === "Booking" && 
-        t.payment_status === "Partially Paid" && 
-        t.status !== "Cancelled"
-      );
-      setData(filtered.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime()));
-      setLoading(false);
-    });
-  }, []);
-
-  const totalBalance = data.reduce((s, r) => s + Math.max(0, (r.amount_paid || 0) - (r.deposit_amount || 0)), 0);
-
-  return (
-    <div>
-      <div className="pos-card bg-destructive/5 border-destructive/20 flex items-center justify-between py-6 mb-6">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Outstanding Balance</p>
-          <p className="text-3xl font-black text-destructive tabular-nums">{formatPeso(totalBalance)}</p>
-        </div>
-        <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive">
-          <AlertTriangle size={24} />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted/50 border-b border-border">
-              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Partial Payment Date</th>
-              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Customer Name</th>
-              <th className="text-right px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Amount Paid</th>
-              <th className="text-right px-4 py-4 font-bold text-destructive uppercase tracking-wider">Remaining Balance</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {loading ? (
-              <tr><td colSpan={4} className="text-center py-12 italic text-muted-foreground">Loading outstanding list...</td></tr>
-            ) : data.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-12 text-muted-foreground">No outstanding/partially paid bookings found.</td></tr>
-            ) : (
-              data.map(r => (
-                <tr key={r.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-4 text-xs font-medium">{r.date_settled ? formatDate(r.date_settled + "T00:00:00") : formatDate(r.date_time)}</td>
-                  <td className="px-4 py-4 font-bold">{r.customer_name}</td>
-                  <td className="px-4 py-4 text-right tabular-nums text-success font-medium">{formatPeso(r.deposit_amount || 0)}</td>
-                  <td className="px-4 py-4 text-right tabular-nums font-black text-destructive bg-destructive/5">
-                    {formatPeso(Math.max(0, (r.amount_paid || 0) - (r.deposit_amount || 0)))}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 function DailyTransactionSummaryReport() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [data, setData] = useState<any[]>([]);
@@ -1619,7 +1554,6 @@ export default function ReportsModule() {
           { key: "room-stay", label: "Room Stay Report" },
           { key: "daily-summary", label: "Daily Transaction Summary" },
           { key: "fully-paid", label: "Report - Fully Paid Bookings" },
-          { key: "outstanding", label: "Report - Outstanding (Partial)" },
           { key: "food-sales", label: "Food Sales (Commission)" },
           { key: "maint-monitoring", label: "Maintenance Fee Monitoring" },
           { key: "analytics", label: "Analytics" },
@@ -1934,8 +1868,6 @@ export default function ReportsModule() {
       {tab === "daily-summary" && <DailyTransactionSummaryReport />}
 
       {tab === "fully-paid" && <FullyPaidBookingsReport />}
-
-      {tab === "outstanding" && <OutstandingBookingsReport />}
 
       {tab === "food-sales" && <FoodSalesReport />}
 
