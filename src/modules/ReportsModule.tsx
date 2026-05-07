@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil, Trash2, BarChart3, TrendingUp, Trophy } from "lucide-react";
 import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, deleteCashierReport, deleteBookingCashierReport, getFoodSales, type Transaction, type CashierReport, type FoodSale } from "@/lib/db";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -962,7 +962,7 @@ function DailyTransactionSummaryReport() {
 
       // 1. SALES STORE (CASH)
       const storeSales = storeCashier
-        .filter(s => s.date.slice(0, 10) === selectedDate)
+        .filter(s => s.date && s.date.slice(0, 10) === selectedDate)
         .reduce((sum, s) => sum + (Number(s.sales) || 0), 0);
       if (storeSales > 0) pushRecord("SALES STORE", "CASH", storeSales);
 
@@ -973,7 +973,7 @@ function DailyTransactionSummaryReport() {
       let maintenanceFees = 0;
 
       // EXPLICIT MANUAL FILTER for exact date matching
-      const filteredTxns = txns.filter(t => t.date_time.slice(0, 10) === selectedDate);
+      const filteredTxns = txns.filter(t => t.date_time && t.date_time.slice(0, 10) === selectedDate);
 
       for (const t of filteredTxns) {
         if (t.status === "Cancelled") continue;
@@ -1002,7 +1002,7 @@ function DailyTransactionSummaryReport() {
       // 3. FOOD SALES (CASH)
       // EXPLICIT MANUAL FILTER for food sales date
       const foodCash = food
-        .filter(f => f.sale_date === selectedDate && f.payment_status === "Fully Paid")
+        .filter(f => f.sale_date && f.sale_date === selectedDate && f.payment_status === "Fully Paid")
         .reduce((sum, f) => sum + (f.cash_received || f.total_sales), 0);
       if (foodCash > 0) pushRecord("FOOD SALES", "CASH", foodCash);
 
