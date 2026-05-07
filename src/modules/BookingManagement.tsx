@@ -76,6 +76,8 @@ export default function BookingManagement() {
       kids_4_below: b.kids_4_below ?? 0,
       function_hall_fee: b.function_hall_fee ?? 0,
       number_of_tables: b.number_of_tables ?? 0,
+      maintenance_fee: b.maintenance_fee ?? 0,
+      deposit_amount: b.deposit_amount ?? 0,
       corkage_fee: b.corkage_fee ?? 0,
     });
   }, []);
@@ -99,6 +101,8 @@ export default function BookingManagement() {
         total_headcount: a + k8 + k5 + k4,
         function_hall_fee: editForm.function_hall_fee ?? 0,
         number_of_tables: editForm.number_of_tables ?? 0,
+        maintenance_fee: editForm.maintenance_fee ?? 0,
+        deposit_amount: editForm.deposit_amount ?? 0,
         corkage_fee: editForm.corkage_fee ?? 0,
       });
       toast.success("Booking updated!");
@@ -628,16 +632,21 @@ export default function BookingManagement() {
                 <input type="number" min="0" className="pos-input w-full" value={editForm.kids_4_below ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, kids_4_below: parseInt(e.target.value) || 0 }))} /></div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div><label className="text-xs font-medium block mb-1">Function Hall Fee</label>
                 <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.function_hall_fee ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, function_hall_fee: parseFloat(e.target.value) || 0 }))} /></div>
               <div><label className="text-xs font-medium block mb-1">Tables</label>
                 <input type="number" min="0" className="pos-input w-full" value={editForm.number_of_tables ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, number_of_tables: parseInt(e.target.value) || 0 }))} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               <div><label className="text-xs font-medium block mb-1">Maintenance Fee</label>
-                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.corkage_fee ?? 0}
-                  onChange={e => setEditForm(f => ({ ...f, corkage_fee: parseFloat(e.target.value) || 0 }))} /></div>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.maintenance_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, maintenance_fee: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1 font-bold text-primary">Deposit Amount</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full border-primary/50" value={editForm.deposit_amount ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, deposit_amount: parseFloat(e.target.value) || 0 }))} /></div>
             </div>
             <div className="flex gap-2 pt-2">
               <button onClick={() => setEditingBooking(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all">Cancel</button>
