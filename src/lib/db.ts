@@ -297,8 +297,13 @@ export async function getTransactions(filter?: {
   let query = supabase.from("transactions").select("*").order("date_time", { ascending: false });
   if (filter?.module) query = query.eq("module", filter.module);
   if (filter?.game_type) query = query.eq("game_type", filter.game_type);
-  if (filter?.dateFrom) query = query.gte("date_time", filter.dateFrom);
-  if (filter?.dateTo) query = query.lte("date_time", filter.dateTo + "T23:59:59");
+  if (filter?.dateFrom && filter?.dateTo) {
+    const toStr = filter.dateTo + "T23:59:59";
+    query = query.or(`and(date_time.gte.${filter.dateFrom},date_time.lte.${toStr}),date_settled.gte.${filter.dateFrom},date_settled.lte.${filter.dateTo}`);
+  } else {
+    if (filter?.dateFrom) query = query.or(`date_time.gte.${filter.dateFrom},date_settled.gte.${filter.dateFrom}`);
+    if (filter?.dateTo) query = query.or(`date_time.lte.${filter.dateTo}T23:59:59,date_settled.lte.${filter.dateTo}`);
+  }
 
   const { data, error } = await query;
   if (error) return [];

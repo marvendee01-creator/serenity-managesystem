@@ -940,7 +940,10 @@ function DailyTransactionSummaryReport() {
       let tentRentCash = 0, tentRentGCash = 0;
       let maintCash = 0, maintGCash = 0;
 
-      const filteredTxns = txns.filter(t => t.date_time && t.date_time.slice(0, 10) === selectedDate);
+      const filteredTxns = txns.filter(t => 
+        (t.date_time && t.date_time.slice(0, 10) === selectedDate) || 
+        (t.date_settled && t.date_settled.slice(0, 10) === selectedDate)
+      );
 
       for (const t of filteredTxns) {
         if (t.status === "Cancelled") continue;
@@ -948,46 +951,64 @@ function DailyTransactionSummaryReport() {
         const isGCash = t.payment_method === "GCash";
         const mFee = t.maintenance_fee || 0;
         
-        // Always track maintenance fee separately by payment method
-        if (isGCash) maintGCash += mFee;
-        else maintCash += mFee;
+        // Track maintenance fee based on creation date
+        if (t.date_time && t.date_time.slice(0, 10) === selectedDate) {
+          if (isGCash) maintGCash += mFee;
+          else maintCash += mFee;
+        }
 
         if (t.module === "Table Rent") {
-          const netAmt = t.amount_paid - mFee;
-          if (isGCash) tableRentGCash += netAmt;
-          else tableRentCash += netAmt;
+          if (t.date_time && t.date_time.slice(0, 10) === selectedDate) {
+            const netAmt = t.amount_paid - mFee;
+            if (isGCash) tableRentGCash += netAmt;
+            else tableRentCash += netAmt;
+          }
           continue;
         }
 
         if (t.module === "Tent") {
-          const netAmt = t.amount_paid - mFee;
-          if (isGCash) tentRentGCash += netAmt;
-          else tentRentCash += netAmt;
+          if (t.date_time && t.date_time.slice(0, 10) === selectedDate) {
+            const netAmt = t.amount_paid - mFee;
+            if (isGCash) tentRentGCash += netAmt;
+            else tentRentCash += netAmt;
+          }
           continue;
         }
 
         if (t.module === "Booking") {
-          const mFee = t.maintenance_fee || 0;
           const deposit = t.deposit_amount || 0;
           const totalPaid = t.amount_paid || 0;
           
-          // The Deposit portion (Net of maintenance fee)
-          const netDeposit = deposit - mFee;
-          if (netDeposit > 0) {
-            if (isGCash) depositGCash += netDeposit;
-            else depositCash += netDeposit;
-          }
-
-          // The Final Payment portion (Total Paid minus what was already counted as deposit)
-          const netFinal = totalPaid - deposit;
-          if (netFinal > 0) {
-            if (isGCash) fullGCash += netFinal;
-            else fullCash += netFinal;
+          // 1. If it was created today, show the deposit portion
+          if (t.date_time && t.date_time.slice(0, 10) === selectedDate) {
+            const netDeposit = deposit - mFee;
+            if (netDeposit > 0) {
+              if (isGCash) depositGCash += netDeposit;
+              else depositCash += netDeposit;
+            }
+            // If it was also settled today (or paid in full immediately), count the rest
+            if (t.date_settled && t.date_settled.slice(0, 10) === selectedDate) {
+              const netFinal = totalPaid - deposit;
+              if (netFinal > 0) {
+                if (isGCash) fullGCash += netFinal;
+                else fullCash += netFinal;
+              }
+            }
+          } 
+          // 2. If it was settled today but NOT created today, only show the settlement portion
+          else if (t.date_settled && t.date_settled.slice(0, 10) === selectedDate) {
+            const netFinal = totalPaid - deposit;
+            if (netFinal > 0) {
+              if (isGCash) fullGCash += netFinal;
+              else fullCash += netFinal;
+            }
           }
         } else if (t.module === "Entrance" || t.module === "Room") {
-          const netAmt = (t.amount_paid - mFee);
-          if (isGCash) othersGCash += netAmt;
-          else othersCash += netAmt;
+          if (t.date_time && t.date_time.slice(0, 10) === selectedDate) {
+            const netAmt = (t.amount_paid - mFee);
+            if (isGCash) othersGCash += netAmt;
+            else othersCash += netAmt;
+          }
         }
       }
 
