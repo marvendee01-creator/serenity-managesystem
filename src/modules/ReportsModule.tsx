@@ -1194,25 +1194,29 @@ function DailyTransactionSummaryReport() {
 }
 
 function MaintenanceFeeMonitoringReport() {
-  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [records, setRecords] = useState<any[]>([]);
+  const [beginningBalance, setBeginningBalance] = useState(0);
+  const [endingBalance, setEndingBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getTransactions({ dateFrom: from || undefined, dateTo: to || undefined }),
+      getTransactions(), // Get all history for balance calculation
       getCashierReports(),
     ]).then(([txns, storeCashier]) => {
-      const ledger: any[] = [];
+      let priorBalance = 0;
+      const todayRecords: any[] = [];
       
-      // 1. Income from Maintenance Fees
+      const allEvents: any[] = [];
+
+      // 1. Collect all Maintenance Income
       txns.forEach(t => {
         const mFee = t.maintenance_fee || 0;
         if (mFee > 0 && (t.module === "Entrance" || t.module === "Booking" || t.module === "Room")) {
-          ledger.push({
-            date: t.date_time,
+          allEvents.push({
+            date: t.date_time.slice(0, 10),
             customer: t.customer_name || "Guest",
             source: t.module,
             amount: mFee,
@@ -1222,98 +1226,128 @@ function MaintenanceFeeMonitoringReport() {
         }
       });
 
-      // 2. Expenses from Store Petty Cash Details
+      // 2. Collect all Maintenance Expenses
       storeCashier.forEach(r => {
-        const rDate = r.date.slice(0, 10);
-        if (rDate >= from && rDate <= to && r.petty_items) {
+        if (r.petty_items) {
           r.petty_items.forEach((p: any) => {
-            ledger.push({
-              date: p.date || r.date,
-              customer: p.particulars || "Store Expense",
-              source: "Store Petty Cash",
-              amount: 0,
-              expense: Number(p.amount) || 0,
-              type: "expense"
-            });
+            if (p.particulars && (p.particulars.toLowerCase().includes("maint") || p.particulars === "Maintenance Fee")) {
+              allEvents.push({
+                date: (p.date || r.date).slice(0, 10),
+                customer: p.particulars,
+                source: "Store Petty Cash",
+                amount: 0,
+                expense: Number(p.amount) || 0,
+                type: "expense"
+              });
+            }
           });
         }
       });
 
       // Sort by date
-      ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      allEvents.sort((a, b) => a.date.localeCompare(b.date));
 
-      // Calculate running balance
-      let running = 0;
-      const finalLedger = ledger.map(item => {
-        const cashOnHand = item.amount - item.expense;
-        running += cashOnHand;
-        return { ...item, cashOnHand, runningBalance: running };
+      // Separate prior vs today
+      allEvents.forEach(e => {
+        if (e.date < selectedDate) {
+          priorBalance += (e.amount - e.expense);
+        } else if (e.date === selectedDate) {
+          todayRecords.push(e);
+        }
       });
 
-      setRecords(finalLedger);
+      let currentRunning = priorBalance;
+      const finalToday = todayRecords.map(item => {
+        const cashOnHand = item.amount - item.expense;
+        currentRunning += cashOnHand;
+        return { ...item, cashOnHand, runningBalance: currentRunning };
+      });
+
+      setBeginningBalance(priorBalance);
+      setRecords(finalToday);
+      setEndingBalance(currentRunning);
       setLoading(false);
     });
-  }, [from, to]);
+  }, [selectedDate]);
 
   const exportCSV = () => {
     const headers = ["Date", "Customer", "Source", "Amount", "Expense", "Cash on Hand", "Running Balance"];
-    const rows = records.map(r => [
-      formatDate(r.date), r.customer, r.source, r.amount.toFixed(2), r.expense.toFixed(2), r.cashOnHand.toFixed(2), r.runningBalance.toFixed(2)
-    ]);
+    const rows = [
+      [selectedDate, "BEGINNING BALANCE", "—", "—", "—", "—", beginningBalance.toFixed(2)],
+      ...records.map(r => [
+        formatDate(r.date), r.customer, r.source, r.amount.toFixed(2), r.expense.toFixed(2), r.cashOnHand.toFixed(2), r.runningBalance.toFixed(2)
+      ]),
+      [selectedDate, "ENDING BALANCE", "—", "—", "—", "—", endingBalance.toFixed(2)]
+    ];
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `maint_fee_monitoring_${from}_${to}.csv`; a.click();
+    a.href = url; a.download = `maint_fee_daily_${selectedDate}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-        <div>
-          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
-          <input type="date" className="pos-input text-sm w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
+      <div className="flex flex-col md:flex-row gap-3 mb-6 items-end">
+        <div className="w-full md:w-64">
+          <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest block mb-1">Select Date</label>
+          <input type="date" className="pos-input text-sm w-full h-11 border-primary/20 bg-primary/5 focus:bg-background transition-all" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
         </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
-          <input type="date" className="pos-input text-sm w-full" value={to} onChange={(e) => setTo(e.target.value)} />
+        <div className="flex-1" />
+        <button onClick={exportCSV} className="h-11 px-6 flex items-center justify-center gap-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-bold hover:bg-primary hover:text-primary-foreground active:scale-95 transition-all shadow-sm">
+          <Download size={18} /> Export Daily Report
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="pos-card border-l-4 border-l-primary flex items-center justify-between py-4">
+          <div>
+            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Beginning Balance</p>
+            <p className="text-xl font-black text-primary tabular-nums">{formatPeso(beginningBalance)}</p>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+             <CalendarDays size={20} />
+          </div>
         </div>
-        <div className="self-end">
-          <button onClick={exportCSV} className="w-full h-10 flex items-center justify-center gap-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-95 transition-all">
-            <Download size={16} /> Export CSV
-          </button>
+        <div className="pos-card border-l-4 border-l-success flex items-center justify-between py-4">
+          <div>
+            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Ending Balance</p>
+            <p className="text-xl font-black text-success tabular-nums">{formatPeso(endingBalance)}</p>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center text-success">
+             <Trophy size={20} />
+          </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="overflow-x-auto rounded-2xl border border-border shadow-md bg-card">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-muted">
-              <th className="text-left px-3 py-2 font-medium">Date</th>
-              <th className="text-left px-3 py-2 font-medium">Customer</th>
-              <th className="text-left px-3 py-2 font-medium">Source</th>
-              <th className="text-right px-3 py-2 font-medium">Amount</th>
-              <th className="text-right px-3 py-2 font-medium">Expense</th>
-              <th className="text-right px-3 py-2 font-medium">Cash on Hand</th>
-              <th className="text-right px-3 py-2 font-medium">Running Balance</th>
+            <tr className="bg-muted/50 border-b border-border">
+              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Customer / Particulars</th>
+              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Source</th>
+              <th className="text-right px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Income</th>
+              <th className="text-right px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Expense</th>
+              <th className="text-right px-4 py-4 font-bold text-primary uppercase tracking-wider">Running</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={7} className="text-center py-8 italic text-muted-foreground">Loading maintenance data...</td></tr>
+              <tr><td colSpan={5} className="text-center py-16 text-muted-foreground italic">Gathering maintenance history...</td></tr>
             ) : records.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No records found for this period</td></tr>
+              <tr><td colSpan={5} className="text-center py-16 text-muted-foreground">No maintenance activity recorded for {formatDate(selectedDate)}</td></tr>
             ) : (
               records.map((r, i) => (
-                <tr key={i} className="border-t border-border hover:bg-muted/50">
-                  <td className="px-3 py-2 text-xs">{formatDate(r.date)}</td>
-                  <td className="px-3 py-2 font-medium">{r.customer}</td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">{r.source}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-success font-medium">{r.amount > 0 ? formatPeso(r.amount) : "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{r.expense > 0 ? formatPeso(r.expense) : "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-bold">{formatPeso(r.cashOnHand)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-black text-primary">{formatPeso(r.runningBalance)}</td>
+                <tr key={i} className="hover:bg-muted/30 transition-colors group">
+                  <td className="px-4 py-4">
+                    <p className="font-bold text-foreground group-hover:text-primary transition-colors">{r.customer}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatDate(r.date)}</p>
+                  </td>
+                  <td className="px-4 py-4 text-xs font-medium text-muted-foreground bg-muted/20">{r.source}</td>
+                  <td className="px-4 py-4 text-right tabular-nums text-success font-black">{r.amount > 0 ? formatPeso(r.amount) : "—"}</td>
+                  <td className="px-4 py-4 text-right tabular-nums text-destructive font-black">{r.expense > 0 ? `(${formatPeso(r.expense)})` : "—"}</td>
+                  <td className="px-4 py-4 text-right tabular-nums font-black text-primary bg-primary/5">{formatPeso(r.runningBalance)}</td>
                 </tr>
               ))
             )}
