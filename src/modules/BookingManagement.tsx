@@ -51,6 +51,7 @@ export default function BookingManagement() {
   const [isProcessingFolio, setIsProcessingFolio] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
   const [lastChange, setLastChange] = useState(0);
+  const [settleDate, setSettleDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const handleDeleteBooking = useCallback(async (booking: Transaction) => {
     if (!booking.id) return;
@@ -152,6 +153,7 @@ export default function BookingManagement() {
     setFolioBooking(booking);
     setReceivedAmount("");
     setOtherCharges("0");
+    setSettleDate(new Date().toISOString().slice(0, 10));
     
     try {
       const name = booking.customer_name.trim();
@@ -195,7 +197,7 @@ export default function BookingManagement() {
     }
     
     setIsProcessingFolio(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = settleDate || new Date().toISOString().slice(0, 10);
     const amountReceived = parseFloat(receivedAmount) || 0;
     
     try {
@@ -236,12 +238,12 @@ export default function BookingManagement() {
     } finally {
       setIsProcessingFolio(false);
     }
-  }, [folioBooking, folioTransactions, folioFoodSales, folioGrandTotal, receivedAmount, folioChange, loadBookings]);
+  }, [folioBooking, folioTransactions, folioFoodSales, folioGrandTotal, receivedAmount, folioChange, settleDate, loadBookings]);
 
   const handleMarkFullyPaid = useCallback(async (booking: Transaction) => {
     if (!booking.id) return;
     const totalAmount = booking.amount_paid || 0;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = settleDate || new Date().toISOString().slice(0, 10);
     try {
       await updateTransaction(booking.id, {
         deposit_amount: totalAmount,
@@ -255,7 +257,7 @@ export default function BookingManagement() {
     } catch {
       toast.error("Failed to update");
     }
-  }, [loadBookings]);
+  }, [loadBookings, settleDate]);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -572,6 +574,18 @@ export default function BookingManagement() {
                   {formatPeso(folioChange)}
                 </p>
               </div>
+            </div>
+
+            {/* Date Override */}
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+              <label className="text-xs font-black uppercase tracking-widest text-primary block mb-2">Settlement Date (Manual Override)</label>
+              <input 
+                type="date" 
+                className="pos-input w-full"
+                value={settleDate}
+                onChange={(e) => setSettleDate(e.target.value)}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1.5 italic">This date will be recorded as the payment receipt date in reports.</p>
             </div>
           </div>
 
