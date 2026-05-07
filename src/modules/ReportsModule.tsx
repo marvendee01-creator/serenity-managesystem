@@ -947,31 +947,38 @@ function DailyTransactionSummaryReport() {
         if (t.maintenance_fee) maintenanceFees += t.maintenance_fee;
 
         const isGCash = t.payment_method === "GCash";
+        const mFee = t.maintenance_fee || 0;
 
         if (t.module === "Table Rent") {
-          if (isGCash) tableRentGCash += t.amount_paid;
-          else tableRentCash += t.amount_paid;
-          continue; // Count separately
+          const netAmt = t.amount_paid - mFee;
+          if (isGCash) tableRentGCash += netAmt;
+          else tableRentCash += netAmt;
+          continue;
         }
 
         if (t.module === "Tent") {
-          if (isGCash) tentRentGCash += t.amount_paid;
-          else tentRentCash += t.amount_paid;
-          continue; // Count separately
+          const netAmt = t.amount_paid - mFee;
+          if (isGCash) tentRentGCash += netAmt;
+          else tentRentCash += netAmt;
+          continue;
         }
 
         if (t.module === "Booking") {
           if (t.payment_status === "Partially Paid" || (t.deposit_amount && t.balance && t.balance > 0)) {
-            if (isGCash) depositGCash += t.deposit_amount || 0;
-            else depositCash += t.deposit_amount || 0;
+            // Subtract maintenance fee proportionally or from the deposit
+            // For simplicity and since maintenance fee is usually fixed, we subtract it from the received amount
+            const netAmt = (t.deposit_amount || 0) - mFee;
+            if (isGCash) depositGCash += netAmt;
+            else depositCash += netAmt;
           }
           if (t.payment_status === "Fully Paid" || (t.balance === 0)) {
-            if (isGCash) fullGCash += t.deposit_amount || t.amount_paid;
-            else fullCash += t.deposit_amount || t.amount_paid;
+            const netAmt = (t.deposit_amount || t.amount_paid) - mFee;
+            if (isGCash) fullGCash += netAmt;
+            else fullCash += netAmt;
           }
         } else if (t.module === "Entrance" || t.module === "Room") {
           // Use Net amount (Gross minus Maintenance Fee) for module sales
-          const netAmt = (t.amount_paid - (t.maintenance_fee || 0));
+          const netAmt = (t.amount_paid - mFee);
           if (isGCash) othersGCash += netAmt;
           else othersCash += netAmt;
         }
