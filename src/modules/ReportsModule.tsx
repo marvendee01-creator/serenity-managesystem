@@ -943,86 +943,221 @@ function RoomStayReport() {
 }
 
 function DailyTransactionSummaryReport() {
-  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
+    setLoading(true);
+    // Use the same date for from and to to get exact day matching
     Promise.all([
-      getTransactions({ dateFrom: from || undefined, dateTo: to || undefined }),
-      getFoodSales({ dateFrom: from || undefined, dateTo: to || undefined }),
-      getCashierReports(),
+      getTransactions({ dateFrom: selectedDate, dateTo: selectedDate }),
+      getFoodSales({ dateFrom: selectedDate, dateTo: selectedDate }),
+      getCashierReports(), // We'll filter these manually by date
     ]).then(([txns, food, storeCashier]) => {
       const records: any[] = [];
-      const pushRecord = (date: string, name: string, pType: string, amt: number) => {
-        if(amt > 0) records.push({ date, name, paymentType: pType, amount: amt, id: Math.random().toString() });
+      const pushRecord = (name: string, pType: string, amt: number) => {
+        if (amt > 0) records.push({ date: selectedDate, name, paymentType: pType, amount: amt, id: Math.random().toString() });
       };
+
+      // 1. SALES STORE (CASH)
+      const storeSales = storeCashier
+        .filter(s => s.date.slice(0, 10) === selectedDate)
+        .reduce((sum, s) => sum + (Number(s.sales) || 0), 0);
+      if (storeSales > 0) pushRecord("SALES STORE", "CASH", storeSales);
+
+      // 2. BOOKING SALES (CASH/GCash)
+      let depositReceived = 0;
+      let fullyPaidAmount = 0;
+      let bookingSalesOthers = 0;
+      let maintenanceFees = 0;
 
       for (const t of txns) {
         if (t.status === "Cancelled") continue;
-        const d = formatDate(t.date_time);
-        const p = t.payment_method || "Cash";
+        
+        // Sum maintenance fees separately from all modules
+        if (t.maintenance_fee) maintenanceFees += t.maintenance_fee;
+
         if (t.module === "Booking") {
-          pushRecord(d, "Deposit Amount Received", p, t.deposit_amount || 0);
-          if (t.balance === 0 || !t.balance) {
-            pushRecord(d, "Fully Paid", p, t.amount_paid);
+          // Deposit Amount Received (Partial payments)
+          if (t.payment_status === "Partially Paid" || (t.deposit_amount && t.balance && t.balance > 0)) {
+            depositReceived += t.deposit_amount || 0;
           }
-          pushRecord(d, "Maintenance Fee", p, t.maintenance_fee || 0);
+          // Fully Paid (Zero balance)
+          if (t.payment_status === "Fully Paid" || (t.balance === 0)) {
+            // In Booking Management settle logic, we set deposit_amount = amount_paid when fully paid
+            fullyPaidAmount += t.deposit_amount || t.amount_paid;
+          }
         } else if (t.module === "Entrance" || t.module === "Room" || t.module === "Tent") {
-          pushRecord(d, "BOOKING SALES", p, t.amount_paid);
-          if (t.maintenance_fee) pushRecord(d, "Maintenance Fee", p, t.maintenance_fee);
+          // For these modules, we count the amount paid (minus maintenance fee if we already counted it)
+          bookingSalesOthers += (t.amount_paid - (t.maintenance_fee || 0));
         }
       }
 
-      for (const f of food) {
-        pushRecord(formatDate(f.sale_date), "FOOD SALES", f.payment_method || "Cash", f.cash_received || f.total_sales);
-      }
+      if (depositReceived > 0) pushRecord("BOOKING SALES (Deposit Received)", "CASH", depositReceived);
+      if (fullyPaidAmount > 0) pushRecord("BOOKING SALES (Fully Paid)", "CASH", fullyPaidAmount);
+      if (bookingSalesOthers > 0) pushRecord("BOOKING SALES (Entrance/Room/Tent)", "CASH", bookingSalesOthers);
 
-      for (const s of storeCashier) {
-        const d = formatDate(s.date);
-        pushRecord(d, "SALES STORE", "Cash", Number(s.sales) || 0);
-      }
+      // 3. FOOD SALES (CASH)
+      const foodCash = food
+        .filter(f => f.payment_status === "Fully Paid") // Only fully paid/cash received
+        .reduce((sum, f) => sum + (f.cash_received || f.total_sales), 0);
+      if (foodCash > 0) pushRecord("FOOD SALES", "CASH", foodCash);
 
-      records.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // 4. MAINTENANCE FEE (CASH)
+      if (maintenanceFees > 0) pushRecord("MAINTENANCE FEE", "CASH", maintenanceFees);
+
       setData(records);
+      setLoading(false);
     });
-  }, [from, to]);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const total = data.reduce((s, r) => s + r.amount, 0);
 
+  const exportExcel = () => {
+    const headers = ["Date", "Name", "Payment Type", "Amount"];
+    const rows = data.map(r => [r.date, r.name, r.paymentType, r.amount.toFixed(2)]);
+    rows.push(["", "GRAND TOTAL", "", total.toFixed(2)]);
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Daily_Summary_${selectedDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printReport = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const html = `
+      <html>
+        <head>
+          <title>Daily Transaction Summary - ${selectedDate}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+            th { background-color: #f5f5f5; font-weight: bold; }
+            .text-right { text-align: right; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .footer { margin-top: 30px; font-weight: bold; border-top: 2px solid #333; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Daily Transaction Summary</h1>
+            <p>Report Date: ${selectedDate}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Name</th>
+                <th>Payment Type</th>
+                <th class="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(r => `
+                <tr>
+                  <td>${r.date}</td>
+                  <td>${r.name}</td>
+                  <td>${r.paymentType}</td>
+                  <td class="text-right">₱${r.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+            <tfoot>
+              <tr class="footer">
+                <td colspan="3">GRAND TOTAL</td>
+                <td class="text-right">₱${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+    w.document.write(html);
+    w.document.close();
+  };
+
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-3 mb-4">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div>
-          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
-          <input type="date" className="pos-input text-sm w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <label className="text-xs font-medium text-muted-foreground block mb-1">Selected Date</label>
+          <input 
+            type="date" 
+            className="pos-input w-full" 
+            value={selectedDate} 
+            onChange={(e) => setSelectedDate(e.target.value)} 
+          />
         </div>
+        <div className="flex gap-2">
+          <button onClick={printReport} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+            <Printer size={16} /> Print / PDF
+          </button>
+          <button onClick={exportExcel} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+            <Download size={16} /> Excel
+          </button>
+        </div>
+        <button onClick={loadData} className="h-10 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 active:scale-[0.97] transition-all">
+          Refresh Report
+        </button>
+      </div>
+
+      <div className="pos-card bg-primary/5 border-primary/20 flex items-center justify-between py-6">
         <div>
-          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
-          <input type="date" className="pos-input text-sm w-full" value={to} onChange={(e) => setTo(e.target.value)} />
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Grand Total Amount</p>
+          <p className="text-3xl font-black text-primary tabular-nums">{formatPeso(total)}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">{selectedDate}</p>
+          <p className="text-xs font-medium px-2 py-1 bg-primary/10 text-primary rounded-full mt-1">Unified Sales Summary</p>
         </div>
       </div>
-      <div className="pos-card text-center mb-4"><p className="text-[10px] text-muted-foreground">Total Summary Amount</p><p className="text-base font-bold tabular-nums text-primary">{formatPeso(total)}</p></div>
-      <div className="overflow-x-auto rounded-xl border border-border">
+
+      <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="text-left p-2">Date</th>
-              <th className="text-left p-2">Name</th>
-              <th className="text-left p-2">Payment Type</th>
-              <th className="text-right p-2">Amount</th>
+              <th className="text-left px-4 py-3 font-bold text-muted-foreground uppercase tracking-wider">Date</th>
+              <th className="text-left px-4 py-3 font-bold text-muted-foreground uppercase tracking-wider">Transaction Source / Name</th>
+              <th className="text-left px-4 py-3 font-bold text-muted-foreground uppercase tracking-wider">Payment</th>
+              <th className="text-right px-4 py-3 font-bold text-muted-foreground uppercase tracking-wider">Amount</th>
             </tr>
           </thead>
-          <tbody>
-            {data.map(r => (
-              <tr key={r.id} className="border-t border-border">
-                <td className="p-2">{r.date}</td>
-                <td className="p-2">{r.name}</td>
-                <td className="p-2">{r.paymentType}</td>
-                <td className="p-2 text-right">{formatPeso(r.amount)}</td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-border">
+            {loading ? (
+              <tr><td colSpan={4} className="text-center py-12 text-muted-foreground italic">Updating report data...</td></tr>
+            ) : data.length === 0 ? (
+              <tr><td colSpan={4} className="text-center py-12 text-muted-foreground">No transactions recorded for this date.</td></tr>
+            ) : (
+              data.map(r => (
+                <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 tabular-nums text-xs">{r.date}</td>
+                  <td className="px-4 py-3 font-medium">{r.name}</td>
+                  <td className="px-4 py-3 text-xs"><span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded-full">{r.paymentType}</span></td>
+                  <td className="px-4 py-3 text-right tabular-nums font-bold text-primary">{formatPeso(r.amount)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
+          {!loading && data.length > 0 && (
+            <tfoot className="bg-muted/30 font-black">
+              <tr>
+                <td colSpan={3} className="px-4 py-4 text-right uppercase">Total Summary Amount</td>
+                <td className="px-4 py-4 text-right text-lg text-primary">{formatPeso(total)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
