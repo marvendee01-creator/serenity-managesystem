@@ -970,9 +970,10 @@ function DailyTransactionSummaryReport() {
             else fullCash += t.deposit_amount || t.amount_paid;
           }
         } else if (t.module === "Entrance" || t.module === "Room") {
-          const netAmt = (t.amount_paid - (t.maintenance_fee || 0));
-          if (isGCash) othersGCash += netAmt;
-          else othersCash += netAmt;
+          // Use Gross amount_paid to match the Transactions Report exactly
+          const grossAmt = t.amount_paid;
+          if (isGCash) othersGCash += grossAmt;
+          else othersCash += grossAmt;
         }
       }
 
@@ -996,9 +997,12 @@ function DailyTransactionSummaryReport() {
         .reduce((sum, f) => sum + (f.cash_received || f.total_sales), 0);
       if (foodCash > 0) pushRecord("FOOD SALES", "CASH", foodCash);
 
-      // 4. MAINTENANCE FEE
-      if (maintenanceFees > 0) pushRecord("MAINTENANCE FEE", "CASH", maintenanceFees);
-
+      // 4. MAINTENANCE FEE (Shown as breakdown/memo, already included in gross amounts above)
+      // To avoid double-counting in Grand Total, we don't push it if it's already in the module sales
+      // But if the user wants it as a separate row for clarity, we can push it and adjust the Grand Total calculation.
+      // Given the "match" requirement, we'll exclude it from the additive records to keep Total = Sum of Gross sales.
+      // However, we can show it as a special row that doesn't add to the total.
+      
       setData(records);
       setLoading(false);
     });
