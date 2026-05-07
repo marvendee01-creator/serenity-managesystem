@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { formatPeso } from "@/lib/format";
 
 const TYPES = ["Exclusive", "Non-Exclusive"] as const;
-const ROOM_OPTIONS = ["None", "Kubo Room", "Barkada Room"] as const;
+const ROOM_OPTIONS = ["Kubo Room", "Barkada Room"] as const;
 
 function BalanceWarningDialog({ balance, onClose }: { balance: number; onClose: () => void }) {
   useEffect(() => {
@@ -69,7 +69,8 @@ export default function BookingModule() {
   const [kids8Above, setKids8Above] = useState("");
   const [kids5to7, setKids5to7] = useState("");
   const [kids4Below, setKids4Below] = useState("");
-  const [addOnRoom, setAddOnRoom] = useState<string>("None");
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+  const [noOfDays, setNoOfDays] = useState("1");
   const [functionHallFee, setFunctionHallFee] = useState("");
   const [withFunctionHall, setWithFunctionHall] = useState(false);
   const [functionHallDays, setFunctionHallDays] = useState("");
@@ -159,7 +160,11 @@ export default function BookingModule() {
   const adultFee = a * adultRate;
   const childrenTotalFee = isExclusive ? 0 : (k8 * kids8Rate + k5 * kids5Rate);
   const personFee = adultFee + childrenTotalFee;
-  const roomFee = addOnRoom === "Kubo Room" ? kuboRate : addOnRoom === "Barkada Room" ? barkadaRate : 0;
+  
+  const days = Math.max(1, parseFloat(noOfDays) || 1);
+  const baseRoomFee = selectedRooms.reduce((sum, r) => sum + (r === "Kubo Room" ? kuboRate : r === "Barkada Room" ? barkadaRate : 0), 0);
+  const roomFee = baseRoomFee * days;
+  
   const tableFee = numTables * tableRate;
   const baseAmount = isExclusive
     ? (exclusiveFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork)
@@ -199,15 +204,15 @@ export default function BookingModule() {
         return { conflict: true, message: "Selected dates are reserved as Exclusive. Please choose another date." };
       }
     }
-    // Per-room conflict: only block when SAME room type overlaps
-    if (addOnRoom === "Kubo Room" && existingBookings.some(b => b.room_type === "Kubo Room" && overlaps(b))) {
-      return { conflict: true, message: "Kubo Room already booked on selected date!" };
+    // Per-room conflict: block when ANY of the selected rooms overlap
+    if (selectedRooms.includes("Kubo Room") && existingBookings.some(b => b.room_type?.includes("Kubo Room") && overlaps(b))) {
+      return { conflict: true, message: "Kubo Room already booked on selected dates!" };
     }
-    if (addOnRoom === "Barkada Room" && existingBookings.some(b => b.room_type === "Barkada Room" && overlaps(b))) {
-      return { conflict: true, message: "Barkada Room already booked on selected date!" };
+    if (selectedRooms.includes("Barkada Room") && existingBookings.some(b => b.room_type?.includes("Barkada Room") && overlaps(b))) {
+      return { conflict: true, message: "Barkada Room already booked on selected dates!" };
     }
     return { conflict: false, message: "" };
-  }, [checkIn, checkOut, existingBookings, isExclusive, addOnRoom]);
+  }, [checkIn, checkOut, existingBookings, isExclusive, selectedRooms]);
 
   const handleSave = useCallback(async () => {
     if (total === 0) { toast.error("Enter amount"); return; }
@@ -232,7 +237,7 @@ export default function BookingModule() {
         function_hall_days: withFunctionHall ? fhDays : 0,
         function_hall_rate: withFunctionHall ? fhRate : 0,
         function_hall_total: functionHallTotal,
-        room_type: addOnRoom !== "None" ? addOnRoom : undefined,
+        room_type: selectedRooms.length > 0 ? selectedRooms.join(", ") : undefined,
         number_of_tables: numTables > 0 ? numTables : undefined,
         adults: a, children: k8 + k5 + k4,
         kids_8_above: k8, kids_5_7: k5, kids_4_below: k4,
@@ -255,7 +260,7 @@ export default function BookingModule() {
           ...(!isExclusive && k8 > 0 ? [{ label: `Kids 8+ (${k8})`, value: `₱${(k8 * kids8Rate).toLocaleString()}` }] : []),
           ...(!isExclusive && k5 > 0 ? [{ label: `Kids 5-7 (${k5})`, value: `₱${(k5 * kids5Rate).toLocaleString()}` }] : []),
           ...(k4 > 0 ? [{ label: `Kids 4↓ FREE (${k4})`, value: "₱0" }] : []),
-          ...(roomFee > 0 ? [{ label: "Room", value: `${addOnRoom} ₱${roomFee.toLocaleString()}` }] : []),
+          ...(roomFee > 0 ? [{ label: `Rooms (${selectedRooms.join(", ")})`, value: `₱${roomFee.toLocaleString()} (${days} day${days > 1 ? "s" : ""})` }] : []),
           ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays} day${fhDays > 1 ? "s" : ""} × ₱${fhRate.toLocaleString()})`, value: `₱${functionHallTotal.toLocaleString()}` }] : []),
           { label: "Deposit", value: `₱${deposit.toLocaleString()}` },
           { label: "Balance", value: `₱${Math.max(0, balance).toLocaleString()}` },
@@ -270,7 +275,8 @@ export default function BookingModule() {
       }
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
-      setDepositAmount(""); setBookingType(TYPES[0]); setAddOnRoom("None"); setAddOnTables("");
+      setDepositAmount(""); setBookingType(TYPES[0]); setSelectedRooms([]); setAddOnTables("");
+      setNoOfDays("1");
       setCheckIn(""); setCheckOut(""); setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage(""); setFunctionHallFee(""); setDiscountAmount("");
       setWithFunctionHall(false); setFunctionHallDays("");
       setFunctionHallRate(funcHallSettingRate.toString());
@@ -279,7 +285,7 @@ export default function BookingModule() {
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, addOnRoom, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate]);
+  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -371,12 +377,31 @@ export default function BookingModule() {
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-medium block mb-1">Add Room (Optional)</label>
-          <select className="pos-input w-full" value={addOnRoom} onChange={(e) => setAddOnRoom(e.target.value)}>
-            {ROOM_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          {addOnRoom !== "None" && <p className="text-xs text-muted-foreground mt-1">Rate: {formatPeso(roomFee)}</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Add Rooms (Optional)</label>
+            <div className="flex flex-col gap-2">
+              {ROOM_OPTIONS.map((r) => (
+                <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-border"
+                    checked={selectedRooms.includes(r)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedRooms(prev => [...prev, r]);
+                      else setSelectedRooms(prev => prev.filter(x => x !== r));
+                    }}
+                  />
+                  {r} <span className="text-muted-foreground text-xs">({formatPeso(r === "Kubo Room" ? kuboRate : barkadaRate)}/day)</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">No. of Days (Rooms)</label>
+            <input type="number" min="1" step="1" className="pos-input w-full" value={noOfDays} onChange={(e) => setNoOfDays(e.target.value)} placeholder="1" />
+            {roomFee > 0 && <p className="text-xs text-primary mt-1">Room Total: {formatPeso(roomFee)}</p>}
+          </div>
         </div>
 
         <div>
@@ -443,7 +468,7 @@ export default function BookingModule() {
             {!isExclusive && k8 > 0 && <p>Kids 8+ ({k8}): {formatPeso(k8 * kids8Rate)}</p>}
             {!isExclusive && k5 > 0 && <p>Kids 5-7 ({k5}): {formatPeso(k5 * kids5Rate)}</p>}
             {k4 > 0 && <p>Kids 4↓ ({k4}): FREE</p>}
-            {roomFee > 0 && <p>+ {addOnRoom}: {formatPeso(roomFee)}</p>}
+            {roomFee > 0 && <p>+ Rooms: {formatPeso(roomFee)}</p>}
             {funcHall > 0 && <p>+ Function Hall Fee: {formatPeso(funcHall)}</p>}
             {functionHallTotal > 0 && <p>+ Function Hall ({fhDays}d × {formatPeso(fhRate)}): {formatPeso(functionHallTotal)}</p>}
             {tableFee > 0 && <p>+ {numTables} table(s): {formatPeso(tableFee)}</p>}

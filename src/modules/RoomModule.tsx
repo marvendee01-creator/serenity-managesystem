@@ -213,6 +213,8 @@ export default function RoomModule() {
   const [funcHallRate, setFuncHallRate] = useState(1500);
   const [withFunctionHall, setWithFunctionHall] = useState(false);
   const [funcHallDays, setFuncHallDays] = useState("1");
+  const [noOfDays, setNoOfDays] = useState("1");
+  const [maintenanceFee, setMaintenanceFee] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -308,8 +310,11 @@ export default function RoomModule() {
 
   const discountAmt = Math.max(0, parseFloat(discount) || 0);
   const fhDays = Math.max(0, parseFloat(funcHallDays) || 0);
+  const days = Math.max(1, parseFloat(noOfDays) || 1);
+  const maintFee = parseFloat(maintenanceFee) || 0;
   const functionHallTotal = withFunctionHall ? fhDays * funcHallRate : 0;
-  const totalRoomAmount = Math.max(0, roomRate - discountAmt + manualExtraCharge + functionHallTotal);
+  const roomTotal = roomRate * days;
+  const totalRoomAmount = Math.max(0, roomTotal - discountAmt + manualExtraCharge + functionHallTotal + maintFee);
   const change = received - totalRoomAmount;
 
   const handleSave = useCallback(async () => {
@@ -336,6 +341,7 @@ export default function RoomModule() {
         function_hall_days: withFunctionHall ? fhDays : 0,
         function_hall_rate: withFunctionHall ? funcHallRate : 0,
         function_hall_total: functionHallTotal,
+        maintenance_fee: maintFee,
       });
       toast.success("Room check-in recorded!");
 
@@ -348,9 +354,10 @@ export default function RoomModule() {
         paymentMethod: payment,
         details: [
           { label: "Room Type", value: roomType },
-          { label: "Room Rate", value: formatPeso(roomRate) },
+          { label: "Room Rate", value: `${formatPeso(roomRate)} × ${days} day(s) = ${formatPeso(roomTotal)}` },
           ...(discountAmt > 0 ? [{ label: "Discount", value: `- ${formatPeso(discountAmt)}` }] : []),
           ...(manualExtraCharge > 0 ? [{ label: "Extra Charge", value: `+ ${formatPeso(manualExtraCharge)}` }] : []),
+          ...(maintFee > 0 ? [{ label: "Maintenance Fee", value: `+ ${formatPeso(maintFee)}` }] : []),
           { label: "Check-in", value: `${checkInDate} ${checkInTime}` },
           { label: "Scheduled Check-out", value: `${checkOutDate} ${checkOutTime}` },
           ...(a > 0 ? [{ label: "Adults", value: `${a}` }] : []),
@@ -369,10 +376,11 @@ export default function RoomModule() {
       setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
       setWithFunctionHall(false); setFuncHallDays("1");
+      setNoOfDays("1"); setMaintenanceFee("");
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge, withFunctionHall, fhDays, funcHallRate, functionHallTotal]);
+  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge, withFunctionHall, fhDays, funcHallRate, functionHallTotal, days, roomTotal, maintFee]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
@@ -445,8 +453,18 @@ export default function RoomModule() {
             ))}
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">No. of Days</label>
+            <input type="number" min="1" step="1" className="pos-input w-full" value={noOfDays} onChange={(e) => setNoOfDays(e.target.value)} placeholder="1" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Maintenance Fee</label>
+            <input type="number" min="0" step="0.01" className="pos-input w-full" value={maintenanceFee} onChange={(e) => setMaintenanceFee(e.target.value)} placeholder="0.00" />
+          </div>
+        </div>
         <div className="pos-card">
-          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}{manualExtraCharge > 0 && <span className="text-warning"> + {formatPeso(manualExtraCharge)} extra</span>}</p>
+          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)} × {days} day(s) = {formatPeso(roomTotal)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}{manualExtraCharge > 0 && <span className="text-warning"> + {formatPeso(manualExtraCharge)} extra</span>}{maintFee > 0 && <span> + {formatPeso(maintFee)} maint</span>}</p>
           <p className="text-sm font-bold text-primary mt-1">Total: {formatPeso(totalRoomAmount)}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: {formatPeso(EXTENSION_RATE_PER_HOUR)}/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>

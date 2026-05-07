@@ -28,7 +28,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "room-stay" | "cash-monitoring";
 
 function EntranceSalesSummary() {
   const [reports, setReports] = useState<BookingCashierReport[]>([]);
@@ -372,12 +372,14 @@ function AnalyticsDashboard() {
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [storeReports, setStoreReports] = useState<CashierReport[]>([]);
   const [bookingReports, setBookingReports] = useState<BookingCashierReport[]>([]);
+  const [foodSales, setFoodSales] = useState<FoodSale[]>([]);
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
 
   useEffect(() => {
     getTransactions({}).then(setTxns);
     getCashierReports().then(setStoreReports);
     loadBookingCashierReports().then(setBookingReports);
+    getFoodSales({}).then(setFoodSales);
   }, []);
 
   const toDateKey = (iso: string) => {
@@ -542,6 +544,14 @@ function AnalyticsDashboard() {
             entranceExpense += Number(item.amount) || 0;
           }
         }
+        // Food POS: income = total_sales, expenses = capital
+        let foodIncome = 0;
+        let foodExpense = 0;
+        for (const s of foodSales) {
+          if (ymOf(s.sale_date) !== monthFilter) continue;
+          foodIncome += Number(s.total_sales) || 0;
+          foodExpense += Number(s.capital) || 0;
+        }
         const storeData = [
           { name: "Income", value: storeIncome, fill: "#4CAF50" },
           { name: "Expenses", value: storeExpense, fill: "#F44336" },
@@ -549,6 +559,10 @@ function AnalyticsDashboard() {
         const entranceData = [
           { name: "Income", value: entranceIncome, fill: "#4CAF50" },
           { name: "Expenses", value: entranceExpense, fill: "#F44336" },
+        ];
+        const foodData = [
+          { name: "Income", value: foodIncome, fill: "#4CAF50" },
+          { name: "Expenses", value: foodExpense, fill: "#F44336" },
         ];
         const renderPie = (title: string, data: typeof storeData, income: number, expense: number) => {
           const hasData = income + expense > 0;
@@ -595,9 +609,10 @@ function AnalyticsDashboard() {
           );
         };
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {renderPie("Income vs Expense — Store", storeData, storeIncome, storeExpense)}
             {renderPie("Income vs Expense — Entrance", entranceData, entranceIncome, entranceExpense)}
+            {renderPie("Income vs Expense — Food POS", foodData, foodIncome, foodExpense)}
           </div>
         );
       })()}
@@ -867,6 +882,115 @@ function FoodSalesReport() {
   );
 }
 
+function RoomStayReport() {
+  const [txns, setTxns] = useState<Transaction[]>([]);
+  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  useEffect(() => {
+    getTransactions({ dateFrom: from || undefined, dateTo: to || undefined }).then(data => {
+      setTxns(data.filter(t => (t.module === "Room" || t.module === "Booking") && t.room_type && t.status !== "Cancelled" && (!t.payment_status || t.payment_status === "Fully Paid")));
+    });
+  }, [from, to]);
+  const totalAmount = txns.reduce((s, t) => s + t.amount_paid, 0);
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
+          <input type="date" className="pos-input text-sm w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
+          <input type="date" className="pos-input text-sm w-full" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      </div>
+      <div className="pos-card text-center mb-4"><p className="text-[10px] text-muted-foreground">Total Room Stay Revenue</p><p className="text-base font-bold tabular-nums">{formatPeso(totalAmount)}</p></div>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left p-2">Date</th>
+              <th className="text-left p-2">Module</th>
+              <th className="text-left p-2">Customer</th>
+              <th className="text-left p-2">Room Type</th>
+              <th className="text-right p-2">Amount Paid</th>
+            </tr>
+          </thead>
+          <tbody>
+            {txns.map(t => (
+              <tr key={t.id} className="border-t border-border">
+                <td className="p-2">{formatDateTime(t.date_time)}</td>
+                <td className="p-2">{t.module}</td>
+                <td className="p-2">{t.customer_name || "—"}</td>
+                <td className="p-2">{t.room_type}</td>
+                <td className="p-2 text-right">{formatPeso(t.amount_paid)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CashMonitoringReport() {
+  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState({ store: 0, entrance: 0, room: 0, tent: 0, booking: 0, foodPOS: 0 });
+
+  useEffect(() => {
+    Promise.all([
+      getTransactions({ dateFrom: from || undefined, dateTo: to || undefined }),
+      getFoodSales({ dateFrom: from || undefined, dateTo: to || undefined }),
+      getCashierReports(),
+      loadBookingCashierReports()
+    ]).then(([txns, food, storeCashier, bookingCashier]) => {
+      // Filter out invalid txns
+      const validTxns = txns.filter(t => t.status !== "Cancelled" && (!t.payment_status || t.payment_status === "Fully Paid"));
+      
+      const roomAmt = validTxns.filter(t => t.module === "Room").reduce((s, t) => s + t.amount_paid, 0);
+      const tentAmt = validTxns.filter(t => t.module === "Tent").reduce((s, t) => s + t.amount_paid, 0);
+      const bookingAmt = validTxns.filter(t => t.module === "Booking").reduce((s, t) => s + t.amount_paid, 0);
+      
+      const entranceAmt = bookingCashier.filter(r => r.reportDate >= from && r.reportDate <= to).reduce((s, r) => s + (r.entranceSales || 0), 0);
+      const storeAmt = storeCashier.filter(r => r.date.slice(0, 10) >= from && r.date.slice(0, 10) <= to).reduce((s, r) => s + (r.sales || 0), 0);
+      
+      const foodAmt = food.reduce((s, r) => s + r.total_sales, 0);
+      
+      setData({ store: storeAmt, entrance: entranceAmt, room: roomAmt, tent: tentAmt, booking: bookingAmt, foodPOS: foodAmt });
+    });
+  }, [from, to]);
+
+  const total = data.store + data.entrance + data.room + data.tent + data.booking + data.foodPOS;
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
+          <input type="date" className="pos-input text-sm w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
+          <input type="date" className="pos-input text-sm w-full" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Store Cashier</p><p className="text-base font-bold tabular-nums">{formatPeso(data.store)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Entrance Cashier</p><p className="text-base font-bold tabular-nums">{formatPeso(data.entrance)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Room</p><p className="text-base font-bold tabular-nums">{formatPeso(data.room)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Tent</p><p className="text-base font-bold tabular-nums">{formatPeso(data.tent)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Booking</p><p className="text-base font-bold tabular-nums">{formatPeso(data.booking)}</p></div>
+        <div className="pos-card text-center"><p className="text-[10px] text-muted-foreground">Food POS</p><p className="text-base font-bold tabular-nums">{formatPeso(data.foodPOS)}</p></div>
+      </div>
+      <div className="pos-card text-center bg-primary/10 border-primary/20">
+        <p className="text-[10px] text-primary block mb-0.5">Total Combined Sales</p>
+        <p className="text-2xl font-bold tabular-nums text-primary">{formatPeso(total)}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function ReportsModule() {
   const [tab, setTab] = useState<Tab>("transactions");
   const [data, setData] = useState<Transaction[]>([]);
@@ -1009,6 +1133,8 @@ export default function ReportsModule() {
           { key: "expenses-entrance", label: "Expenses Summary - Entrance" },
           { key: "petty-monitoring", label: "Petty Cash Monitor" },
           { key: "reservation", label: "Reservations" },
+          { key: "room-stay", label: "Room Stay Report" },
+          { key: "cash-monitoring", label: "Cash Monitoring Report" },
           { key: "food-sales", label: "Food Sales (Commission)" },
           { key: "analytics", label: "Analytics" },
         ];
@@ -1303,6 +1429,10 @@ export default function ReportsModule() {
       {tab === "petty-monitoring" && <PettyCashMonitoring />}
 
       {tab === "analytics" && <AnalyticsDashboard />}
+
+      {tab === "room-stay" && <RoomStayReport />}
+
+      {tab === "cash-monitoring" && <CashMonitoringReport />}
 
       {tab === "food-sales" && <FoodSalesReport />}
 
