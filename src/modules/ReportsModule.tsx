@@ -922,9 +922,9 @@ function FullyPaidBookingsReport() {
 
   useEffect(() => {
     setLoading(true);
-    getTransactions().then(all => {
+    getTransactions({ dateFrom: from, dateTo: to }).then(all => {
       const filtered = all.filter(t => 
-        t.module === "Booking" && 
+        (t.module === "Booking" || t.module === "Room") && 
         t.payment_status === "Fully Paid" && 
         t.status !== "Cancelled" &&
         t.date_settled && t.date_settled >= from && t.date_settled <= to
