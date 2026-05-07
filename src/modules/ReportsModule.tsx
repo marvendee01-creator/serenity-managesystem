@@ -967,16 +967,22 @@ function DailyTransactionSummaryReport() {
         }
 
         if (t.module === "Booking") {
-          const received = t.amount_paid || t.deposit_amount || 0;
-          const net = received - mFee;
+          const mFee = t.maintenance_fee || 0;
+          const deposit = t.deposit_amount || 0;
+          const totalPaid = t.amount_paid || 0;
           
-          if (t.payment_status === "Partially Paid" || (t.balance && t.balance > 0)) {
-            if (isGCash) depositGCash += net;
-            else depositCash += net;
-          } else {
-            // Assume Fully Paid or Final Settlement
-            if (isGCash) fullGCash += net;
-            else fullCash += net;
+          // The Deposit portion (Net of maintenance fee)
+          const netDeposit = deposit - mFee;
+          if (netDeposit > 0) {
+            if (isGCash) depositGCash += netDeposit;
+            else depositCash += netDeposit;
+          }
+
+          // The Final Payment portion (Total Paid minus what was already counted as deposit)
+          const netFinal = totalPaid - deposit;
+          if (netFinal > 0) {
+            if (isGCash) fullGCash += netFinal;
+            else fullCash += netFinal;
           }
         } else if (t.module === "Entrance" || t.module === "Room") {
           const netAmt = (t.amount_paid - mFee);
