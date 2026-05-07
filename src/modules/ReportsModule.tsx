@@ -970,10 +970,10 @@ function DailyTransactionSummaryReport() {
             else fullCash += t.deposit_amount || t.amount_paid;
           }
         } else if (t.module === "Entrance" || t.module === "Room") {
-          // Use Gross amount_paid to match the Transactions Report exactly
-          const grossAmt = t.amount_paid;
-          if (isGCash) othersGCash += grossAmt;
-          else othersCash += grossAmt;
+          // Use Net amount (Gross minus Maintenance Fee) for module sales
+          const netAmt = (t.amount_paid - (t.maintenance_fee || 0));
+          if (isGCash) othersGCash += netAmt;
+          else othersCash += netAmt;
         }
       }
 
@@ -1239,6 +1239,8 @@ export default function ReportsModule() {
   const [editingBcReport, setEditingBcReport] = useState<BookingCashierReport | null>(null);
   const [previewBcReport, setPreviewBcReport] = useState<BookingCashierReport | null>(null);
 
+  const [maintFeeOnly, setMaintFeeOnly] = useState(false);
+
   useEffect(() => {
     // Fetch with date range filtering
     getTransactions({
@@ -1254,11 +1256,13 @@ export default function ReportsModule() {
         if (t.status === "Cancelled") return false;
         if (t.payment_status && t.payment_status !== "Fully Paid") return false;
         const ts = new Date(t.date_time).getTime();
-        return ts >= fromMs && ts <= toMs;
+        if (ts < fromMs || ts > toMs) return false;
+        if (maintFeeOnly && !(t.maintenance_fee && t.maintenance_fee > 0)) return false;
+        return true;
       });
       setData(filtered);
     });
-  }, [moduleFilter, txnDateFrom, txnDateTo, gameFilter]);
+  }, [moduleFilter, txnDateFrom, txnDateTo, gameFilter, maintFeeOnly]);
 
   useEffect(() => {
     getCashierReports().then(reports => {
@@ -1395,7 +1399,18 @@ export default function ReportsModule() {
                 <option value="">All Games</option>
                 {["Volleyball", "Dart", "Basketball", "Billiard"].map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
-            ) : <div />}
+            ) : (
+              <div className="flex items-center gap-2 self-end mb-2 h-10">
+                <input 
+                  type="checkbox" 
+                  id="maintFilter" 
+                  checked={maintFeeOnly} 
+                  onChange={e => setMaintFeeOnly(e.target.checked)}
+                  className="w-4 h-4 accent-primary"
+                />
+                <label htmlFor="maintFilter" className="text-xs font-medium cursor-pointer">With Maint. Fee Only</label>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-3 mb-4">
