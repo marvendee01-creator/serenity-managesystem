@@ -953,7 +953,7 @@ function DailyTransactionSummaryReport() {
     Promise.all([
       getTransactions({ dateFrom: selectedDate, dateTo: selectedDate }),
       getFoodSales({ dateFrom: selectedDate, dateTo: selectedDate }),
-      getCashierReports(), // We'll filter these manually by date
+      getCashierReports(),
     ]).then(([txns, food, storeCashier]) => {
       const records: any[] = [];
       const pushRecord = (name: string, pType: string, amt: number) => {
@@ -972,7 +972,10 @@ function DailyTransactionSummaryReport() {
       let bookingSalesOthers = 0;
       let maintenanceFees = 0;
 
-      for (const t of txns) {
+      // EXPLICIT MANUAL FILTER for exact date matching
+      const filteredTxns = txns.filter(t => t.date_time.slice(0, 10) === selectedDate);
+
+      for (const t of filteredTxns) {
         if (t.status === "Cancelled") continue;
         
         // Sum maintenance fees separately from all modules
@@ -985,11 +988,9 @@ function DailyTransactionSummaryReport() {
           }
           // Fully Paid (Zero balance)
           if (t.payment_status === "Fully Paid" || (t.balance === 0)) {
-            // In Booking Management settle logic, we set deposit_amount = amount_paid when fully paid
             fullyPaidAmount += t.deposit_amount || t.amount_paid;
           }
         } else if (t.module === "Entrance" || t.module === "Room" || t.module === "Tent") {
-          // For these modules, we count the amount paid (minus maintenance fee if we already counted it)
           bookingSalesOthers += (t.amount_paid - (t.maintenance_fee || 0));
         }
       }
@@ -999,8 +1000,9 @@ function DailyTransactionSummaryReport() {
       if (bookingSalesOthers > 0) pushRecord("BOOKING SALES (Entrance/Room/Tent)", "CASH", bookingSalesOthers);
 
       // 3. FOOD SALES (CASH)
+      // EXPLICIT MANUAL FILTER for food sales date
       const foodCash = food
-        .filter(f => f.payment_status === "Fully Paid") // Only fully paid/cash received
+        .filter(f => f.sale_date === selectedDate && f.payment_status === "Fully Paid")
         .reduce((sum, f) => sum + (f.cash_received || f.total_sales), 0);
       if (foodCash > 0) pushRecord("FOOD SALES", "CASH", foodCash);
 
