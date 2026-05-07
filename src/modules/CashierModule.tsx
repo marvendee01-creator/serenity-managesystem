@@ -101,7 +101,7 @@ export function printCashierReport(report: Parameters<typeof buildCashierReportH
 const PREV_ENDING_CASH_KEY = "serenity_prev_ending_cash";
 
 export default function CashierModule({ editReport, onBack }: CashierModuleProps) {
-  const [reportDate, setReportDate] = useState(editReport ? editReport.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const [reportDate, setReportDate] = useState(editReport ? new Date(editReport.date).toLocaleDateString('en-CA') : new Date().toLocaleDateString('en-CA'));
   const [beginningCash, setBeginningCash] = useState(editReport ? editReport.beginning_cash.toString() : "");
   const [sales, setSales] = useState(editReport ? editReport.sales.toString() : "");
   const [saving, setSaving] = useState(false);
@@ -166,7 +166,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
     setDenoms(prev => prev.map((d, idx) => idx === i ? { ...d, quantity: val } : d));
 
   const buildReportData = () => ({
-    date: reportDate ? new Date(reportDate + "T00:00:00").toISOString() : (editReport?.date || new Date().toISOString()),
+    date: reportDate ? (reportDate + "T00:00:00Z") : (editReport?.date || new Date().toISOString()),
     beginning_cash: bc,
     sales: s,
     petty_cash: totalPettyCash,

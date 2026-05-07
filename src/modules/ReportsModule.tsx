@@ -928,7 +928,7 @@ function DailyTransactionSummaryReport() {
 
       // 1. SALES STORE (CASH) - From Daily Cashier Report Sales field
       const storeSales = storeCashier
-        .filter(s => s.date && s.date.slice(0, 10) === selectedDate)
+        .filter(s => s.date && new Date(s.date).toLocaleDateString('en-CA') === selectedDate)
         .reduce((sum, s) => sum + (Number(s.sales) || 0), 0);
       if (storeSales > 0) pushRecord("SALES STORE", "CASH", storeSales);
 
