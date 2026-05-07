@@ -322,10 +322,17 @@ export default function BookingManagement() {
                   {b.room_type && <p className="text-xs opacity-70">{b.room_type}</p>}
                   {b.date_settled && <p className="text-xs opacity-70">Fully paid: {formatDate(b.date_settled + "T00:00:00")}</p>}
                 </div>
-                <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${badge.className}`}>
-                  {badge.icon}
-                  {b.payment_status || "—"}
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold mb-2 ${badge.className}`}>
+                    {badge.icon}
+                    {b.payment_status || "—"}
+                  </span>
+                  {b.payment_status === "Fully Paid" && (
+                    <div className="border-4 border-success/40 text-success/40 font-black text-[14px] px-2 py-0.5 rounded rotate-[-15deg] uppercase tracking-tighter select-none pointer-events-none">
+                      Fully Paid
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 text-xs mb-3">
                 <div>
@@ -354,12 +361,6 @@ export default function BookingManagement() {
                     className="flex-1 min-w-[120px] h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all flex items-center justify-center gap-2"
                   >
                     <Receipt size={16} /> Settle Folio
-                  </button>
-                  <button
-                    onClick={() => handleMarkFullyPaid(b)}
-                    className="flex-1 min-w-[120px] h-10 rounded-lg text-sm font-medium bg-success/20 text-success hover:bg-success/30 active:scale-[0.97] transition-all"
-                  >
-                    Mark as Fully Paid
                   </button>
                   <button
                     onClick={() => openEdit(b)}
@@ -467,6 +468,13 @@ export default function BookingManagement() {
                 <p className="text-muted-foreground text-xs uppercase font-bold tracking-wider mb-1">Transaction No</p>
                 <p className="font-bold text-lg">{folioBooking?.transaction_no}</p>
               </div>
+              {folioBooking?.payment_status === "Fully Paid" && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                  <div className="border-8 border-success/30 text-success/30 font-black text-6xl px-8 py-4 rounded-xl rotate-[-20deg] uppercase tracking-widest select-none pointer-events-none">
+                    Fully Paid
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bill Details */}
