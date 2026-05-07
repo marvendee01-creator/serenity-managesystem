@@ -997,11 +997,8 @@ function DailyTransactionSummaryReport() {
         .reduce((sum, f) => sum + (f.cash_received || f.total_sales), 0);
       if (foodCash > 0) pushRecord("FOOD SALES", "CASH", foodCash);
 
-      // 4. MAINTENANCE FEE (Shown as breakdown/memo, already included in gross amounts above)
-      // To avoid double-counting in Grand Total, we don't push it if it's already in the module sales
-      // But if the user wants it as a separate row for clarity, we can push it and adjust the Grand Total calculation.
-      // Given the "match" requirement, we'll exclude it from the additive records to keep Total = Sum of Gross sales.
-      // However, we can show it as a special row that doesn't add to the total.
+      // 4. MAINTENANCE FEE
+      if (maintenanceFees > 0) pushRecord("MAINTENANCE FEE", "CASH", maintenanceFees);
       
       setData(records);
       setLoading(false);
@@ -1433,15 +1430,15 @@ export default function ReportsModule() {
                   <th className="text-right px-3 py-2 font-medium">Kids (8+)</th>
                   <th className="text-right px-3 py-2 font-medium">Kids (5-7)</th>
                   <th className="text-right px-3 py-2 font-medium text-xs">Kids (4↓ FREE)</th>
-                  <th className="text-right px-3 py-2 font-medium">Headcount</th>
                   <th className="text-right px-3 py-2 font-medium">Amount</th>
+                  <th className="text-right px-3 py-2 font-medium">Maint. Fee</th>
                   <th className="text-left px-3 py-2 font-medium">Payment</th>
                   <th className="text-center px-3 py-2 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 && (
-                  <tr><td colSpan={12} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
+                  <tr><td colSpan={13} className="text-center py-8 text-muted-foreground">No transactions found</td></tr>
                 )}
                 {data.map((t) => {
                   const computedHeadcount = t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0);
@@ -1455,8 +1452,8 @@ export default function ReportsModule() {
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_8_above ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_5_7 ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_4_below ?? 0}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{computedHeadcount}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.amount_paid)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{formatPeso(t.maintenance_fee || 0)}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
                       <td className="px-3 py-2 text-center">
                         <button
