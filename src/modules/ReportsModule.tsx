@@ -28,7 +28,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "room-stay" | "cash-monitoring";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "room-stay" | "cash-monitoring" | "daily-summary";
 
 function EntranceSalesSummary() {
   const [reports, setReports] = useState<BookingCashierReport[]>([]);
@@ -909,21 +909,115 @@ function RoomStayReport() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="text-left p-2">Date</th>
-              <th className="text-left p-2">Module</th>
-              <th className="text-left p-2">Customer</th>
+              <th className="text-left p-2">Check In</th>
+              <th className="text-left p-2">Check Out</th>
+              <th className="text-left p-2">Customer Name</th>
               <th className="text-left p-2">Room Type</th>
-              <th className="text-right p-2">Amount Paid</th>
+              <th className="text-left p-2">Paid Status</th>
+              <th className="text-right p-2">No. of Days</th>
             </tr>
           </thead>
           <tbody>
-            {txns.map(t => (
+            {txns.map(t => {
+              const inMs = t.check_in ? new Date(t.check_in).getTime() : new Date(t.date_time).getTime();
+              const outMs = t.check_out ? new Date(t.check_out).getTime() : inMs;
+              const days = Math.max(1, Math.ceil((outMs - inMs) / (1000*60*60*24)) || 1);
+              return (
               <tr key={t.id} className="border-t border-border">
-                <td className="p-2">{formatDateTime(t.date_time)}</td>
-                <td className="p-2">{t.module}</td>
+                <td className="p-2">{t.check_in ? formatDate(t.check_in) : formatDate(t.date_time)}</td>
+                <td className="p-2">{t.check_out ? formatDate(t.check_out) : "—"}</td>
                 <td className="p-2">{t.customer_name || "—"}</td>
                 <td className="p-2">{t.room_type}</td>
-                <td className="p-2 text-right">{formatPeso(t.amount_paid)}</td>
+                <td className="p-2">{t.payment_status || "Fully Paid"}</td>
+                <td className="p-2 text-right">{days}</td>
+              </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function DailyTransactionSummaryReport() {
+  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState<any[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      getTransactions({ dateFrom: from || undefined, dateTo: to || undefined }),
+      getFoodSales({ dateFrom: from || undefined, dateTo: to || undefined }),
+      getCashierReports(),
+    ]).then(([txns, food, storeCashier]) => {
+      const records: any[] = [];
+      const pushRecord = (date: string, name: string, pType: string, amt: number) => {
+        if(amt > 0) records.push({ date, name, paymentType: pType, amount: amt, id: Math.random().toString() });
+      };
+
+      for (const t of txns) {
+        if (t.status === "Cancelled") continue;
+        const d = formatDate(t.date_time);
+        const p = t.payment_method || "Cash";
+        if (t.module === "Booking") {
+          pushRecord(d, "Deposit Amount Received", p, t.deposit_amount || 0);
+          if (t.balance === 0 || !t.balance) {
+            pushRecord(d, "Fully Paid", p, t.amount_paid);
+          }
+          pushRecord(d, "Maintenance Fee", p, t.maintenance_fee || 0);
+        } else if (t.module === "Entrance" || t.module === "Room" || t.module === "Tent") {
+          pushRecord(d, "BOOKING SALES", p, t.amount_paid);
+          if (t.maintenance_fee) pushRecord(d, "Maintenance Fee", p, t.maintenance_fee);
+        }
+      }
+
+      for (const f of food) {
+        pushRecord(formatDate(f.sale_date), "FOOD SALES", f.payment_method || "Cash", f.cash_received || f.total_sales);
+      }
+
+      for (const s of storeCashier) {
+        const d = formatDate(s.date);
+        pushRecord(d, "SALES STORE", "Cash", Number(s.sales) || 0);
+      }
+
+      records.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setData(records);
+    });
+  }, [from, to]);
+
+  const total = data.reduce((s, r) => s + r.amount, 0);
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
+          <input type="date" className="pos-input text-sm w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
+          <input type="date" className="pos-input text-sm w-full" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      </div>
+      <div className="pos-card text-center mb-4"><p className="text-[10px] text-muted-foreground">Total Summary Amount</p><p className="text-base font-bold tabular-nums text-primary">{formatPeso(total)}</p></div>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left p-2">Date</th>
+              <th className="text-left p-2">Name</th>
+              <th className="text-left p-2">Payment Type</th>
+              <th className="text-right p-2">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map(r => (
+              <tr key={r.id} className="border-t border-border">
+                <td className="p-2">{r.date}</td>
+                <td className="p-2">{r.name}</td>
+                <td className="p-2">{r.paymentType}</td>
+                <td className="p-2 text-right">{formatPeso(r.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -1135,6 +1229,7 @@ export default function ReportsModule() {
           { key: "reservation", label: "Reservations" },
           { key: "room-stay", label: "Room Stay Report" },
           { key: "cash-monitoring", label: "Cash Monitoring Report" },
+          { key: "daily-summary", label: "Daily Transaction Summary" },
           { key: "food-sales", label: "Food Sales (Commission)" },
           { key: "analytics", label: "Analytics" },
         ];
@@ -1433,6 +1528,8 @@ export default function ReportsModule() {
       {tab === "room-stay" && <RoomStayReport />}
 
       {tab === "cash-monitoring" && <CashMonitoringReport />}
+
+      {tab === "daily-summary" && <DailyTransactionSummaryReport />}
 
       {tab === "food-sales" && <FoodSalesReport />}
 

@@ -44,16 +44,19 @@ function BalanceWarningDialog({ balance, onClose }: { balance: number; onClose: 
   );
 }
 
-function DateConflictDialog({ message, onClose }: { message: string; onClose: () => void }) {
+function BookingConflictDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onCancel}>
       <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6 text-center" onClick={e => e.stopPropagation()}>
-        <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
-          <XCircle size={32} className="text-destructive" />
+        <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle size={32} className="text-warning" />
         </div>
-        <h3 className="text-xl font-bold text-foreground mb-2">❌ BOOKING NOT ALLOWED</h3>
+        <h3 className="text-xl font-bold text-foreground mb-2">⚠️ Booking Conflict Detected!</h3>
         <p className="text-sm text-muted-foreground mb-6">{message}</p>
-        <button onClick={onClose} className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-accent active:scale-[0.97] transition-all">OK</button>
+        <div className="flex gap-3 justify-center">
+          <button onClick={onCancel} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold text-base hover:bg-accent transition-all">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 h-12 rounded-lg bg-warning text-warning-foreground font-semibold text-base hover:bg-warning/90 transition-all">Proceed Anyway</button>
+        </div>
       </div>
     </div>
   );
@@ -63,8 +66,8 @@ export default function BookingModule() {
   const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
   const [stayType, setStayType] = useState<"Day Tour" | "Overnight">("Day Tour");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [checkOut, setCheckOut] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); });
   const [adults, setAdults] = useState("");
   const [kids8Above, setKids8Above] = useState("");
   const [kids5to7, setKids5to7] = useState("");
@@ -108,6 +111,13 @@ export default function BookingModule() {
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
+  useEffect(() => {
+    if (checkIn && noOfDays) {
+      const d = new Date(checkIn);
+      d.setDate(d.getDate() + Math.max(1, parseInt(noOfDays) || 1));
+      setCheckOut(d.toISOString().slice(0, 10));
+    }
+  }, [checkIn, noOfDays]);
   useEffect(() => {
     getSettings().then((s) => {
       setExclusiveFee(s.exclusive_fee);
@@ -214,11 +224,13 @@ export default function BookingModule() {
     return { conflict: false, message: "" };
   }, [checkIn, checkOut, existingBookings, isExclusive, selectedRooms]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (proceedConflict = false) => {
     if (total === 0) { toast.error("Enter amount"); return; }
-    const conflict = hasDateConflict();
-    if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
-    if (!pending8amProceed && has8amActiveConflict()) { setShow8amWarning(true); return; }
+    if (!proceedConflict) {
+      const conflict = hasDateConflict();
+      if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
+      if (!pending8amProceed && has8amActiveConflict()) { setShow8amWarning(true); return; }
+    }
     
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
@@ -296,7 +308,7 @@ export default function BookingModule() {
   return (
     <>
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
-      {showDateConflict && <DateConflictDialog message={dateConflictMessage} onClose={() => setShowDateConflict(false)} />}
+      {showDateConflict && <BookingConflictDialog message={dateConflictMessage} onCancel={() => setShowDateConflict(false)} onConfirm={() => { setShowDateConflict(false); handleSave(true); }} />}
       {show8amWarning && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShow8amWarning(false)}>
           <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center" onClick={e => e.stopPropagation()}>

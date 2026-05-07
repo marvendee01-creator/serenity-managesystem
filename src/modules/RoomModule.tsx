@@ -194,7 +194,7 @@ function getTodayDate() {
 
 export default function RoomModule() {
   const [customerName, setCustomerName] = useState("");
-  const [roomType, setRoomType] = useState<string>(ROOM_TYPES[0]);
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([ROOM_TYPES[0]]);
   const [adults, setAdults] = useState("");
   const [kids8Above, setKids8Above] = useState("");
   const [kids5to7, setKids5to7] = useState("");
@@ -236,11 +236,24 @@ export default function RoomModule() {
   }, [manualOverrideTime]);
 
   useEffect(() => {
+    if (checkInDate && noOfDays) {
+      const d = new Date(checkInDate);
+      d.setDate(d.getDate() + Math.max(1, parseInt(noOfDays) || 1));
+      setCheckOutDate(d.toISOString().slice(0, 10));
+    }
+  }, [checkInDate, noOfDays]);
+
+  useEffect(() => {
     getSettings().then((s) => {
-      setRoomRate(roomType === "Barkada Room" ? s.barkada_room_rate : s.kubo_room_rate);
+      let rate = 0;
+      for (const r of selectedRooms) {
+        if (r === "Barkada Room") rate += s.barkada_room_rate;
+        else if (r === "Kubo Room") rate += s.kubo_room_rate;
+      }
+      setRoomRate(rate);
       setFuncHallRate(s.function_hall_rate_per_day ?? 1500);
     });
-  }, [roomType]);
+  }, [selectedRooms]);
 
   // Auto-derive function hall days from check-in/check-out span
   useEffect(() => {
@@ -289,7 +302,7 @@ export default function RoomModule() {
   const k5 = parseInt(kids5to7) || 0;
   const k4 = parseInt(kids4Below) || 0;
   const totalHeadcount = a + k8 + k5 + k4;
-  const paxLimit = PAX_LIMITS[roomType] || 20;
+  const paxLimit = selectedRooms.reduce((sum, r) => sum + (PAX_LIMITS[r] || 20), 0);
   const received = parseFloat(amountReceived) || 0;
 
   const getHoursElapsed = (entryTime: string) => {
@@ -317,12 +330,29 @@ export default function RoomModule() {
   const totalRoomAmount = Math.max(0, roomTotal - discountAmt + manualExtraCharge + functionHallTotal + maintFee);
   const change = received - totalRoomAmount;
 
-  const handleSave = useCallback(async () => {
+  const [showConflictWarning, setShowConflictWarning] = useState(false);
+
+  const handleSave = useCallback(async (proceedConflict = false) => {
     if (totalHeadcount === 0) { toast.error("Enter number of guests"); return; }
-    if (totalHeadcount > paxLimit) { toast.error(`PAX LIMIT: Max ${paxLimit} pax only for ${roomType}`); return; }
+    if (selectedRooms.length === 0) { toast.error("Select at least one room"); return; }
+    if (totalHeadcount > paxLimit) { toast.error(`PAX LIMIT: Max ${paxLimit} pax only for selected rooms`); return; }
     if (received < totalRoomAmount && received > 0) { toast.error("Insufficient amount received"); return; }
     if (!checkInDate) { toast.error("Select check-in date"); return; }
     if (!checkOutDate) { toast.error("Select check-out date"); return; }
+
+    if (!proceedConflict) {
+      const inMs = new Date(checkInDate).getTime();
+      const conflict = activeRooms.some(ar => {
+        if (!ar.check_out) return false;
+        const outMs = new Date(ar.check_out).getTime();
+        return ar.room_type && selectedRooms.some(r => ar.room_type!.includes(r)) && inMs <= outMs;
+      });
+      if (conflict) {
+        setShowConflictWarning(true);
+        return;
+      }
+    }
+
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
     const checkInDateTime = new Date(`${checkInDate}T${checkInTime || getCurrentTime()}`).toISOString();
@@ -330,7 +360,7 @@ export default function RoomModule() {
     try {
       await addTransaction({
         transaction_no: txNo, date_time: checkInDateTime, module: "Room",
-        customer_name: customerName || undefined, room_type: roomType,
+        customer_name: customerName || undefined, room_type: selectedRooms.join(", "),
         pax: totalHeadcount, adults: a, children: k8 + k5 + k4,
         kids_8_above: k8, kids_5_7: k5, kids_4_below: k4,
         total_headcount: totalHeadcount,
@@ -346,14 +376,14 @@ export default function RoomModule() {
       toast.success("Room check-in recorded!");
 
       const rData = {
-        transactionNo: txNo, dateTime: checkInDateTime, module: `Room - ${roomType}`,
+        transactionNo: txNo, dateTime: checkInDateTime, module: `Room - ${selectedRooms.join(", ")}`,
         customerName: customerName || undefined,
         adults: a, children: k8 + k5 + k4, headcount: totalHeadcount,
         totalAmount: totalRoomAmount, amountReceived: received > 0 ? received : undefined,
         change: received >= totalRoomAmount && received > 0 ? change : undefined,
         paymentMethod: payment,
         details: [
-          { label: "Room Type", value: roomType },
+          { label: "Room Type", value: selectedRooms.join(", ") },
           { label: "Room Rate", value: `${formatPeso(roomRate)} × ${days} day(s) = ${formatPeso(roomTotal)}` },
           ...(discountAmt > 0 ? [{ label: "Discount", value: `- ${formatPeso(discountAmt)}` }] : []),
           ...(manualExtraCharge > 0 ? [{ label: "Extra Charge", value: `+ ${formatPeso(manualExtraCharge)}` }] : []),
@@ -377,10 +407,12 @@ export default function RoomModule() {
       setManualOverrideTime(false);
       setWithFunctionHall(false); setFuncHallDays("1");
       setNoOfDays("1"); setMaintenanceFee("");
+      setSelectedRooms([ROOM_TYPES[0]]);
+      setShowConflictWarning(false);
       loadActiveRooms(); firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, roomType, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge, withFunctionHall, fhDays, funcHallRate, functionHallTotal, days, roomTotal, maintFee]);
+  }, [customerName, selectedRooms, activeRooms, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge, withFunctionHall, fhDays, funcHallRate, functionHallTotal, days, roomTotal, maintFee]);
 
   const handleCheckout = useCallback((room: ActiveRoom) => {
     setCheckoutRoom(room);
@@ -440,16 +472,37 @@ export default function RoomModule() {
           onCancel={() => setCheckoutRoom(null)}
         />
       )}
-      <ModuleShell title="Room" icon={<BedDouble size={20} />} onSave={handleSave} saveLabel="Check In" saving={saving}>
+      <ModuleShell title="Room" icon={<BedDouble size={20} />} onSave={() => handleSave(false)} saveLabel="Check In" saving={saving}>
+        {showConflictWarning && (
+          <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded-xl mb-4 text-center">
+            <h3 className="font-bold mb-2">⚠️ Room Conflict Detected!</h3>
+            <p className="text-sm mb-4">This room is already booked on the selected date. Do you want to proceed anyway?</p>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => setShowConflictWarning(false)} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-bold hover:bg-secondary/80">Cancel</button>
+              <button onClick={() => { setShowConflictWarning(false); handleSave(true); }} className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-bold hover:bg-destructive/90">Proceed Anyway</button>
+            </div>
+          </div>
+        )}
         <div>
           <label className="text-sm font-medium block mb-1">Customer Name (Optional)</label>
           <input ref={firstRef} type="text" className="pos-input w-full" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter name" />
         </div>
         <div>
           <label className="text-sm font-medium block mb-2">Room Type</label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             {ROOM_TYPES.map((rt) => (
-              <button key={rt} className={`toggle-btn flex-1 ${roomType === rt ? "toggle-btn-active" : ""}`} onClick={() => setRoomType(rt)}>{rt}</button>
+              <label key={rt} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-border"
+                  checked={selectedRooms.includes(rt)}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedRooms(prev => [...prev, rt]);
+                    else setSelectedRooms(prev => prev.filter(x => x !== rt));
+                  }}
+                />
+                {rt}
+              </label>
             ))}
           </div>
         </div>
