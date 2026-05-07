@@ -919,13 +919,15 @@ function RoomStayReport() {
           </thead>
           <tbody>
             {txns.map(t => {
-              const inMs = t.check_in ? new Date(t.check_in).getTime() : new Date(t.date_time).getTime();
-              const outMs = t.check_out ? new Date(t.check_out).getTime() : inMs;
-              const days = Math.max(1, Math.ceil((outMs - inMs) / (1000*60*60*24)) || 1);
+              const inDate = new Date(t.check_in || t.date_time);
+              inDate.setHours(0, 0, 0, 0);
+              const outDate = new Date(t.check_out || t.check_in || t.date_time);
+              outDate.setHours(0, 0, 0, 0);
+              const days = Math.max(1, Math.round((outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60 * 24)));
               return (
               <tr key={t.id} className="border-t border-border">
-                <td className="p-2">{t.check_in ? formatDate(t.check_in) : formatDate(t.date_time)}</td>
-                <td className="p-2">{t.check_out ? formatDate(t.check_out) : "—"}</td>
+                <td className="p-2">{t.check_in ? formatDateTime(t.check_in) : formatDateTime(t.date_time)}</td>
+                <td className="p-2">{t.check_out ? formatDateTime(t.check_out) : "—"}</td>
                 <td className="p-2">{t.customer_name || "—"}</td>
                 <td className="p-2">{t.room_type}</td>
                 <td className="p-2">{t.payment_status || "Fully Paid"}</td>
