@@ -1194,21 +1194,17 @@ function DailyTransactionSummaryReport() {
 }
 
 function MaintenanceFeeMonitoringReport() {
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [records, setRecords] = useState<any[]>([]);
-  const [beginningBalance, setBeginningBalance] = useState(0);
-  const [endingBalance, setEndingBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getTransactions(), // Get all history for balance calculation
+      getTransactions(), 
       getCashierReports(),
     ]).then(([txns, storeCashier]) => {
-      let priorBalance = 0;
-      const todayRecords: any[] = [];
-      
       const allEvents: any[] = [];
 
       // 1. Collect all Maintenance Income
@@ -1221,7 +1217,6 @@ function MaintenanceFeeMonitoringReport() {
             source: t.module,
             amount: mFee,
             expense: 0,
-            type: "income"
           });
         }
       });
@@ -1237,7 +1232,6 @@ function MaintenanceFeeMonitoringReport() {
                 source: "Store Petty Cash",
                 amount: 0,
                 expense: Number(p.amount) || 0,
-                type: "expense"
               });
             }
           });
@@ -1247,77 +1241,50 @@ function MaintenanceFeeMonitoringReport() {
       // Sort by date
       allEvents.sort((a, b) => a.date.localeCompare(b.date));
 
-      // Separate prior vs today
+      // Calculate running balance and filter by range
+      let running = 0;
+      const ledger: any[] = [];
       allEvents.forEach(e => {
-        if (e.date < selectedDate) {
-          priorBalance += (e.amount - e.expense);
-        } else if (e.date === selectedDate) {
-          todayRecords.push(e);
+        const cashOnHand = e.amount - e.expense;
+        running += cashOnHand;
+        if (e.date >= from && e.date <= to) {
+          ledger.push({ ...e, cashOnHand, runningBalance: running });
         }
       });
 
-      let currentRunning = priorBalance;
-      const finalToday = todayRecords.map(item => {
-        const cashOnHand = item.amount - item.expense;
-        currentRunning += cashOnHand;
-        return { ...item, cashOnHand, runningBalance: currentRunning };
-      });
-
-      setBeginningBalance(priorBalance);
-      setRecords(finalToday);
-      setEndingBalance(currentRunning);
+      setRecords(ledger);
       setLoading(false);
     });
-  }, [selectedDate]);
+  }, [from, to]);
 
   const exportCSV = () => {
     const headers = ["Date", "Customer", "Source", "Amount", "Expense", "Cash on Hand", "Running Balance"];
-    const rows = [
-      [selectedDate, "BEGINNING BALANCE", "—", "—", "—", "—", beginningBalance.toFixed(2)],
-      ...records.map(r => [
-        formatDate(r.date), r.customer, r.source, r.amount.toFixed(2), r.expense.toFixed(2), r.cashOnHand.toFixed(2), r.runningBalance.toFixed(2)
-      ]),
-      [selectedDate, "ENDING BALANCE", "—", "—", "—", "—", endingBalance.toFixed(2)]
-    ];
+    const rows = records.map(r => [
+      formatDate(r.date), r.customer, r.source, r.amount.toFixed(2), r.expense.toFixed(2), r.cashOnHand.toFixed(2), r.runningBalance.toFixed(2)
+    ]);
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `maint_fee_daily_${selectedDate}.csv`; a.click();
+    a.href = url; a.download = `maint_fee_monitoring_${from}_${to}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
     <div>
-      <div className="flex flex-col md:flex-row gap-3 mb-6 items-end">
-        <div className="w-full md:w-64">
-          <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest block mb-1">Select Date</label>
-          <input type="date" className="pos-input text-sm w-full h-11 border-primary/20 bg-primary/5 focus:bg-background transition-all" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 items-end">
+        <div>
+          <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest block mb-1">Date From</label>
+          <input type="date" className="pos-input text-sm w-full h-11" value={from} onChange={(e) => setFrom(e.target.value)} />
         </div>
-        <div className="flex-1" />
-        <button onClick={exportCSV} className="h-11 px-6 flex items-center justify-center gap-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-bold hover:bg-primary hover:text-primary-foreground active:scale-95 transition-all shadow-sm">
-          <Download size={18} /> Export Daily Report
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="pos-card border-l-4 border-l-primary flex items-center justify-between py-4">
-          <div>
-            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Beginning Balance</p>
-            <p className="text-xl font-black text-primary tabular-nums">{formatPeso(beginningBalance)}</p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-             <CalendarDays size={20} />
-          </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest block mb-1">Date To</label>
+          <input type="date" className="pos-input text-sm w-full h-11" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
-        <div className="pos-card border-l-4 border-l-success flex items-center justify-between py-4">
-          <div>
-            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Ending Balance</p>
-            <p className="text-xl font-black text-success tabular-nums">{formatPeso(endingBalance)}</p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center text-success">
-             <Trophy size={20} />
-          </div>
+        <div className="md:col-start-4">
+          <button onClick={exportCSV} className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-bold hover:bg-primary hover:text-primary-foreground active:scale-95 transition-all shadow-sm">
+            <Download size={18} /> Export CSV
+          </button>
         </div>
       </div>
 
@@ -1325,25 +1292,24 @@ function MaintenanceFeeMonitoringReport() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/50 border-b border-border">
+              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Date</th>
               <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Customer / Particulars</th>
               <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Source</th>
               <th className="text-right px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Income</th>
               <th className="text-right px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Expense</th>
-              <th className="text-right px-4 py-4 font-bold text-primary uppercase tracking-wider">Running</th>
+              <th className="text-right px-4 py-4 font-bold text-primary uppercase tracking-wider">Balance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-16 text-muted-foreground italic">Gathering maintenance history...</td></tr>
+              <tr><td colSpan={6} className="text-center py-16 text-muted-foreground italic">Gathering maintenance history...</td></tr>
             ) : records.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-16 text-muted-foreground">No maintenance activity recorded for {formatDate(selectedDate)}</td></tr>
+              <tr><td colSpan={6} className="text-center py-16 text-muted-foreground">No maintenance activity recorded for this period</td></tr>
             ) : (
               records.map((r, i) => (
                 <tr key={i} className="hover:bg-muted/30 transition-colors group">
-                  <td className="px-4 py-4">
-                    <p className="font-bold text-foreground group-hover:text-primary transition-colors">{r.customer}</p>
-                    <p className="text-[10px] text-muted-foreground">{formatDate(r.date)}</p>
-                  </td>
+                  <td className="px-4 py-4 text-xs font-medium">{formatDate(r.date)}</td>
+                  <td className="px-4 py-4 font-bold text-foreground group-hover:text-primary transition-colors">{r.customer}</td>
                   <td className="px-4 py-4 text-xs font-medium text-muted-foreground bg-muted/20">{r.source}</td>
                   <td className="px-4 py-4 text-right tabular-nums text-success font-black">{r.amount > 0 ? formatPeso(r.amount) : "—"}</td>
                   <td className="px-4 py-4 text-right tabular-nums text-destructive font-black">{r.expense > 0 ? `(${formatPeso(r.expense)})` : "—"}</td>
@@ -1503,7 +1469,6 @@ export default function ReportsModule() {
           { key: "petty-monitoring", label: "Petty Cash Monitor" },
           { key: "reservation", label: "Reservations" },
           { key: "room-stay", label: "Room Stay Report" },
-          { key: "cash-monitoring", label: "Cash Monitoring Report" },
           { key: "daily-summary", label: "Daily Transaction Summary" },
           { key: "food-sales", label: "Food Sales (Commission)" },
           { key: "maint-monitoring", label: "Maintenance Fee Monitoring" },
