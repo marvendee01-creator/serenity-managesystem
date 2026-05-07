@@ -1290,6 +1290,7 @@ function MaintenanceFeeMonitoringReport() {
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [records, setRecords] = useState<any[]>([]);
+  const [begBalance, setBegBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -1303,7 +1304,7 @@ function MaintenanceFeeMonitoringReport() {
       // 1. Collect all Maintenance Income
       txns.forEach(t => {
         const mFee = t.maintenance_fee || 0;
-        if (mFee > 0 && (t.module === "Entrance" || t.module === "Booking" || t.module === "Room")) {
+        if (mFee > 0 && (t.module === "Entrance" || t.module === "Booking" || t.module === "Room") && t.status !== "Cancelled") {
           allEvents.push({
             date: t.date_time.slice(0, 10),
             customer: t.customer_name || "Guest",
@@ -1331,20 +1332,29 @@ function MaintenanceFeeMonitoringReport() {
         }
       });
 
-      // Sort by date
-      allEvents.sort((a, b) => a.date.localeCompare(b.date));
+      // Sort by date, then by amount descending (Income before Expense)
+      allEvents.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return b.amount - a.amount; // amount > 0 comes before expense > 0
+      });
 
-      // Calculate running balance and filter by range
+      // Calculate beginning balance (everything before 'from')
       let running = 0;
+      let startBalance = 0;
       const ledger: any[] = [];
+      
       allEvents.forEach(e => {
-        const cashOnHand = e.amount - e.expense;
-        running += cashOnHand;
+        const net = e.amount - e.expense;
+        if (e.date < from) {
+          startBalance += net;
+        }
+        running += net;
         if (e.date >= from && e.date <= to) {
-          ledger.push({ ...e, cashOnHand, runningBalance: running });
+          ledger.push({ ...e, cashOnHand: net, runningBalance: running });
         }
       });
 
+      setBegBalance(startBalance);
       setRecords(ledger);
       setLoading(false);
     });
@@ -1352,9 +1362,12 @@ function MaintenanceFeeMonitoringReport() {
 
   const exportCSV = () => {
     const headers = ["Date", "Customer", "Source", "Amount", "Expense", "Cash on Hand", "Running Balance"];
-    const rows = records.map(r => [
-      formatDate(r.date), r.customer, r.source, r.amount.toFixed(2), r.expense.toFixed(2), r.cashOnHand.toFixed(2), r.runningBalance.toFixed(2)
-    ]);
+    const rows = [
+      [from, "Beginning Balance", "Forwarded", "0.00", "0.00", "0.00", begBalance.toFixed(2)],
+      ...records.map(r => [
+        formatDate(r.date), r.customer, r.source, r.amount.toFixed(2), r.expense.toFixed(2), r.cashOnHand.toFixed(2), r.runningBalance.toFixed(2)
+      ])
+    ];
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -1396,21 +1409,43 @@ function MaintenanceFeeMonitoringReport() {
           <tbody className="divide-y divide-border">
             {loading ? (
               <tr><td colSpan={6} className="text-center py-16 text-muted-foreground italic">Gathering maintenance history...</td></tr>
-            ) : records.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-16 text-muted-foreground">No maintenance activity recorded for this period</td></tr>
             ) : (
-              records.map((r, i) => (
-                <tr key={i} className="hover:bg-muted/30 transition-colors group">
-                  <td className="px-4 py-4 text-xs font-medium">{formatDate(r.date)}</td>
-                  <td className="px-4 py-4 font-bold text-foreground group-hover:text-primary transition-colors">{r.customer}</td>
-                  <td className="px-4 py-4 text-xs font-medium text-muted-foreground bg-muted/20">{r.source}</td>
-                  <td className="px-4 py-4 text-right tabular-nums text-success font-black">{r.amount > 0 ? formatPeso(r.amount) : "—"}</td>
-                  <td className="px-4 py-4 text-right tabular-nums text-destructive font-black">{r.expense > 0 ? `(${formatPeso(r.expense)})` : "—"}</td>
-                  <td className="px-4 py-4 text-right tabular-nums font-black text-primary bg-primary/5">{formatPeso(r.runningBalance)}</td>
+              <>
+                <tr className="bg-primary/5 font-bold italic">
+                  <td className="px-4 py-3 text-xs">{formatDate(from)}</td>
+                  <td className="px-4 py-3">Beginning Balance</td>
+                  <td className="px-4 py-3 text-xs opacity-50">Balance Forwarded</td>
+                  <td className="px-4 py-3 text-right">—</td>
+                  <td className="px-4 py-3 text-right">—</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-primary">{formatPeso(begBalance)}</td>
                 </tr>
-              ))
+                {records.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-16 text-muted-foreground">No maintenance activity recorded for this period</td></tr>
+                ) : (
+                  records.map((r, i) => (
+                    <tr key={i} className="hover:bg-muted/30 transition-colors group">
+                      <td className="px-4 py-4 text-xs font-medium">{formatDate(r.date)}</td>
+                      <td className="px-4 py-4 font-bold text-foreground group-hover:text-primary transition-colors">{r.customer}</td>
+                      <td className="px-4 py-4 text-xs font-medium text-muted-foreground bg-muted/20">{r.source}</td>
+                      <td className="px-4 py-4 text-right tabular-nums text-success font-black">{r.amount > 0 ? formatPeso(r.amount) : "—"}</td>
+                      <td className="px-4 py-4 text-right tabular-nums text-destructive font-black">{r.expense > 0 ? `(${formatPeso(r.expense)})` : "—"}</td>
+                      <td className="px-4 py-4 text-right tabular-nums font-black text-primary bg-primary/5">{formatPeso(r.runningBalance)}</td>
+                    </tr>
+                  ))
+                )}
+              </>
             )}
           </tbody>
+          {!loading && (
+            <tfoot className="bg-primary/5 font-black border-t-2 border-primary/20">
+              <tr>
+                <td colSpan={5} className="px-4 py-4 text-right uppercase text-primary">Ending Balance ({formatDate(to)})</td>
+                <td className="px-4 py-4 text-right text-lg text-primary underline decoration-double">
+                  {formatPeso(records.length > 0 ? records[records.length - 1].runningBalance : begBalance)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
