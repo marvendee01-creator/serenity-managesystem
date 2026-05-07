@@ -165,21 +165,22 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
     ]).then(([entranceTxns, bookingTxns, tentTxns, roomTxns, foodSales]) => {
       const all = [...entranceTxns, ...bookingTxns, ...tentTxns, ...roomTxns]
         .filter(t => t.date_time.slice(0, 10) === today);
-      const entranceToday = entranceTxns.filter(t => t.date_time.slice(0, 10) === today);
-      const bookingToday = bookingTxns.filter(t => t.date_time.slice(0, 10) === today);
-      const tentToday = tentTxns.filter(t => t.date_time.slice(0, 10) === today);
-      const entranceTotal = entranceToday.reduce((s, t) => s + t.amount_paid, 0);
-      const bookingTotal = bookingToday.reduce((s, t) => s + (t.deposit_amount || 0), 0);
-      const tentTotal = tentToday.reduce((s, t) => s + t.amount_paid, 0);
-      const main = entranceTotal + bookingTotal + tentTotal;
-      const food = foodSales.reduce((s, r) => s + r.total_sales, 0);
+      
       const maintenance = all.reduce((s, t) => s + (t.maintenance_fee || 0), 0);
       const drinks = all.reduce((s, t) => s + (t.drinks_corkage_fee || 0), 0);
       const liquor = all.reduce((s, t) => s + (t.liquor_corkage_fee || 0), 0);
       const functionHall = all.reduce((s, t) => s + (t.function_hall_total || 0), 0);
+      const food = foodSales.reduce((s, r) => s + r.total_sales, 0);
+
+      // Main is the sum of (amount_paid or deposit) minus the specific fees already counted
+      const main = all.reduce((s, t) => {
+        const amt = (t.module === "Booking" ? (t.deposit_amount || 0) : t.amount_paid);
+        return s + amt - (t.maintenance_fee || 0) - (t.drinks_corkage_fee || 0) - (t.liquor_corkage_fee || 0) - (t.function_hall_total || 0);
+      }, 0);
+
       setSalesBreakdown({ main, food, maintenance, drinks, liquor, functionHall });
-      const totalSales = main + food;
-      if (totalSales > 0) setEntranceSales(totalSales.toString());
+      const totalSales = main + food + maintenance + drinks + liquor + functionHall;
+      if (totalSales > 0) setEntranceSales(totalSales.toFixed(2));
     });
   }, [editReport]);
 
@@ -325,7 +326,7 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
             <span className="text-muted-foreground">Liquor Corkage</span><span className="text-right tabular-nums">₱{salesBreakdown.liquor.toLocaleString()}</span>
             <span className="text-muted-foreground">Function Hall Rent</span><span className="text-right tabular-nums">₱{salesBreakdown.functionHall.toLocaleString()}</span>
           </div>
-          <p className="text-[10px] text-muted-foreground italic">Maintenance/Corkage/Function Hall are included inside the main amount above (informational breakdown).</p>
+          <p className="text-[10px] text-muted-foreground italic">Base Sales, Food, Fees, and Corkage are summed together into the main A. CASH SUMMARY total.</p>
         </div>
 
         {/* A. CASH SUMMARY */}
