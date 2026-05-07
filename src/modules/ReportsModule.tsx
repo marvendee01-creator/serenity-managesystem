@@ -8,7 +8,7 @@ import ReservationBoard from "@/modules/ReservationBoard";
 import { formatPeso } from "@/lib/format";
 import { toast } from "sonner";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
-const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent"];
+const MODULES = ["All", "Entrance", "Room", "Booking", "Games Rental", "Table Rent", "Tent"];
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -206,29 +206,22 @@ function StoreSalesSummary() {
 }
 
 function ExpensesSummary({ source, title }: { source: "store" | "entrance"; title: string }) {
-  const [rows, setRows] = useState<{ date: string; amount: number; reportIds: number[] }[]>([]);
+  const [rows, setRows] = useState<{ date: string; particulars: string; receipt_no: string; amount: number; reportId: number }[]>([]);
   const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     const load = async () => {
-      const map = new Map<string, { amount: number; reportIds: Set<number> }>();
-      const ymOf = (s: string) => {
-        const d = new Date(s);
-        return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
-      };
-      const dayKey = (s: string) => formatDate(s);
+      const allItems: any[] = [];
+      const ymOf = (s: string) => s.slice(0, 7);
+      
       if (source === "store") {
         const all = await getCashierReports();
         for (const r of all) {
           for (const item of (r.petty_items || [])) {
             const itemDate = item.date || r.date;
             if (ymOf(itemDate) !== monthFilter) continue;
-            const k = dayKey(itemDate);
-            const cur = map.get(k) || { amount: 0, reportIds: new Set<number>() };
-            cur.amount += (Number(item.amount) || 0);
-            if (r.id) cur.reportIds.add(r.id);
-            map.set(k, cur);
+            allItems.push({ ...item, date: itemDate, reportId: r.id });
           }
         }
       } else {
@@ -237,18 +230,11 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           for (const item of (r.petty_items || [])) {
             const itemDate = item.date || r.report_date;
             if (ymOf(itemDate) !== monthFilter) continue;
-            const k = dayKey(itemDate);
-            const cur = map.get(k) || { amount: 0, reportIds: new Set<number>() };
-            cur.amount += (Number(item.amount) || 0);
-            if (r.id) cur.reportIds.add(r.id);
-            map.set(k, cur);
+            allItems.push({ ...item, date: itemDate, reportId: r.id });
           }
         }
       }
-      const out = Array.from(map.entries())
-        .map(([date, v]) => ({ date, amount: v.amount, reportIds: Array.from(v.reportIds) }))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      setRows(out);
+      setRows(allItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
     };
     load();
   }, [source, monthFilter, refresh]);
@@ -259,24 +245,29 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
   const buildHTML = () => `
     <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h2{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #999;padding:6px 8px;font-size:11px}th{background:#f0f0f0;text-align:left}.right{text-align:right}.bold{font-weight:bold}</style>
     <h2>SERENITY INLAND RESORT</h2>
-    <h2>${title} — ${monthLabel}</h2>
+    <h2>${title} Details — ${monthLabel}</h2>
     <table>
-      <tr><th>Date</th><th class="right">Daily Total Expenses</th></tr>
-      ${rows.map(r => `<tr><td>${r.date}</td><td class="right">₱${r.amount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`).join("")}
-      <tr class="bold"><td>TOTAL</td><td class="right">₱${total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+      <thead>
+        <tr><th>Date</th><th>Particulars</th><th>Receipt No</th><th class="right">Amount</th></tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `<tr><td>${r.date}</td><td>${r.particulars}</td><td>${r.receipt_no}</td><td class="right">₱${r.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr class="bold"><td>TOTAL</td><td></td><td></td><td class="right">₱${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>
+      </tfoot>
     </table>`;
 
   const exportExcel = () => {
-    const headers = ["Date", "Daily Total Expenses"];
-    const data = rows.map(r => [r.date, r.amount.toFixed(2)]);
-    data.push(["TOTAL", total.toFixed(2)]);
+    const headers = ["Date", "Particulars", "Receipt No", "Amount"];
+    const data = rows.map(r => [r.date, r.particulars, r.receipt_no, r.amount.toFixed(2)]);
+    data.push(["TOTAL", "", "", total.toFixed(2)]);
     const csv = [headers, ...data].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `expenses_summary_${source}_${monthFilter}.csv`; a.click();
+    a.href = url; a.download = `expenses_detailed_${source}_${monthFilter}.csv`; a.click();
     URL.revokeObjectURL(url);
-    toast.success("Excel exported");
   };
 
   const exportPDF = () => {
@@ -284,84 +275,59 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
     if (!w) return;
     w.document.write(`<html><head><title>${title}</title></head><body>${buildHTML()}<script>window.print();</script></body></html>`);
     w.document.close();
-    toast.success("PDF print dialog opened");
-  };
-
-  const printPreview = () => {
-    const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) return;
-    w.document.write(`<html><head><title>${title} — Preview</title></head><body>${buildHTML()}</body></html>`);
-    w.document.close();
-  };
-
-  const deleteRow = async (row: { date: string; reportIds: number[] }) => {
-    if (!confirm(`Delete all ${source === "store" ? "store cashier" : "booking cashier"} reports that contain expenses for ${row.date}? This will remove the parent reports entirely.`)) return;
-    try {
-      for (const id of row.reportIds) {
-        if (source === "store") await deleteCashierReport(id);
-        else await deleteBookingCashierReport(id);
-      }
-      toast.success("Records deleted");
-      setRefresh(k => k + 1);
-    } catch { toast.error("Failed to delete"); }
   };
 
   return (
-    <div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <div className="md:col-span-1">
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+        <div>
           <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
-          <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
+          <input type="month" className="pos-input text-sm w-full" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
         </div>
-        <button onClick={exportExcel} className="self-end h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+        <button onClick={exportExcel} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
           <Download size={14} /> Export Excel
         </button>
-        <button onClick={exportPDF} className="self-end h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
-          <Download size={14} /> Export PDF
+        <button onClick={exportPDF} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+          <Printer size={14} /> Print / PDF
         </button>
-        <button onClick={printPreview} className="self-end h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2">
-          <Eye size={14} /> Print Preview
-        </button>
-        <div className="self-end" />
       </div>
 
-      <div className="pos-card text-center mb-4">
-        <p className="text-xs text-muted-foreground">Total {title} for {monthLabel}</p>
-        <p className="text-2xl font-bold tabular-nums text-destructive">{formatPeso(total)}</p>
+      <div className="pos-card text-center mb-4 bg-destructive/5 border-destructive/20">
+        <p className="text-xs text-muted-foreground uppercase">Total Petty Cash Expenses for {monthLabel}</p>
+        <p className="text-2xl font-black tabular-nums text-destructive">{formatPeso(total)}</p>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-muted">
-              <th className="text-left px-3 py-2 font-medium">Date</th>
-              <th className="text-right px-3 py-2 font-medium">Daily Total Expenses</th>
-              <th className="text-center px-3 py-2 font-medium">Action</th>
+            <tr className="bg-muted font-bold text-muted-foreground uppercase text-[10px]">
+              <th className="text-left px-3 py-2">Date</th>
+              <th className="text-left px-3 py-2">Particulars</th>
+              <th className="text-left px-3 py-2">Receipt No</th>
+              <th className="text-right px-3 py-2">Amount</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {rows.length === 0 && (
-              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No expenses for this month</td></tr>
+              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground italic">No petty cash items found for this month</td></tr>
             )}
-            {rows.map(r => (
-              <tr key={r.date} className="border-t border-border hover:bg-muted/50">
-                <td className="px-3 py-2 text-xs whitespace-nowrap">{r.date}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium text-destructive">{formatPeso(r.amount)}</td>
-                <td className="px-3 py-2 text-center">
-                  <button onClick={() => deleteRow(r)} className="w-8 h-8 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 flex items-center justify-center mx-auto active:scale-95 transition-all" title="Delete parent reports">
-                    <Trash2 size={14} />
-                  </button>
-                </td>
+            {rows.map((r, idx) => (
+              <tr key={idx} className="hover:bg-muted/50 transition-colors">
+                <td className="px-3 py-2 text-[11px] whitespace-nowrap">{r.date}</td>
+                <td className="px-3 py-2 font-medium">{r.particulars}</td>
+                <td className="px-3 py-2 text-muted-foreground">{r.receipt_no}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-bold text-destructive">{formatPeso(r.amount)}</td>
               </tr>
             ))}
-            {rows.length > 0 && (
-              <tr className="border-t-2 border-border bg-accent/30 font-bold">
-                <td className="px-3 py-2">TOTAL</td>
-                <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
-                <td />
-              </tr>
-            )}
           </tbody>
+          {rows.length > 0 && (
+            <tfoot className="bg-muted/30 font-bold border-t-2 border-border">
+              <tr>
+                <td colSpan={3} className="px-3 py-3 text-right text-xs">TOTAL EXPENSES</td>
+                <td className="px-3 py-3 text-right text-base text-destructive">{formatPeso(total)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
@@ -960,53 +926,77 @@ function DailyTransactionSummaryReport() {
         if (amt > 0) records.push({ date: selectedDate, name, paymentType: pType, amount: amt, id: Math.random().toString() });
       };
 
-      // 1. SALES STORE (CASH)
+      // 1. SALES STORE (CASH) - From Daily Cashier Report Sales field
       const storeSales = storeCashier
         .filter(s => s.date && s.date.slice(0, 10) === selectedDate)
         .reduce((sum, s) => sum + (Number(s.sales) || 0), 0);
       if (storeSales > 0) pushRecord("SALES STORE", "CASH", storeSales);
 
-      // 2. BOOKING SALES (CASH/GCash)
-      let depositReceived = 0;
-      let fullyPaidAmount = 0;
-      let bookingSalesOthers = 0;
+      // 2. BOOKING SALES Breakdown
+      let depositCash = 0, depositGCash = 0;
+      let fullCash = 0, fullGCash = 0;
+      let othersCash = 0, othersGCash = 0;
+      let tableRentCash = 0, tableRentGCash = 0;
+      let tentRentCash = 0, tentRentGCash = 0;
       let maintenanceFees = 0;
 
-      // EXPLICIT MANUAL FILTER for exact date matching
       const filteredTxns = txns.filter(t => t.date_time && t.date_time.slice(0, 10) === selectedDate);
 
       for (const t of filteredTxns) {
         if (t.status === "Cancelled") continue;
-        
-        // Sum maintenance fees separately from all modules
         if (t.maintenance_fee) maintenanceFees += t.maintenance_fee;
 
+        const isGCash = t.payment_method === "GCash";
+
+        if (t.module === "Table Rent") {
+          if (isGCash) tableRentGCash += t.amount_paid;
+          else tableRentCash += t.amount_paid;
+          continue; // Count separately
+        }
+
+        if (t.module === "Tent") {
+          if (isGCash) tentRentGCash += t.amount_paid;
+          else tentRentCash += t.amount_paid;
+          continue; // Count separately
+        }
+
         if (t.module === "Booking") {
-          // Deposit Amount Received (Partial payments)
           if (t.payment_status === "Partially Paid" || (t.deposit_amount && t.balance && t.balance > 0)) {
-            depositReceived += t.deposit_amount || 0;
+            if (isGCash) depositGCash += t.deposit_amount || 0;
+            else depositCash += t.deposit_amount || 0;
           }
-          // Fully Paid (Zero balance)
           if (t.payment_status === "Fully Paid" || (t.balance === 0)) {
-            fullyPaidAmount += t.deposit_amount || t.amount_paid;
+            if (isGCash) fullGCash += t.deposit_amount || t.amount_paid;
+            else fullCash += t.deposit_amount || t.amount_paid;
           }
-        } else if (t.module === "Entrance" || t.module === "Room" || t.module === "Tent") {
-          bookingSalesOthers += (t.amount_paid - (t.maintenance_fee || 0));
+        } else if (t.module === "Entrance" || t.module === "Room") {
+          const netAmt = (t.amount_paid - (t.maintenance_fee || 0));
+          if (isGCash) othersGCash += netAmt;
+          else othersCash += netAmt;
         }
       }
 
-      if (depositReceived > 0) pushRecord("BOOKING SALES (Deposit Received)", "CASH", depositReceived);
-      if (fullyPaidAmount > 0) pushRecord("BOOKING SALES (Fully Paid)", "CASH", fullyPaidAmount);
-      if (bookingSalesOthers > 0) pushRecord("BOOKING SALES (Entrance/Room/Tent)", "CASH", bookingSalesOthers);
+      if (depositCash > 0) pushRecord("BOOKING SALES (Deposit Received)", "CASH", depositCash);
+      if (depositGCash > 0) pushRecord("BOOKING SALES (Deposit Received)", "GCASH", depositGCash);
+      if (fullCash > 0) pushRecord("BOOKING SALES (Fully Paid)", "CASH", fullCash);
+      if (fullGCash > 0) pushRecord("BOOKING SALES (Fully Paid)", "GCASH", fullGCash);
+      
+      if (tableRentCash > 0) pushRecord("TABLE RENT SALES", "CASH", tableRentCash);
+      if (tableRentGCash > 0) pushRecord("TABLE RENT SALES", "GCASH", tableRentGCash);
+      
+      if (tentRentCash > 0) pushRecord("TENT RENT SALES", "CASH", tentRentCash);
+      if (tentRentGCash > 0) pushRecord("TENT RENT SALES", "GCASH", tentRentGCash);
 
-      // 3. FOOD SALES (CASH)
-      // EXPLICIT MANUAL FILTER for food sales date
+      if (othersCash > 0) pushRecord("ENTRANCE/ROOM SALES", "CASH", othersCash);
+      if (othersGCash > 0) pushRecord("ENTRANCE/ROOM SALES", "GCASH", othersGCash);
+
+      // 3. FOOD SALES
       const foodCash = food
-        .filter(f => f.sale_date && f.sale_date === selectedDate && f.payment_status === "Fully Paid")
+        .filter(f => f.sale_date === selectedDate && f.payment_status === "Fully Paid")
         .reduce((sum, f) => sum + (f.cash_received || f.total_sales), 0);
       if (foodCash > 0) pushRecord("FOOD SALES", "CASH", foodCash);
 
-      // 4. MAINTENANCE FEE (CASH)
+      // 4. MAINTENANCE FEE
       if (maintenanceFees > 0) pushRecord("MAINTENANCE FEE", "CASH", maintenanceFees);
 
       setData(records);
