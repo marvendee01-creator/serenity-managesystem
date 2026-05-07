@@ -967,14 +967,16 @@ function DailyTransactionSummaryReport() {
         }
 
         if (t.module === "Booking") {
-          if (t.payment_status === "Partially Paid" || (t.deposit_amount && t.balance && t.balance > 0)) {
-            const netAmt = (t.deposit_amount || 0) - mFee;
-            if (isGCash) depositGCash += netAmt;
-            else depositCash += netAmt;
-          } else if (t.payment_status === "Fully Paid" || (t.balance === 0)) {
-            const netAmt = (t.deposit_amount || t.amount_paid) - mFee;
-            if (isGCash) fullGCash += netAmt;
-            else fullCash += netAmt;
+          const received = t.amount_paid || t.deposit_amount || 0;
+          const net = received - mFee;
+          
+          if (t.payment_status === "Partially Paid" || (t.balance && t.balance > 0)) {
+            if (isGCash) depositGCash += net;
+            else depositCash += net;
+          } else {
+            // Assume Fully Paid or Final Settlement
+            if (isGCash) fullGCash += net;
+            else fullCash += net;
           }
         } else if (t.module === "Entrance" || t.module === "Room") {
           const netAmt = (t.amount_paid - mFee);
@@ -1259,9 +1261,7 @@ export default function ReportsModule() {
       const fromMs = txnDateFrom ? new Date(txnDateFrom + "T00:00:00").getTime() : -Infinity;
       const toMs = txnDateTo ? new Date(txnDateTo + "T23:59:59").getTime() : Infinity;
       const filtered = txns.filter(t => {
-        // Exclude cancelled bookings from reports
         if (t.status === "Cancelled") return false;
-        if (t.payment_status && t.payment_status !== "Fully Paid") return false;
         const ts = new Date(t.date_time).getTime();
         if (ts < fromMs || ts > toMs) return false;
         if (maintFeeOnly && !(t.maintenance_fee && t.maintenance_fee > 0)) return false;
