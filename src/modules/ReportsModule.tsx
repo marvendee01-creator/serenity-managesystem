@@ -1051,7 +1051,7 @@ function CashMonitoringReport() {
       const entranceAmt = bookingCashier.filter(r => r.reportDate >= from && r.reportDate <= to).reduce((s, r) => s + (r.entranceSales || 0), 0);
       const storeAmt = storeCashier.filter(r => r.date.slice(0, 10) >= from && r.date.slice(0, 10) <= to).reduce((s, r) => s + (r.sales || 0), 0);
       
-      const foodAmt = food.reduce((s, r) => s + r.total_sales, 0);
+      const foodAmt = food.filter(f => !f.payment_status || f.payment_status === "Fully Paid").reduce((s, r) => s + r.total_sales, 0);
       
       setData({ store: storeAmt, entrance: entranceAmt, room: roomAmt, tent: tentAmt, booking: bookingAmt, foodPOS: foodAmt });
     });
