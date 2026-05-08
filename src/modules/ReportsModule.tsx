@@ -28,7 +28,7 @@ function formatDate(iso: string) {
   return `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")}/${d.getFullYear()}`;
 }
 
-type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "room-stay" | "maint-monitoring" | "daily-summary" | "fully-paid";
+type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "room-stay" | "maint-monitoring" | "daily-summary";
 
 function EntranceSalesSummary() {
   const [reports, setReports] = useState<BookingCashierReport[]>([]);
@@ -1093,92 +1093,7 @@ function RoomStayReport() {
   );
 }
 
-function FullyPaidBookingsReport() {
-  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
-  const [data, setData] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setLoading(true);
-    getTransactions({ dateFrom: from, dateTo: to }).then(all => {
-      const filtered = all.filter(t => {
-        const isPaid = t.payment_status === "Fully Paid" || (!t.payment_status && t.module === "Room");
-        const effectiveDate = (t.date_settled || t.date_time.slice(0, 10));
-        return (
-          (t.module === "Booking" || t.module === "Room") && 
-          isPaid && 
-          t.status !== "Cancelled" &&
-          effectiveDate >= from && effectiveDate <= to
-        );
-      });
-      setData(filtered.sort((a, b) => {
-        const dateA = a.date_settled || a.date_time.slice(0, 10);
-        const dateB = b.date_settled || b.date_time.slice(0, 10);
-        return new Date(dateB).getTime() - new Date(dateA).getTime();
-      }));
-      setLoading(false);
-    });
-  }, [from, to]);
-
-  const total = data.reduce((s, r) => s + (r.amount_paid || 0), 0);
-
-  return (
-    <div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 items-end">
-        <div>
-          <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Date Settled From</label>
-          <input type="date" className="pos-input text-sm w-full h-11" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Date Settled To</label>
-          <input type="date" className="pos-input text-sm w-full h-11" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-      </div>
-
-      <div className="pos-card bg-success/5 border-success/20 flex items-center justify-between py-6 mb-6">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Amount Received (Fully Paid)</p>
-          <p className="text-3xl font-black text-success tabular-nums">{formatPeso(total)}</p>
-        </div>
-        <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center text-success">
-          <Trophy size={24} />
-        </div>
-      </div>
-
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted/50 border-b border-border">
-              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Date Settled</th>
-              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Customer Name</th>
-              <th className="text-left px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Booking Type</th>
-              <th className="text-right px-4 py-4 font-bold text-muted-foreground uppercase tracking-wider">Amount Received</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {loading ? (
-              <tr><td colSpan={4} className="text-center py-12 italic text-muted-foreground">Loading reports...</td></tr>
-            ) : data.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-12 text-muted-foreground">No fully paid bookings for this period.</td></tr>
-            ) : (
-              data.map(r => (
-                <tr key={r.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-4 text-xs font-medium">
-                    {r.date_settled ? formatDate(r.date_settled + "T00:00:00") : formatDate(r.date_time)}
-                  </td>
-                  <td className="px-4 py-4 font-bold">{r.customer_name}</td>
-                  <td className="px-4 py-4 text-xs text-muted-foreground">{r.booking_type} {r.room_type ? `(${r.room_type})` : ""}</td>
-                  <td className="px-4 py-4 text-right tabular-nums font-black text-success">{formatPeso(r.amount_paid)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 function DailyTransactionSummaryReport() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -1775,9 +1690,8 @@ export default function ReportsModule() {
           { key: "expenses-entrance", label: "Expenses Summary - Entrance" },
           { key: "petty-monitoring", label: "Petty Cash Monitor" },
           { key: "reservation", label: "Reservations" },
-          { key: "room-stay", label: "Room Stay Report" },
+          { key: "room-stay", label: "Booking Financial Ledger" },
           { key: "daily-summary", label: "Daily Transaction Summary" },
-          { key: "fully-paid", label: "Report - Fully Paid Bookings" },
           { key: "food-sales", label: "Food Sales (Commission)" },
           { key: "maint-monitoring", label: "Maintenance Fee Monitoring" },
           { key: "analytics", label: "Analytics" },
@@ -2091,7 +2005,7 @@ export default function ReportsModule() {
 
       {tab === "daily-summary" && <DailyTransactionSummaryReport />}
 
-      {tab === "fully-paid" && <FullyPaidBookingsReport />}
+
 
       {tab === "food-sales" && <FoodSalesReport />}
 
