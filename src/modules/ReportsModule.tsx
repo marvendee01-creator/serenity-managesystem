@@ -869,8 +869,9 @@ function RoomStayReport() {
         if (!t.room_type) return false;
         if (t.status === "Cancelled") return false;
         if (t.payment_status && t.payment_status !== "Fully Paid") return false;
-        // Filter STRICTLY by check_in date — fall back to date_time only if check_in is absent
-        const checkInDate = (t.check_in || t.date_time).slice(0, 10);
+        // Filter STRICTLY by check_in date ONLY as requested
+        if (!t.check_in) return false;
+        const checkInDate = t.check_in.slice(0, 10);
         return checkInDate >= from && checkInDate <= to;
       });
       // Sort by check_in ascending
