@@ -858,15 +858,145 @@ function RoomStayReport() {
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    getTransactions({ dateFrom: from || undefined, dateTo: to || undefined }).then(data => {
-      setTxns(data.filter(t => (t.module === "Room" || t.module === "Booking") && t.room_type && t.status !== "Cancelled" && (!t.payment_status || t.payment_status === "Fully Paid")));
+    setLoading(true);
+    // Fetch all Room/Booking transactions and filter client-side by check_in date ONLY
+    getTransactions({}).then(data => {
+      const filtered = data.filter(t => {
+        if (!(t.module === "Room" || t.module === "Booking")) return false;
+        if (!t.room_type) return false;
+        if (t.status === "Cancelled") return false;
+        if (t.payment_status && t.payment_status !== "Fully Paid") return false;
+        // Filter STRICTLY by check_in date — fall back to date_time only if check_in is absent
+        const checkInDate = (t.check_in || t.date_time).slice(0, 10);
+        return checkInDate >= from && checkInDate <= to;
+      });
+      // Sort by check_in ascending
+      filtered.sort((a, b) => {
+        const da = (a.check_in || a.date_time).slice(0, 10);
+        const db = (b.check_in || b.date_time).slice(0, 10);
+        return da.localeCompare(db);
+      });
+      setTxns(filtered);
+      setLoading(false);
     });
   }, [from, to]);
-  const totalAmount = txns.reduce((s, t) => s + t.amount_paid, 0);
+
+  const totalAmount = txns.reduce((s, t) => s + (t.amount_paid || 0), 0);
+  const totalBalance = txns.reduce((s, t) => s + (t.balance || 0), 0);
+  const totalDays = txns.reduce((t, r) => {
+    const inD = new Date((r.check_in || r.date_time).slice(0, 10));
+    const outD = r.check_out ? new Date(r.check_out.slice(0, 10)) : inD;
+    return t + Math.max(1, Math.round((outD.getTime() - inD.getTime()) / 86400000));
+  }, 0);
+  const rangeLabel = from === to ? formatDate(from + "T00:00:00") : `${formatDate(from + "T00:00:00")} – ${formatDate(to + "T00:00:00")}`;
+
+  const exportCSV = () => {
+    const headers = ["Customer Name", "Room Type", "Check-In", "Check-Out", "Days", "Payment Status", "Amount Paid", "Balance"];
+    const rows = txns.map(t => {
+      const inD = new Date((t.check_in || t.date_time).slice(0, 10));
+      const outD = t.check_out ? new Date(t.check_out.slice(0, 10)) : inD;
+      const days = Math.max(1, Math.round((outD.getTime() - inD.getTime()) / 86400000));
+      return [
+        t.customer_name || "—",
+        t.room_type || "—",
+        t.check_in ? formatDateTime(t.check_in) : formatDateTime(t.date_time),
+        t.check_out ? formatDateTime(t.check_out) : "—",
+        days,
+        t.payment_status || "Fully Paid",
+        (t.amount_paid || 0).toFixed(2),
+        (t.balance || 0).toFixed(2),
+      ];
+    });
+    rows.push(["", "", "", "GRAND TOTAL", totalDays, "", totalAmount.toFixed(2), totalBalance.toFixed(2)]);
+    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `room_stay_report_${from}_to_${to}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const buildPrintHTML = () => `
+    <style>
+      body{font-family:Arial,sans-serif;font-size:11px;margin:24px}
+      h2{text-align:center;margin:4px 0;font-size:15px}
+      p.sub{text-align:center;font-size:11px;color:#555;margin:2px 0 12px}
+      table{width:100%;border-collapse:collapse;margin-top:10px}
+      th,td{border:1px solid #bbb;padding:5px 7px;font-size:10px}
+      th{background:#f0f0f0;font-weight:bold;text-align:left}
+      .right{text-align:right}
+      .center{text-align:center}
+      .total-row{font-weight:bold;background:#f9f9f9}
+      .badge{padding:2px 6px;border-radius:8px;font-size:9px;background:#d1fae5;color:#065f46}
+    </style>
+    <h2>SERENITY INLAND RESORT</h2>
+    <h2>Room Stay Report</h2>
+    <p class="sub">Check-In Period: ${rangeLabel} &nbsp;|&nbsp; Total Records: ${txns.length}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Customer Name</th>
+          <th>Room Type</th>
+          <th>Check-In</th>
+          <th>Check-Out</th>
+          <th class="center">Days</th>
+          <th>Status</th>
+          <th class="right">Amount Paid</th>
+          <th class="right">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${txns.map((t, i) => {
+          const inD = new Date((t.check_in || t.date_time).slice(0, 10));
+          const outD = t.check_out ? new Date(t.check_out.slice(0, 10)) : inD;
+          const days = Math.max(1, Math.round((outD.getTime() - inD.getTime()) / 86400000));
+          return `<tr>
+            <td class="center">${i + 1}</td>
+            <td>${t.customer_name || "—"}</td>
+            <td>${t.room_type || "—"}</td>
+            <td>${t.check_in ? formatDateTime(t.check_in) : formatDateTime(t.date_time)}</td>
+            <td>${t.check_out ? formatDateTime(t.check_out) : "—"}</td>
+            <td class="center">${days}</td>
+            <td><span class="badge">${t.payment_status || "Fully Paid"}</span></td>
+            <td class="right">₱${(t.amount_paid || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td class="right">₱${(t.balance || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          </tr>`;
+        }).join("")}
+        <tr class="total-row">
+          <td colspan="5" class="right">GRAND TOTAL</td>
+          <td class="center">${totalDays}</td>
+          <td></td>
+          <td class="right">₱${totalAmount.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+          <td class="right">₱${totalBalance.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+        </tr>
+      </tbody>
+    </table>`;
+
+  const handlePrint = () => {
+    const w = window.open("", "_blank", "width=1000,height=700");
+    if (!w) return;
+    w.document.write(`<html><head><title>Room Stay Report</title></head><body>${buildPrintHTML()}<script>window.print();<\/script></body></html>`);
+    w.document.close();
+  };
+
+  const handleExportPDF = () => {
+    const w = window.open("", "_blank", "width=1000,height=700");
+    if (!w) return;
+    w.document.write(`<html><head><title>Room Stay Report</title></head><body>${buildPrintHTML()}<script>window.print();<\/script></body></html>`);
+    w.document.close();
+  };
+
+  const totalAmountValue = txns.reduce((s, t) => s + (t.amount_paid || 0), 0);
+  
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-3 mb-4">
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 items-end">
         <div>
           <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
           <input type="date" className="pos-input text-sm w-full" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -875,8 +1005,36 @@ function RoomStayReport() {
           <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
           <input type="date" className="pos-input text-sm w-full" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
+        <button onClick={exportCSV} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+          <Download size={14} /> CSV
+        </button>
+        <button onClick={handleExportPDF} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+          <FileText size={14} /> PDF
+        </button>
+        <button onClick={handlePrint} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+          <Printer size={14} /> Print
+        </button>
       </div>
-      <div className="pos-card text-center mb-4"><p className="text-[10px] text-muted-foreground">Total Room Stay Revenue</p><p className="text-base font-bold tabular-nums">{formatPeso(totalAmount)}</p></div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="pos-card text-center">
+          <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Revenue</p>
+          <p className="text-xl font-bold tabular-nums text-success">{formatPeso(totalAmountValue)}</p>
+        </div>
+        <div className="pos-card text-center">
+          <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Balance</p>
+          <p className="text-xl font-bold tabular-nums text-destructive">{formatPeso(totalBalance)}</p>
+        </div>
+        <div className="pos-card text-center">
+          <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Days</p>
+          <p className="text-xl font-bold tabular-nums">{totalDays}</p>
+        </div>
+        <div className="pos-card text-center">
+          <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Records</p>
+          <p className="text-xl font-bold tabular-nums">{txns.length}</p>
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
@@ -885,29 +1043,49 @@ function RoomStayReport() {
               <th className="text-left p-2">Check Out</th>
               <th className="text-left p-2">Customer Name</th>
               <th className="text-left p-2">Room Type</th>
-              <th className="text-left p-2">Paid Status</th>
-              <th className="text-right p-2">No. of Days</th>
+              <th className="text-left p-2">Status</th>
+              <th className="text-right p-2">Days</th>
+              <th className="text-right p-2">Amount</th>
+              <th className="text-right p-2">Balance</th>
             </tr>
           </thead>
           <tbody>
-            {txns.map(t => {
-              const inDate = new Date(t.check_in || t.date_time);
-              inDate.setHours(0, 0, 0, 0);
-              const outDate = new Date(t.check_out || t.check_in || t.date_time);
-              outDate.setHours(0, 0, 0, 0);
-              const days = Math.max(1, Math.round((outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60 * 24)));
+            {loading ? (
+              <tr><td colSpan={8} className="text-center py-12 italic text-muted-foreground">Loading reports...</td></tr>
+            ) : txns.length === 0 ? (
+              <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No records found for this period.</td></tr>
+            ) : txns.map(t => {
+              const inDate = new Date((t.check_in || t.date_time).slice(0, 10));
+              const outDate = t.check_out ? new Date(t.check_out.slice(0, 10)) : inDate;
+              const days = Math.max(1, Math.round((outDate.getTime() - inDate.getTime()) / 86400000));
               return (
-              <tr key={t.id} className="border-t border-border">
-                <td className="p-2">{t.check_in ? formatDateTime(t.check_in) : formatDateTime(t.date_time)}</td>
-                <td className="p-2">{t.check_out ? formatDateTime(t.check_out) : "—"}</td>
-                <td className="p-2">{t.customer_name || "—"}</td>
-                <td className="p-2">{t.room_type}</td>
-                <td className="p-2">{t.payment_status || "Fully Paid"}</td>
-                <td className="p-2 text-right">{days}</td>
-              </tr>
+                <tr key={t.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="p-2 text-xs">{t.check_in ? formatDateTime(t.check_in) : formatDateTime(t.date_time)}</td>
+                  <td className="p-2 text-xs">{t.check_out ? formatDateTime(t.check_out) : "—"}</td>
+                  <td className="p-2 font-medium">{t.customer_name || "—"}</td>
+                  <td className="p-2">{t.room_type}</td>
+                  <td className="p-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase">
+                      {t.payment_status || "Fully Paid"}
+                    </span>
+                  </td>
+                  <td className="p-2 text-right">{days}</td>
+                  <td className="p-2 text-right tabular-nums font-bold">{formatPeso(t.amount_paid || 0)}</td>
+                  <td className="p-2 text-right tabular-nums font-bold text-destructive">{formatPeso(t.balance || 0)}</td>
+                </tr>
               );
             })}
           </tbody>
+          {!loading && txns.length > 0 && (
+            <tfoot className="bg-muted/30 font-bold border-t-2 border-border">
+              <tr>
+                <td colSpan={5} className="p-2 text-right">GRAND TOTAL</td>
+                <td className="p-2 text-right">{totalDays}</td>
+                <td className="p-2 text-right text-success">{formatPeso(totalAmountValue)}</td>
+                <td className="p-2 text-right text-destructive">{formatPeso(totalBalance)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
