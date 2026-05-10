@@ -661,7 +661,6 @@ export async function addFoodSale(sale: Omit<FoodSale, "id">): Promise<number> {
       capital: sale.capital,
       profit: sale.profit,
       commission_share: sale.commission_share,
-      payment_status: sale.payment_status ?? null,
     } as any)
     .select("id")
     .single();
@@ -698,7 +697,7 @@ export async function getFoodSales(filter?: { dateFrom?: string; dateTo?: string
 export async function updateFoodSale(id: number, updates: Partial<FoodSale>): Promise<void> {
   const data: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(updates)) {
-    if (k === "id") continue;
+    if (k === "id" || k === "payment_status") continue;
     data[k] = v ?? null;
   }
   const { error } = await supabase.from("food_sales" as any).update(data as any).eq("id", id);
