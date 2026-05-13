@@ -415,7 +415,7 @@ export default function RoomModule() {
       setSelectedRooms([ROOM_TYPES[0]]);
       setShowConflictWarning(false);
       loadActiveRooms(); firstRef.current?.focus();
-    } catch { toast.error("Failed to save"); }
+    } catch (err) { console.error("Room save error:", err); toast.error("Failed to save"); }
     setSaving(false);
   }, [customerName, selectedRooms, activeRooms, totalHeadcount, paxLimit, totalRoomAmount, payment, loadActiveRooms, received, change, roomRate, checkInDate, checkInTime, checkOutDate, checkOutTime, a, k8, k5, k4, discountAmt, manualExtraCharge, withFunctionHall, fhDays, funcHallRate, functionHallTotal, days, roomTotal, maintFee]);
 
@@ -434,7 +434,7 @@ export default function RoomModule() {
       toast.success(`Checked out! Total: ${formatPeso(totalAmount)}${extensionFee > 0 ? ` (incl. ${formatPeso(extensionFee)} extension)` : ""}`);
       setCheckoutRoom(null);
       loadActiveRooms();
-    } catch { toast.error("Failed to checkout"); }
+    } catch (err) { console.error("Checkout error:", err); toast.error("Failed to checkout"); }
   }, [checkoutRoom, loadActiveRooms]);
 
   useEffect(() => {

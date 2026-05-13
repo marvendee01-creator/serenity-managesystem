@@ -264,7 +264,7 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       maintenance_fee: t.maintenance_fee ?? 0,
       drinks_corkage_fee: t.drinks_corkage_fee ?? 0,
       liquor_corkage_fee: t.liquor_corkage_fee ?? 0,
-      extra_bed_charges: t.extra_bed_charges ?? 0,
+      // extra_bed_charges is not yet in the DB schema
     } as any)
     .select("id")
     .single();
@@ -275,7 +275,7 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
 export async function updateTransaction(id: number, updates: Partial<Transaction>): Promise<void> {
   const updateData: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(updates)) {
-    if (key === "id") continue;
+    if (key === "id" || key === "extra_bed_charges") continue;
     updateData[key] = value ?? null;
   }
   const { error } = await supabase

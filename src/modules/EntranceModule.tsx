@@ -178,7 +178,7 @@ export default function EntranceModule() {
       setPayment("Cash"); setTourType(getAutoTourType());
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
-    } catch { toast.error("Failed to save"); }
+    } catch (err) { console.error("Entrance save error:", err); toast.error("Failed to save"); }
     setSaving(false);
   }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, withFunctionHall, fhDays, funcHallRate, functionHallTotal, maint, drinksCork, liquorCork, useManualDatetime, customDate, customTime, isCharge, receivedVal, change]);
 

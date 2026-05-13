@@ -68,7 +68,7 @@ export default function TableRentModule() {
       setAdults(0); setKids8Above(0); setKids5to7(0); setKids4Below(0);
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       setPayment("Cash");
-    } catch { toast.error("Failed to save"); }
+    } catch (err) { console.error("Table rent save error:", err); toast.error("Failed to save"); }
     setSaving(false);
   }, [customerName, numTables, total, adults, kids8Above, kids5to7, kids4Below, totalHeadcount, totalChildren, payment, useManualDatetime, customDate, customTime]);
 

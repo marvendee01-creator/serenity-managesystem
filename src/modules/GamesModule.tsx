@@ -122,7 +122,7 @@ export default function GamesModule() {
       else if (gameType === "Volleyball") setRate(String(volleyballRate));
       else setRate("");
       nameRef.current?.focus();
-    } catch { toast.error("Failed to save"); }
+    } catch (err) { console.error("Games save error:", err); toast.error("Failed to save"); }
     setSaving(false);
   }, [gameType, name, amt, payment, received, change, useManualDatetime, customDate, customTime, hours, billiardRate, dartRate, volleyballRate, isCharge]);
 
