@@ -48,6 +48,7 @@ export interface Transaction {
   maintenance_fee?: number;
   drinks_corkage_fee?: number;
   liquor_corkage_fee?: number;
+  extra_bed_charges?: number;
 }
 
 export interface BookingCashierEntry {
@@ -263,6 +264,7 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       maintenance_fee: t.maintenance_fee ?? 0,
       drinks_corkage_fee: t.drinks_corkage_fee ?? 0,
       liquor_corkage_fee: t.liquor_corkage_fee ?? 0,
+      extra_bed_charges: t.extra_bed_charges ?? 0,
     } as any)
     .select("id")
     .single();
@@ -353,6 +355,7 @@ export async function getTransactions(filter?: {
     maintenance_fee: (row as any).maintenance_fee != null ? Number((row as any).maintenance_fee) : undefined,
     drinks_corkage_fee: (row as any).drinks_corkage_fee != null ? Number((row as any).drinks_corkage_fee) : undefined,
     liquor_corkage_fee: (row as any).liquor_corkage_fee != null ? Number((row as any).liquor_corkage_fee) : undefined,
+    extra_bed_charges: (row as any).extra_bed_charges != null ? Number((row as any).extra_bed_charges) : undefined,
   }));
 }
 

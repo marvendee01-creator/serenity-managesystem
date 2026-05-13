@@ -1630,9 +1630,9 @@ export default function ReportsModule() {
   const totalChildren = data.reduce((s, t) => s + t.children, 0);
 
   const exportCSV = () => {
-    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Adults", "Kids (8+)", "Kids (5-7)", "Kids (4 & Below)", "Headcount", "Amount", "Payment"];
+    const headers = ["Transaction No", "Date/Time", "Module", "Customer Name", "Adults", "Kids (8+)", "Kids (5-7)", "Kids (4 & Below)", "Headcount", "Amount", "Extra Bed", "Payment"];
     const rows = data.map((t) => [
-      t.transaction_no, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0), t.amount_paid, t.payment_method,
+      t.transaction_no, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.adults + (t.kids_8_above ?? 0) + (t.kids_5_7 ?? 0) + (t.kids_4_below ?? 0), t.amount_paid, t.extra_bed_charges ?? 0, t.payment_method,
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -1775,6 +1775,7 @@ export default function ReportsModule() {
                   <th className="text-right px-3 py-2 font-medium">Kids (5-7)</th>
                   <th className="text-right px-3 py-2 font-medium text-xs">Kids (4↓ FREE)</th>
                   <th className="text-right px-3 py-2 font-medium">Amount</th>
+                  <th className="text-right px-3 py-2 font-medium">Extra Bed</th>
                   <th className="text-right px-3 py-2 font-medium">Maint. Fee</th>
                   <th className="text-left px-3 py-2 font-medium">Payment</th>
                   <th className="text-center px-3 py-2 font-medium">Action</th>
@@ -1797,6 +1798,7 @@ export default function ReportsModule() {
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_5_7 ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{t.kids_4_below ?? 0}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.amount_paid)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.extra_bed_charges || 0)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{formatPeso(t.maintenance_fee || 0)}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
                       <td className="px-3 py-2 text-center">
@@ -2052,6 +2054,10 @@ export default function ReportsModule() {
                 <input type="number" step="0.01" className="pos-input w-full" value={editForm.amount_paid ?? 0} onChange={e => setEditForm(f => ({ ...f, amount_paid: parseFloat(e.target.value) || 0 }))} min="0" />
               </div>
               <div>
+                <label className="text-sm font-medium block mb-1">Extra Bed Charges</label>
+                <input type="number" step="0.01" className="pos-input w-full" value={editForm.extra_bed_charges ?? 0} onChange={e => setEditForm(f => ({ ...f, extra_bed_charges: parseFloat(e.target.value) || 0 }))} min="0" />
+              </div>
+              <div>
                 <label className="text-sm font-medium block mb-1">Payment Method</label>
                 <div className="flex gap-2">
                   {(["Cash", "GCash"] as const).map(m => (
@@ -2084,6 +2090,7 @@ export default function ReportsModule() {
                         children: (editForm.kids_8_above ?? 0) + (editForm.kids_5_7 ?? 0) + (editForm.kids_4_below ?? 0),
                         total_headcount: totalHc,
                         amount_paid: editForm.amount_paid,
+                        extra_bed_charges: editForm.extra_bed_charges,
                         payment_method: editForm.payment_method,
                       });
                       toast.success("Transaction updated!");

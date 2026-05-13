@@ -80,6 +80,7 @@ export default function BookingManagement() {
       maintenance_fee: b.maintenance_fee ?? 0,
       deposit_amount: b.deposit_amount ?? 0,
       corkage_fee: b.corkage_fee ?? 0,
+      extra_bed_charges: b.extra_bed_charges ?? 0,
     });
   }, []);
 
@@ -105,6 +106,7 @@ export default function BookingManagement() {
         maintenance_fee: editForm.maintenance_fee ?? 0,
         deposit_amount: editForm.deposit_amount ?? 0,
         corkage_fee: editForm.corkage_fee ?? 0,
+        extra_bed_charges: editForm.extra_bed_charges ?? 0,
       });
       toast.success("Booking updated!");
       setEditingBooking(null);
@@ -669,6 +671,11 @@ export default function BookingManagement() {
               <div><label className="text-xs font-medium block mb-1 font-bold text-primary">Deposit Amount</label>
                 <input type="number" step="0.01" min="0" className="pos-input w-full border-primary/50" value={editForm.deposit_amount ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, deposit_amount: parseFloat(e.target.value) || 0 }))} /></div>
+            </div>
+            <div>
+              <label className="text-xs font-medium block mb-1">Extra Bed Charges</label>
+              <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.extra_bed_charges ?? 0}
+                onChange={e => setEditForm(f => ({ ...f, extra_bed_charges: parseFloat(e.target.value) || 0 }))} />
             </div>
             <div className="flex gap-2 pt-2">
               <button onClick={() => setEditingBooking(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all">Cancel</button>

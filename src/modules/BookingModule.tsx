@@ -86,6 +86,7 @@ export default function BookingModule() {
   const [discountAmount, setDiscountAmount] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
+  const [extraBedCharges, setExtraBedCharges] = useState("");
 
   const [exclusiveFee, setExclusiveFee] = useState(5000);
   const [dayAdultRate, setDayAdultRate] = useState(100);
@@ -158,6 +159,7 @@ export default function BookingModule() {
   const liquorCork = parseFloat(liquorCorkage) || 0;
   const funcHall = parseFloat(functionHallFee) || 0;
   const deposit = parseFloat(depositAmount) || 0;
+  const extraBed = parseFloat(extraBedCharges) || 0;
   const discount = parseFloat(discountAmount) || 0;
   const fhDays = Math.max(0, parseFloat(functionHallDays) || 0);
   const fhRate = Math.max(0, parseFloat(functionHallRate) || 0);
@@ -178,8 +180,8 @@ export default function BookingModule() {
   
   const tableFee = numTables * tableRate;
   const baseAmount = isExclusive
-    ? (exclusiveFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork)
-    : (personFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork);
+    ? (exclusiveFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork + extraBed)
+    : (personFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork + extraBed);
   const total = Math.max(0, baseAmount - discount);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
@@ -258,6 +260,7 @@ export default function BookingModule() {
         amount_paid: total, deposit_amount: deposit,
         balance: balance > 0 ? balance : 0, payment_status: paymentStatus,
         payment_method: payment,
+        extra_bed_charges: extraBed,
       });
       toast.success("Booking saved!");
 
@@ -275,6 +278,7 @@ export default function BookingModule() {
           ...(k4 > 0 ? [{ label: `Kids 4↓ FREE (${k4})`, value: "₱0" }] : []),
           ...(roomFee > 0 ? [{ label: `Rooms (${selectedRooms.join(", ")})`, value: `₱${roomFee.toLocaleString()} (${days} day${days > 1 ? "s" : ""})` }] : []),
           ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays} day${fhDays > 1 ? "s" : ""} × ₱${fhRate.toLocaleString()})`, value: `₱${functionHallTotal.toLocaleString()}` }] : []),
+          ...(extraBed > 0 ? [{ label: "Extra Bed", value: `₱${extraBed.toLocaleString()}` }] : []),
           { label: "Deposit", value: `₱${deposit.toLocaleString()}` },
           { label: "Balance", value: `₱${Math.max(0, balance).toLocaleString()}` },
         ],
@@ -291,6 +295,7 @@ export default function BookingModule() {
       setDepositAmount(""); setBookingType(TYPES[0]); setSelectedRooms([]); setAddOnTables("");
       setNoOfDays("1");
       setCheckIn(""); setCheckOut(""); setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage(""); setFunctionHallFee(""); setDiscountAmount("");
+      setExtraBedCharges("");
       setWithFunctionHall(false); setFunctionHallDays("");
       setFunctionHallRate(funcHallSettingRate.toString());
       getTransactions({ module: "Booking" }).then(setExistingBookings);
@@ -473,6 +478,11 @@ export default function BookingModule() {
           </div>
         </div>
 
+        <div>
+          <label className="text-sm font-medium block mb-1">Extra Bed Charges</label>
+          <input type="number" step="0.01" className="pos-input w-full" value={extraBedCharges} onChange={(e) => setExtraBedCharges(e.target.value)} placeholder="0.00" min="0" />
+        </div>
+
         <div className="pos-card border-primary/30">
           <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
           <p className="text-2xl font-bold text-primary tabular-nums">{formatPeso(total)}</p>
@@ -489,6 +499,7 @@ export default function BookingModule() {
             {corkage > 0 && <p>+ Maintenance: {formatPeso(corkage)}</p>}
             {drinksCork > 0 && <p>+ Drinks Corkage: {formatPeso(drinksCork)}</p>}
             {liquorCork > 0 && <p>+ Liquor Corkage: {formatPeso(liquorCork)}</p>}
+            {extraBed > 0 && <p>+ Extra Bed: {formatPeso(extraBed)}</p>}
             {discount > 0 && <p className="text-success">− Discount: {formatPeso(discount)}</p>}
           </div>
         </div>

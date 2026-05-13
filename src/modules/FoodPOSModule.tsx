@@ -99,7 +99,7 @@ function POSScreen({ inventory, onSold }: { inventory: FoodInventoryItem[]; onSo
       setQty("1"); setUnitPrice(""); setDiscount(""); setCashReceived("");
       setPaymentMethod("Cash");
       onSold();
-    } catch { toast.error("Failed to save sale"); }
+    } catch (err: any) { console.error("Food sale error:", err); toast.error(err?.message || "Failed to save sale"); }
     setSaving(false);
   }, [selected, q, up, d, total, cash, change, capital, profit, commission, customerName, onSold]);
 

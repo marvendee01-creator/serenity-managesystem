@@ -209,6 +209,7 @@ export default function RoomModule() {
   const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [discount, setDiscount] = useState("");
+  const [extraBedCharges, setExtraBedCharges] = useState("");
   const [manualExtraCharge, setManualExtraCharge] = useState(0);
   const [roomRate, setRoomRate] = useState(0);
   const [funcHallRate, setFuncHallRate] = useState(1500);
@@ -326,9 +327,10 @@ export default function RoomModule() {
   const fhDays = Math.max(0, parseFloat(funcHallDays) || 0);
   const days = Math.max(1, parseFloat(noOfDays) || 1);
   const maintFee = parseFloat(maintenanceFee) || 0;
+  const extraBed = parseFloat(extraBedCharges) || 0;
   const functionHallTotal = withFunctionHall ? fhDays * funcHallRate : 0;
   const roomTotal = roomRate * days;
-  const totalRoomAmount = Math.max(0, roomTotal - discountAmt + manualExtraCharge + functionHallTotal + maintFee);
+  const totalRoomAmount = Math.max(0, roomTotal - discountAmt + manualExtraCharge + functionHallTotal + maintFee + extraBed);
   const change = received - totalRoomAmount;
 
   const [showConflictWarning, setShowConflictWarning] = useState(false);
@@ -373,6 +375,7 @@ export default function RoomModule() {
         function_hall_rate: withFunctionHall ? funcHallRate : 0,
         function_hall_total: functionHallTotal,
         maintenance_fee: maintFee,
+        extra_bed_charges: extraBed,
       });
       toast.success("Room check-in recorded!");
 
@@ -389,6 +392,7 @@ export default function RoomModule() {
           ...(discountAmt > 0 ? [{ label: "Discount", value: `- ${formatPeso(discountAmt)}` }] : []),
           ...(manualExtraCharge > 0 ? [{ label: "Extra Charge", value: `+ ${formatPeso(manualExtraCharge)}` }] : []),
           ...(maintFee > 0 ? [{ label: "Maintenance Fee", value: `+ ${formatPeso(maintFee)}` }] : []),
+          ...(extraBed > 0 ? [{ label: "Extra Bed", value: `+ ${formatPeso(extraBed)}` }] : []),
           { label: "Check-in", value: `${checkInDate} ${checkInTime}` },
           { label: "Scheduled Check-out", value: `${checkOutDate} ${checkOutTime}` },
           ...(a > 0 ? [{ label: "Adults", value: `${a}` }] : []),
@@ -407,7 +411,7 @@ export default function RoomModule() {
       setCheckOutDate(getTodayDate()); setCheckOutTime("17:00");
       setManualOverrideTime(false);
       setWithFunctionHall(false); setFuncHallDays("1");
-      setNoOfDays("1"); setMaintenanceFee("");
+      setNoOfDays("1"); setMaintenanceFee(""); setExtraBedCharges("");
       setSelectedRooms([ROOM_TYPES[0]]);
       setShowConflictWarning(false);
       loadActiveRooms(); firstRef.current?.focus();
@@ -518,7 +522,7 @@ export default function RoomModule() {
           </div>
         </div>
         <div className="pos-card">
-          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)} × {days} day(s) = {formatPeso(roomTotal)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}{manualExtraCharge > 0 && <span className="text-warning"> + {formatPeso(manualExtraCharge)} extra</span>}{maintFee > 0 && <span> + {formatPeso(maintFee)} maint</span>}</p>
+          <p className="text-xs text-muted-foreground">Room Rate: {formatPeso(roomRate)} × {days} day(s) = {formatPeso(roomTotal)}{discountAmt > 0 && <span className="text-success"> − {formatPeso(discountAmt)} discount</span>}{manualExtraCharge > 0 && <span className="text-warning"> + {formatPeso(manualExtraCharge)} extra</span>}{maintFee > 0 && <span> + {formatPeso(maintFee)} maint</span>}{extraBed > 0 && <span className="text-primary"> + {formatPeso(extraBed)} bed</span>}</p>
           <p className="text-sm font-bold text-primary mt-1">Total: {formatPeso(totalRoomAmount)}</p>
           <p className="text-xs text-muted-foreground mt-1">Max {paxLimit} pax • Extension: {formatPeso(EXTENSION_RATE_PER_HOUR)}/hr (max {MAX_EXTENSION_HOURS}hrs)</p>
         </div>
@@ -609,6 +613,10 @@ export default function RoomModule() {
           <label className="text-sm font-medium block mb-1">Discount (₱)</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />
           {discountAmt > 0 && <p className="text-xs text-success mt-1">− {formatPeso(discountAmt)} off room rate</p>}
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">Extra Bed Charges (₱)</label>
+          <input type="number" step="0.01" className="pos-input w-full" value={extraBedCharges} onChange={(e) => setExtraBedCharges(e.target.value)} placeholder="0.00" min="0" />
         </div>
 
         <div className="pos-card space-y-2">
