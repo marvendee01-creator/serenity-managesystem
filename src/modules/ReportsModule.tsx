@@ -1644,21 +1644,6 @@ export default function ReportsModule() {
     URL.revokeObjectURL(url);
   };
 
-  const exportExcel = () => {
-    const headers = ["Txn No", "Date/Time", "Module", "Customer", "Adults", "Kids (8+)", "Kids (5-7)", "Kids (4 Below)", "Amount", "Extra Bed", "Maint. Fee", "Payment"];
-    const rows = data.map((t) => [
-      t.transaction_no, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.amount_paid, t.extra_bed_charges ?? 0, t.maintenance_fee ?? 0, t.payment_method,
-    ]);
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "application/vnd.ms-excel" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `report_${new Date().toISOString().slice(0, 10)}.xls`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   if (editingReport) {
     return (
       <CashierModule
@@ -1773,14 +1758,9 @@ export default function ReportsModule() {
             </div>
           </div>
 
-          <div className="flex gap-2 mb-4">
-            <button onClick={exportCSV} className="flex items-center gap-2 px-4 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
-              <Download size={16} /> Export CSV
-            </button>
-            <button onClick={exportExcel} className="flex items-center gap-2 px-4 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
-              <FileText size={16} /> Export Excel
-            </button>
-          </div>
+          <button onClick={exportCSV} className="mb-4 flex items-center gap-2 px-4 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground active:scale-[0.97] transition-all">
+            <Download size={16} /> Export CSV
+          </button>
 
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="w-full text-sm">
