@@ -858,6 +858,7 @@ function BookingFinancialLedger() {
   const [txns, setTxns] = useState<(Transaction & { balance_amount: number; payment_status: string })[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [dateFilter, setDateFilter] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -885,26 +886,25 @@ function BookingFinancialLedger() {
   const filtered = txns.filter(t => {
     const matchesSearch = !search || t.customer_name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "All" || t.payment_status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesDate = !dateFilter || (t.check_in && t.check_in.slice(0, 10) === dateFilter);
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
-  const totalReceivable = filtered.reduce((s, t) => s + (t.balance_amount || 0), 0);
+  const totalOutstanding = filtered.reduce((s, t) => s + (t.balance_amount || 0), 0);
   const totalPartial = filtered.filter(t => t.payment_status === 'Partially Paid').length;
   const totalUnpaid = filtered.filter(t => t.payment_status === 'Unpaid').length;
 
   const exportCSV = () => {
-    const headers = ["Date", "Customer Name", "Booking Type", "Room Selected", "Check-In", "Check-Out", "Total Amount", "Deposit Paid", "Balance Remaining", "Payment Status"];
+    const headers = ["Customer Name", "Check In Date", "Check Out Date", "Booking Type", "Payment Status", "Total Amount", "Deposit Amount", "Balance Remaining"];
     const rows = filtered.map(t => [
-      formatDate(t.date_time),
       t.customer_name || "—",
+      t.check_in ? formatDate(t.check_in) : "—",
+      t.check_out ? formatDate(t.check_out) : "—",
       t.booking_type || "—",
-      t.room_type || "—",
-      t.check_in ? formatDateTime(t.check_in) : "—",
-      t.check_out ? formatDateTime(t.check_out) : "—",
+      t.payment_status,
       (t.amount_paid || 0).toFixed(2),
       (t.deposit_amount || 0).toFixed(2),
-      (t.balance_amount || 0).toFixed(2),
-      t.payment_status
+      (t.balance_amount || 0).toFixed(2)
     ]);
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -936,37 +936,32 @@ function BookingFinancialLedger() {
     <table>
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Customer</th>
-          <th>Type</th>
-          <th>Rooms</th>
+          <th>Customer Name</th>
           <th>Check-In</th>
           <th>Check-Out</th>
-          <th class="right">Total</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th class="right">Total Amount</th>
           <th class="right">Deposit</th>
           <th class="right">Balance</th>
-          <th>Status</th>
         </tr>
       </thead>
       <tbody>
         ${filtered.map(t => `
           <tr>
-            <td>${formatDate(t.date_time)}</td>
             <td>${t.customer_name || "—"}</td>
+            <td>${t.check_in ? formatDate(t.check_in) : "—"}</td>
+            <td>${t.check_out ? formatDate(t.check_out) : "—"}</td>
             <td>${t.booking_type || "—"}</td>
-            <td>${t.room_type || "—"}</td>
-            <td>${t.check_in ? formatDateTime(t.check_in) : "—"}</td>
-            <td>${t.check_out ? formatDateTime(t.check_out) : "—"}</td>
+            <td><span class="status ${t.payment_status === 'Fully Paid' ? 'status-paid' : t.payment_status === 'Partially Paid' ? 'status-partial' : 'status-unpaid'}">${t.payment_status}</span></td>
             <td class="right">₱${(t.amount_paid || 0).toLocaleString()}</td>
             <td class="right">₱${(t.deposit_amount || 0).toLocaleString()}</td>
             <td class="right">₱${(t.balance_amount || 0).toLocaleString()}</td>
-            <td><span class="status ${t.payment_status === 'Fully Paid' ? 'status-paid' : t.payment_status === 'Partially Paid' ? 'status-partial' : 'status-unpaid'}">${t.payment_status}</span></td>
           </tr>
         `).join("")}
         <tr class="total-row">
-          <td colspan="8" class="right">TOTAL RECEIVABLE</td>
-          <td class="right">₱${totalReceivable.toLocaleString()}</td>
-          <td></td>
+          <td colspan="7" class="right">TOTAL OUTSTANDING BALANCE</td>
+          <td class="right">₱${totalOutstanding.toLocaleString()}</td>
         </tr>
       </tbody>
     </table>`;
@@ -980,14 +975,14 @@ function BookingFinancialLedger() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-        <div>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+        <div className="md:col-span-2">
           <label className="text-xs font-medium text-muted-foreground block mb-1">Filter By Customer</label>
           <div className="relative">
             <input 
               type="text" 
               className="pos-input w-full pl-8" 
-              placeholder="Search name..." 
+              placeholder="Search customer name..." 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
             />
@@ -997,27 +992,38 @@ function BookingFinancialLedger() {
         <div>
           <label className="text-xs font-medium text-muted-foreground block mb-1">Filter By Status</label>
           <select className="pos-input w-full" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="All">All</option>
+            <option value="All">All Status</option>
             <option value="Fully Paid">Fully Paid</option>
             <option value="Partially Paid">Partially Paid</option>
             <option value="Unpaid">Unpaid</option>
           </select>
         </div>
-        <button onClick={exportCSV} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
-          <Download size={16} /> Export CSV
-        </button>
-        <button onClick={handlePrint} className="h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
-          <Printer size={16} /> Print Preview
-        </button>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground block mb-1">Filter By Check-In Date</label>
+          <input 
+            type="date" 
+            className="pos-input w-full" 
+            value={dateFilter} 
+            onChange={e => setDateFilter(e.target.value)} 
+          />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={exportCSV} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+            <Download size={16} /> CSV
+          </button>
+          <button onClick={handlePrint} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+            <Printer size={16} /> Print
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="pos-card bg-primary/5 border-primary/20">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Receivable</p>
-          <p className="text-2xl font-black text-primary tabular-nums">{formatPeso(totalReceivable)}</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Outstanding Balance</p>
+          <p className="text-2xl font-black text-primary tabular-nums">{formatPeso(totalOutstanding)}</p>
         </div>
         <div className="pos-card bg-warning/5 border-warning/20">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Partial Payments</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Partially Paid</p>
           <p className="text-2xl font-black text-warning tabular-nums">{totalPartial}</p>
         </div>
         <div className="pos-card bg-destructive/5 border-destructive/20">
@@ -1030,34 +1036,27 @@ function BookingFinancialLedger() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             <tr>
-              <th className="text-left px-3 py-3">Date</th>
               <th className="text-left px-3 py-3">Customer Name</th>
+              <th className="text-left px-3 py-3">Check In Date</th>
+              <th className="text-left px-3 py-3">Check Out Date</th>
               <th className="text-left px-3 py-3">Booking Type</th>
-              <th className="text-left px-3 py-3">Room Selected</th>
-              <th className="text-left px-3 py-3">Check-In</th>
-              <th className="text-left px-3 py-3">Check-Out</th>
-              <th className="text-right px-3 py-3">Total Amount</th>
-              <th className="text-right px-3 py-3">Deposit Paid</th>
-              <th className="text-right px-3 py-3">Balance Remaining</th>
               <th className="text-center px-3 py-3">Payment Status</th>
+              <th className="text-right px-3 py-3">Total Amount</th>
+              <th className="text-right px-3 py-3">Deposit Amount</th>
+              <th className="text-right px-3 py-3">Balance Remaining</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={10} className="text-center py-12 italic text-muted-foreground">Loading ledger data...</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 italic text-muted-foreground">Loading ledger data...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-muted-foreground">No bookings found matching filters.</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No bookings found matching filters.</td></tr>
             ) : filtered.map(t => (
               <tr key={t.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-3 py-3 text-xs tabular-nums">{formatDate(t.date_time)}</td>
                 <td className="px-3 py-3 font-bold">{t.customer_name || "—"}</td>
+                <td className="px-3 py-3 text-xs tabular-nums">{t.check_in ? formatDate(t.check_in) : "—"}</td>
+                <td className="px-3 py-3 text-xs tabular-nums">{t.check_out ? formatDate(t.check_out) : "—"}</td>
                 <td className="px-3 py-3 text-xs text-muted-foreground">{t.booking_type}</td>
-                <td className="px-3 py-3 text-xs">{t.room_type || "—"}</td>
-                <td className="px-3 py-3 text-[10px] text-muted-foreground">{t.check_in ? formatDateTime(t.check_in) : "—"}</td>
-                <td className="px-3 py-3 text-[10px] text-muted-foreground">{t.check_out ? formatDateTime(t.check_out) : "—"}</td>
-                <td className="px-3 py-3 text-right tabular-nums font-medium">{formatPeso(t.amount_paid || 0)}</td>
-                <td className="px-3 py-3 text-right tabular-nums font-medium text-success">{formatPeso(t.deposit_amount || 0)}</td>
-                <td className="px-3 py-3 text-right tabular-nums font-black text-destructive">{formatPeso(t.balance_amount || 0)}</td>
                 <td className="px-3 py-3 text-center">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                     t.payment_status === 'Fully Paid' ? 'bg-success/20 text-success' :
@@ -1067,6 +1066,9 @@ function BookingFinancialLedger() {
                     {t.payment_status}
                   </span>
                 </td>
+                <td className="px-3 py-3 text-right tabular-nums font-medium">{formatPeso(t.amount_paid || 0)}</td>
+                <td className="px-3 py-3 text-right tabular-nums font-medium text-success">{formatPeso(t.deposit_amount || 0)}</td>
+                <td className="px-3 py-3 text-right tabular-nums font-black text-destructive">{formatPeso(t.balance_amount || 0)}</td>
               </tr>
             ))}
           </tbody>
