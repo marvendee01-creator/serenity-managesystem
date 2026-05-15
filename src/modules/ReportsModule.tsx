@@ -895,17 +895,23 @@ function BookingFinancialLedger() {
   const totalUnpaid = filtered.filter(t => t.payment_status === 'Unpaid').length;
 
   const exportCSV = () => {
-    const headers = ["Customer Name", "Check In Date", "Check Out Date", "Booking Type", "Payment Status", "Total Amount", "Deposit Amount", "Balance Remaining"];
-    const rows = filtered.map(t => [
-      t.customer_name || "—",
-      t.check_in ? formatDate(t.check_in) : "—",
-      t.check_out ? formatDate(t.check_out) : "—",
-      t.booking_type || "—",
-      t.payment_status,
-      (t.amount_paid || 0).toFixed(2),
-      (t.deposit_amount || 0).toFixed(2),
-      (t.balance_amount || 0).toFixed(2)
-    ]);
+    const headers = ["Customer Name", "Check In Date", "Check Out Date", "No. of Days", "Booking Type", "Payment Status", "Total Amount", "Deposit Amount", "Balance Remaining"];
+    const rows = filtered.map(t => {
+      const days = t.check_in && t.check_out 
+        ? Math.max(1, Math.ceil((new Date(t.check_out).getTime() - new Date(t.check_in).getTime()) / (1000 * 60 * 60 * 24)))
+        : 1;
+      return [
+        t.customer_name || "—",
+        t.check_in ? formatDate(t.check_in) : "—",
+        t.check_out ? formatDate(t.check_out) : "—",
+        days,
+        t.booking_type || "—",
+        t.payment_status,
+        (t.amount_paid || 0).toFixed(2),
+        (t.deposit_amount || 0).toFixed(2),
+        (t.balance_amount || 0).toFixed(2)
+      ];
+    });
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -939,6 +945,7 @@ function BookingFinancialLedger() {
           <th>Customer Name</th>
           <th>Check-In</th>
           <th>Check-Out</th>
+          <th class="center">Days</th>
           <th>Type</th>
           <th>Status</th>
           <th class="right">Total Amount</th>
@@ -947,20 +954,25 @@ function BookingFinancialLedger() {
         </tr>
       </thead>
       <tbody>
-        ${filtered.map(t => `
+        ${filtered.map(t => {
+          const days = t.check_in && t.check_out 
+            ? Math.max(1, Math.ceil((new Date(t.check_out).getTime() - new Date(t.check_in).getTime()) / (1000 * 60 * 60 * 24)))
+            : 1;
+          return `
           <tr>
             <td>${t.customer_name || "—"}</td>
             <td>${t.check_in ? formatDate(t.check_in) : "—"}</td>
             <td>${t.check_out ? formatDate(t.check_out) : "—"}</td>
+            <td class="center">${days}</td>
             <td>${t.booking_type || "—"}</td>
             <td><span class="status ${t.payment_status === 'Fully Paid' ? 'status-paid' : t.payment_status === 'Partially Paid' ? 'status-partial' : 'status-unpaid'}">${t.payment_status}</span></td>
             <td class="right">₱${(t.amount_paid || 0).toLocaleString()}</td>
             <td class="right">₱${(t.deposit_amount || 0).toLocaleString()}</td>
             <td class="right">₱${(t.balance_amount || 0).toLocaleString()}</td>
           </tr>
-        `).join("")}
+        `; }).join("")}
         <tr class="total-row">
-          <td colspan="7" class="right">TOTAL OUTSTANDING BALANCE</td>
+          <td colspan="8" class="right">TOTAL OUTSTANDING BALANCE</td>
           <td class="right">₱${totalOutstanding.toLocaleString()}</td>
         </tr>
       </tbody>
@@ -1039,6 +1051,7 @@ function BookingFinancialLedger() {
               <th className="text-left px-3 py-3">Customer Name</th>
               <th className="text-left px-3 py-3">Check In Date</th>
               <th className="text-left px-3 py-3">Check Out Date</th>
+              <th className="text-center px-3 py-3">No. of Days</th>
               <th className="text-left px-3 py-3">Booking Type</th>
               <th className="text-center px-3 py-3">Payment Status</th>
               <th className="text-right px-3 py-3">Total Amount</th>
@@ -1048,29 +1061,35 @@ function BookingFinancialLedger() {
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={8} className="text-center py-12 italic text-muted-foreground">Loading ledger data...</td></tr>
+              <tr><td colSpan={9} className="text-center py-12 italic text-muted-foreground">Loading ledger data...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No bookings found matching filters.</td></tr>
-            ) : filtered.map(t => (
-              <tr key={t.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-3 py-3 font-bold">{t.customer_name || "—"}</td>
-                <td className="px-3 py-3 text-xs tabular-nums">{t.check_in ? formatDate(t.check_in) : "—"}</td>
-                <td className="px-3 py-3 text-xs tabular-nums">{t.check_out ? formatDate(t.check_out) : "—"}</td>
-                <td className="px-3 py-3 text-xs text-muted-foreground">{t.booking_type}</td>
-                <td className="px-3 py-3 text-center">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                    t.payment_status === 'Fully Paid' ? 'bg-success/20 text-success' :
-                    t.payment_status === 'Partially Paid' ? 'bg-warning/20 text-warning' :
-                    'bg-destructive/20 text-destructive'
-                  }`}>
-                    {t.payment_status}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-right tabular-nums font-medium">{formatPeso(t.amount_paid || 0)}</td>
-                <td className="px-3 py-3 text-right tabular-nums font-medium text-success">{formatPeso(t.deposit_amount || 0)}</td>
-                <td className="px-3 py-3 text-right tabular-nums font-black text-destructive">{formatPeso(t.balance_amount || 0)}</td>
-              </tr>
-            ))}
+              <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No bookings found matching filters.</td></tr>
+            ) : filtered.map(t => {
+              const days = t.check_in && t.check_out 
+                ? Math.max(1, Math.ceil((new Date(t.check_out).getTime() - new Date(t.check_in).getTime()) / (1000 * 60 * 60 * 24)))
+                : 1;
+              return (
+                <tr key={t.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-3 py-3 font-bold">{t.customer_name || "—"}</td>
+                  <td className="px-3 py-3 text-xs tabular-nums">{t.check_in ? formatDate(t.check_in) : "—"}</td>
+                  <td className="px-3 py-3 text-xs tabular-nums">{t.check_out ? formatDate(t.check_out) : "—"}</td>
+                  <td className="px-3 py-3 text-center text-xs tabular-nums font-medium">{days}</td>
+                  <td className="px-3 py-3 text-xs text-muted-foreground">{t.booking_type}</td>
+                  <td className="px-3 py-3 text-center">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                      t.payment_status === 'Fully Paid' ? 'bg-success/20 text-success' :
+                      t.payment_status === 'Partially Paid' ? 'bg-warning/20 text-warning' :
+                      'bg-destructive/20 text-destructive'
+                    }`}>
+                      {t.payment_status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums font-medium">{formatPeso(t.amount_paid || 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums font-medium text-success">{formatPeso(t.deposit_amount || 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums font-black text-destructive">{formatPeso(t.balance_amount || 0)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
