@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban, Pencil, Trash2 } from "lucide-react";
-import { getTransactions, updateTransaction, deleteTransaction, getFoodSales, updateFoodSale, type Transaction, type FoodSale } from "@/lib/db";
+import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban, Pencil, Trash2, BedDouble } from "lucide-react";
+import { getTransactions, updateTransaction, deleteTransaction, getFoodSales, updateFoodSale, getSettings, type Transaction, type FoodSale } from "@/lib/db";
 import { formatPeso } from "@/lib/format";
 import { Receipt, CreditCard, Wallet, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+
+const ROOM_OPTIONS = ["Kubo Room", "Barkada Room"] as const;
 
 type PaymentFilter = "ALL" | "Unpaid" | "Partially Paid" | "Fully Paid";
 
@@ -42,6 +44,20 @@ export default function BookingManagement() {
   const [editingBooking, setEditingBooking] = useState<Transaction | null>(null);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
   const [editSaving, setEditSaving] = useState(false);
+
+  // Room edit state
+  const [editSelectedRooms, setEditSelectedRooms] = useState<string[]>([]);
+  const [editNoOfDays, setEditNoOfDays] = useState("1");
+  const [kuboRate, setKuboRate] = useState(1000);
+  const [barkadaRate, setBarkadaRate] = useState(1500);
+
+  // Load room rates from settings once
+  useEffect(() => {
+    getSettings().then((s) => {
+      setKuboRate(s.kubo_room_rate);
+      setBarkadaRate(s.barkada_room_rate);
+    });
+  }, []);
   
   const [folioBooking, setFolioBooking] = useState<Transaction | null>(null);
   const [folioTransactions, setFolioTransactions] = useState<Transaction[]>([]);
@@ -68,6 +84,21 @@ export default function BookingManagement() {
 
   const openEdit = useCallback((b: Transaction) => {
     setEditingBooking(b);
+    // Parse existing rooms from the stored room_type string
+    const rooms = b.room_type
+      ? b.room_type.split(",").map((r) => r.trim()).filter((r) => ROOM_OPTIONS.includes(r as typeof ROOM_OPTIONS[number]))
+      : [];
+    setEditSelectedRooms(rooms);
+    // Derive no_of_days from check_in/check_out if possible
+    let derivedDays = 1;
+    if (b.check_in && b.check_out) {
+      const inMs = new Date(b.check_in).getTime();
+      const outMs = new Date(b.check_out).getTime();
+      if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
+        derivedDays = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
+      }
+    }
+    setEditNoOfDays(String(derivedDays));
     setEditForm({
       check_in: b.check_in,
       check_out: b.check_out,
@@ -76,11 +107,15 @@ export default function BookingManagement() {
       kids_5_7: b.kids_5_7 ?? 0,
       kids_4_below: b.kids_4_below ?? 0,
       function_hall_fee: b.function_hall_fee ?? 0,
+      function_hall_total: b.function_hall_total ?? 0,
       number_of_tables: b.number_of_tables ?? 0,
       maintenance_fee: b.maintenance_fee ?? 0,
       deposit_amount: b.deposit_amount ?? 0,
       corkage_fee: b.corkage_fee ?? 0,
       extra_bed_charges: b.extra_bed_charges ?? 0,
+      drinks_corkage_fee: b.drinks_corkage_fee ?? 0,
+      liquor_corkage_fee: b.liquor_corkage_fee ?? 0,
+      amount_paid: b.amount_paid,
     });
   }, []);
 
@@ -92,6 +127,52 @@ export default function BookingManagement() {
       const k8 = editForm.kids_8_above ?? 0;
       const k5 = editForm.kids_5_7 ?? 0;
       const k4 = editForm.kids_4_below ?? 0;
+
+      // Recompute room fee from selected rooms × days
+      const days = Math.max(1, parseInt(editNoOfDays) || 1);
+      const roomFee = editSelectedRooms.reduce(
+        (sum, r) => sum + (r === "Kubo Room" ? kuboRate : r === "Barkada Room" ? barkadaRate : 0),
+        0
+      ) * days;
+
+      // Recompute grand total
+      // Base booking amount = original total minus old room fee
+      const oldRoomTypes = editingBooking.room_type
+        ? editingBooking.room_type.split(",").map((r) => r.trim())
+        : [];
+      // Derive old days from original check_in/check_out
+      let oldDays = 1;
+      if (editingBooking.check_in && editingBooking.check_out) {
+        const inMs = new Date(editingBooking.check_in).getTime();
+        const outMs = new Date(editingBooking.check_out).getTime();
+        if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
+          oldDays = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
+        }
+      }
+      const oldRoomFee = oldRoomTypes.reduce(
+        (sum, r) => sum + (r === "Kubo Room" ? kuboRate : r === "Barkada Room" ? barkadaRate : 0),
+        0
+      ) * oldDays;
+
+      const originalTotal = editingBooking.amount_paid ?? 0;
+      const baseAmount = originalTotal - oldRoomFee; // portion that is NOT room-related
+
+      const maintenanceFee = editForm.maintenance_fee ?? 0;
+      const drinksCorkage = editForm.drinks_corkage_fee ?? 0;
+      const liquorCorkage = editForm.liquor_corkage_fee ?? 0;
+      const extraBed = editForm.extra_bed_charges ?? 0;
+      const funcHallTotal = editForm.function_hall_total ?? editingBooking.function_hall_total ?? 0;
+
+      // New total = base (non-room) + new room fee
+      // To avoid double-counting charges already in base, compute: base_no_charges + all_charges_new
+      const baseNoCharges = baseAmount - maintenanceFee - drinksCorkage - liquorCorkage - extraBed - funcHallTotal;
+      const newTotal = Math.max(0, baseNoCharges + roomFee + maintenanceFee + drinksCorkage + liquorCorkage + extraBed + funcHallTotal);
+
+      const deposit = editForm.deposit_amount ?? 0;
+      const newBalance = Math.max(0, newTotal - deposit);
+      const newPaymentStatus =
+        deposit === 0 ? "Unpaid" : deposit < newTotal ? "Partially Paid" : "Fully Paid";
+
       await updateTransaction(editingBooking.id, {
         check_in: editForm.check_in || undefined,
         check_out: editForm.check_out || undefined,
@@ -102,11 +183,18 @@ export default function BookingManagement() {
         children: k8 + k5 + k4,
         total_headcount: a + k8 + k5 + k4,
         function_hall_fee: editForm.function_hall_fee ?? 0,
+        function_hall_total: funcHallTotal,
         number_of_tables: editForm.number_of_tables ?? 0,
-        maintenance_fee: editForm.maintenance_fee ?? 0,
-        deposit_amount: editForm.deposit_amount ?? 0,
+        maintenance_fee: maintenanceFee,
+        drinks_corkage_fee: drinksCorkage,
+        liquor_corkage_fee: liquorCorkage,
+        deposit_amount: deposit,
         corkage_fee: editForm.corkage_fee ?? 0,
-        extra_bed_charges: editForm.extra_bed_charges ?? 0,
+        extra_bed_charges: extraBed,
+        room_type: editSelectedRooms.length > 0 ? editSelectedRooms.join(", ") : undefined,
+        amount_paid: newTotal,
+        balance: newBalance,
+        payment_status: newPaymentStatus,
       });
       toast.success("Booking updated!");
       setEditingBooking(null);
@@ -116,7 +204,7 @@ export default function BookingManagement() {
       });
     } catch { toast.error("Failed to update"); }
     setEditSaving(false);
-  }, [editingBooking, editForm]);
+  }, [editingBooking, editForm, editSelectedRooms, editNoOfDays, kuboRate, barkadaRate]);
 
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
@@ -625,23 +713,105 @@ export default function BookingManagement() {
 
       {/* Edit Booking Dialog */}
       <Dialog open={!!editingBooking} onOpenChange={(o) => { if (!o) setEditingBooking(null); }}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Edit Booking</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><BedDouble size={18} className="text-primary" /> Edit Booking</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+
+            {/* ── Dates ── */}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs font-medium block mb-1">Check-in</label>
                 <input type="datetime-local" className="pos-input w-full text-sm"
                   value={editForm.check_in ? editForm.check_in.slice(0, 16) : ""}
-                  onChange={e => setEditForm(f => ({ ...f, check_in: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
+                  onChange={e => {
+                    const val = e.target.value ? new Date(e.target.value).toISOString() : undefined;
+                    setEditForm(f => ({ ...f, check_in: val }));
+                    // auto-derive no_of_days
+                    if (e.target.value && editForm.check_out) {
+                      const inMs = new Date(e.target.value).getTime();
+                      const outMs = new Date(editForm.check_out).getTime();
+                      if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
+                        setEditNoOfDays(String(Math.max(1, Math.ceil((outMs - inMs) / 86400000))));
+                      }
+                    }
+                  }} />
               </div>
               <div>
                 <label className="text-xs font-medium block mb-1">Check-out</label>
                 <input type="datetime-local" className="pos-input w-full text-sm"
                   value={editForm.check_out ? editForm.check_out.slice(0, 16) : ""}
-                  onChange={e => setEditForm(f => ({ ...f, check_out: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
+                  onChange={e => {
+                    const val = e.target.value ? new Date(e.target.value).toISOString() : undefined;
+                    setEditForm(f => ({ ...f, check_out: val }));
+                    // auto-derive no_of_days
+                    if (e.target.value && editForm.check_in) {
+                      const inMs = new Date(editForm.check_in).getTime();
+                      const outMs = new Date(e.target.value).getTime();
+                      if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
+                        setEditNoOfDays(String(Math.max(1, Math.ceil((outMs - inMs) / 86400000))));
+                      }
+                    }
+                  }} />
               </div>
             </div>
+
+            {/* ── Room Selection ── */}
+            <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-primary block">Room Selection</label>
+              <div className="flex flex-col gap-2">
+                {ROOM_OPTIONS.map((r) => {
+                  const rate = r === "Kubo Room" ? kuboRate : barkadaRate;
+                  const checked = editSelectedRooms.includes(r);
+                  return (
+                    <label key={r} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-all ${
+                      checked ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/40"
+                    }`}>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded"
+                        checked={checked}
+                        onChange={(e) => {
+                          setEditSelectedRooms(prev =>
+                            e.target.checked ? [...prev, r] : prev.filter(x => x !== r)
+                          );
+                        }}
+                      />
+                      <span className="text-sm font-medium flex-1">{r}</span>
+                      <span className="text-xs text-muted-foreground">{formatPeso(rate)}/day</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">No. of Days (Rooms)</label>
+                <input
+                  type="number" min="1" step="1" className="pos-input w-full"
+                  value={editNoOfDays}
+                  onChange={e => setEditNoOfDays(e.target.value)}
+                />
+              </div>
+              {/* Live Rate Breakdown */}
+              {(() => {
+                const days = Math.max(1, parseInt(editNoOfDays) || 1);
+                const roomFee = editSelectedRooms.reduce(
+                  (sum, r) => sum + (r === "Kubo Room" ? kuboRate : r === "Barkada Room" ? barkadaRate : 0), 0
+                ) * days;
+                return editSelectedRooms.length > 0 ? (
+                  <div className="text-xs bg-primary/10 rounded-lg p-2 space-y-0.5">
+                    {editSelectedRooms.map(r => (
+                      <p key={r} className="text-muted-foreground">
+                        {r}: {formatPeso(r === "Kubo Room" ? kuboRate : barkadaRate)} × {days} day{days > 1 ? "s" : ""} = <strong className="text-foreground">{formatPeso((r === "Kubo Room" ? kuboRate : barkadaRate) * days)}</strong>
+                      </p>
+                    ))}
+                    <p className="font-bold text-primary border-t border-primary/20 pt-1 mt-1">
+                      Room Total: {formatPeso(roomFee)}
+                    </p>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* ── Guest Counts ── */}
             <div className="grid grid-cols-2 gap-2">
               <div><label className="text-xs font-medium block mb-1">Adults</label>
                 <input type="number" min="0" className="pos-input w-full" value={editForm.adults ?? 0}
@@ -656,7 +826,21 @@ export default function BookingManagement() {
                 <input type="number" min="0" className="pos-input w-full" value={editForm.kids_4_below ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, kids_4_below: parseInt(e.target.value) || 0 }))} /></div>
             </div>
+
+            {/* ── Fees ── */}
             <div className="grid grid-cols-2 gap-2">
+              <div><label className="text-xs font-medium block mb-1">Maintenance Fee</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.maintenance_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, maintenance_fee: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Extra Bed Charges</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.extra_bed_charges ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, extra_bed_charges: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Drinks Corkage</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.drinks_corkage_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, drinks_corkage_fee: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><label className="text-xs font-medium block mb-1">Liquor Corkage</label>
+                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.liquor_corkage_fee ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, liquor_corkage_fee: parseFloat(e.target.value) || 0 }))} /></div>
               <div><label className="text-xs font-medium block mb-1">Function Hall Fee</label>
                 <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.function_hall_fee ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, function_hall_fee: parseFloat(e.target.value) || 0 }))} /></div>
@@ -664,22 +848,74 @@ export default function BookingManagement() {
                 <input type="number" min="0" className="pos-input w-full" value={editForm.number_of_tables ?? 0}
                   onChange={e => setEditForm(f => ({ ...f, number_of_tables: parseInt(e.target.value) || 0 }))} /></div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-xs font-medium block mb-1">Maintenance Fee</label>
-                <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.maintenance_fee ?? 0}
-                  onChange={e => setEditForm(f => ({ ...f, maintenance_fee: parseFloat(e.target.value) || 0 }))} /></div>
-              <div><label className="text-xs font-medium block mb-1 font-bold text-primary">Deposit Amount</label>
-                <input type="number" step="0.01" min="0" className="pos-input w-full border-primary/50" value={editForm.deposit_amount ?? 0}
-                  onChange={e => setEditForm(f => ({ ...f, deposit_amount: parseFloat(e.target.value) || 0 }))} /></div>
-            </div>
+
+            {/* ── Live Total Preview ── */}
+            {(() => {
+              const days = Math.max(1, parseInt(editNoOfDays) || 1);
+              const roomFee = editSelectedRooms.reduce(
+                (sum, r) => sum + (r === "Kubo Room" ? kuboRate : r === "Barkada Room" ? barkadaRate : 0), 0
+              ) * days;
+              // Derive old room fee
+              const oldRoomTypes = editingBooking?.room_type
+                ? editingBooking.room_type.split(",").map(r => r.trim())
+                : [];
+              let oldDays = 1;
+              if (editingBooking?.check_in && editingBooking?.check_out) {
+                const inMs = new Date(editingBooking.check_in).getTime();
+                const outMs = new Date(editingBooking.check_out).getTime();
+                if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
+                  oldDays = Math.max(1, Math.ceil((outMs - inMs) / 86400000));
+                }
+              }
+              const oldRoomFee = oldRoomTypes.reduce(
+                (sum, r) => sum + (r === "Kubo Room" ? kuboRate : r === "Barkada Room" ? barkadaRate : 0), 0
+              ) * oldDays;
+              const originalTotal = editingBooking?.amount_paid ?? 0;
+              const baseAmount = originalTotal - oldRoomFee;
+              const maintenance = editForm.maintenance_fee ?? 0;
+              const drinks = editForm.drinks_corkage_fee ?? 0;
+              const liquor = editForm.liquor_corkage_fee ?? 0;
+              const extraBed = editForm.extra_bed_charges ?? 0;
+              const funcHallTotal = editForm.function_hall_total ?? editingBooking?.function_hall_total ?? 0;
+              const baseNoCharges = baseAmount - maintenance - drinks - liquor - extraBed - funcHallTotal;
+              const newTotal = Math.max(0, baseNoCharges + roomFee + maintenance + drinks + liquor + extraBed + funcHallTotal);
+              const deposit = editForm.deposit_amount ?? 0;
+              const newBalance = Math.max(0, newTotal - deposit);
+              const statusColor = deposit >= newTotal ? "text-success" : deposit > 0 ? "text-warning" : "text-destructive";
+              return (
+                <div className="p-3 rounded-xl border border-border bg-muted/40 space-y-1.5">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Updated Total Preview</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Room Charges</span>
+                    <span className="font-medium tabular-nums">{formatPeso(roomFee)}</span>
+                  </div>
+                  {maintenance > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Maintenance</span><span className="tabular-nums">{formatPeso(maintenance)}</span></div>}
+                  {drinks > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Drinks Corkage</span><span className="tabular-nums">{formatPeso(drinks)}</span></div>}
+                  {liquor > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Liquor Corkage</span><span className="tabular-nums">{formatPeso(liquor)}</span></div>}
+                  {extraBed > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Extra Bed</span><span className="tabular-nums">{formatPeso(extraBed)}</span></div>}
+                  {funcHallTotal > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Function Hall</span><span className="tabular-nums">{formatPeso(funcHallTotal)}</span></div>}
+                  <div className="border-t border-border pt-1.5 flex justify-between font-bold">
+                    <span>New Total</span>
+                    <span className="tabular-nums text-primary text-base">{formatPeso(newTotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Balance</span>
+                    <span className={`font-bold tabular-nums ${statusColor}`}>{formatPeso(newBalance)}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Deposit ── */}
             <div>
-              <label className="text-xs font-medium block mb-1">Extra Bed Charges</label>
-              <input type="number" step="0.01" min="0" className="pos-input w-full" value={editForm.extra_bed_charges ?? 0}
-                onChange={e => setEditForm(f => ({ ...f, extra_bed_charges: parseFloat(e.target.value) || 0 }))} />
+              <label className="text-xs font-medium block mb-1 font-bold text-primary">Deposit Amount</label>
+              <input type="number" step="0.01" min="0" className="pos-input w-full border-primary/50" value={editForm.deposit_amount ?? 0}
+                onChange={e => setEditForm(f => ({ ...f, deposit_amount: parseFloat(e.target.value) || 0 }))} />
             </div>
-            <div className="flex gap-2 pt-2">
+
+            <div className="flex gap-2 pt-1">
               <button onClick={() => setEditingBooking(null)} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all">Cancel</button>
-              <button disabled={editSaving} onClick={saveEdit} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all disabled:opacity-50">{editSaving ? "Saving..." : "Save"}</button>
+              <button disabled={editSaving} onClick={saveEdit} className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all disabled:opacity-50">{editSaving ? "Saving..." : "Save Changes"}</button>
             </div>
           </div>
         </DialogContent>
