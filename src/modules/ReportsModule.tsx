@@ -1632,11 +1632,17 @@ export default function ReportsModule() {
   const totalAmount = data.reduce((s, t) => s + t.amount_paid, 0);
   const totalAdults = data.reduce((s, t) => s + t.adults, 0);
   const totalChildren = data.reduce((s, t) => s + t.children, 0);
+  const totalKids8 = data.reduce((s, t) => s + (t.kids_8_above ?? 0), 0);
+  const totalKids5 = data.reduce((s, t) => s + (t.kids_5_7 ?? 0), 0);
+  const totalKids4 = data.reduce((s, t) => s + (t.kids_4_below ?? 0), 0);
+  const totalExtraBed = data.reduce((s, t) => s + (t.extra_bed_charges ?? 0), 0);
+  const totalMaintFee = data.reduce((s, t) => s + (t.maintenance_fee ?? 0), 0);
+  const grandTotalAll = data.reduce((s, t) => s + t.amount_paid + (t.extra_bed_charges ?? 0) + (t.maintenance_fee ?? 0), 0);
 
   const exportCSV = () => {
-    const headers = ["Txn No", "Date/Time", "Module", "Customer", "Adults", "Kids (8+)", "Kids (5-7)", "Kids (4 Below)", "Amount", "Extra Bed", "Maint. Fee", "Payment"];
+    const headers = ["Txn No", "Check-in Date & Time", "Date/Time", "Module", "Customer", "Adults", "Kids (8+)", "Kids (5-7)", "Kids (4 Below)", "Amount", "Extra Bed", "Maint. Fee", "Grand Total", "Payment"];
     const rows = data.map((t) => [
-      t.transaction_no, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.amount_paid, t.extra_bed_charges ?? 0, t.maintenance_fee ?? 0, t.payment_method,
+      t.transaction_no, t.check_in ? formatDateTime(t.check_in) : "", formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.amount_paid, t.extra_bed_charges ?? 0, t.maintenance_fee ?? 0, (t.amount_paid + (t.extra_bed_charges ?? 0) + (t.maintenance_fee ?? 0)), t.payment_method,
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -1771,6 +1777,7 @@ export default function ReportsModule() {
               <thead>
                 <tr className="bg-muted">
                   <th className="text-left px-3 py-2 font-medium">Txn No</th>
+                  <th className="text-left px-3 py-2 font-medium">Check-in Date & Time</th>
                   <th className="text-left px-3 py-2 font-medium">Date/Time</th>
                   <th className="text-left px-3 py-2 font-medium">Module</th>
                   <th className="text-left px-3 py-2 font-medium">Customer</th>
@@ -1781,6 +1788,7 @@ export default function ReportsModule() {
                   <th className="text-right px-3 py-2 font-medium">Amount</th>
                   <th className="text-right px-3 py-2 font-medium">Extra Bed</th>
                   <th className="text-right px-3 py-2 font-medium">Maint. Fee</th>
+                  <th className="text-right px-3 py-2 font-medium">Grand Total</th>
                   <th className="text-left px-3 py-2 font-medium">Payment</th>
                   <th className="text-center px-3 py-2 font-medium">Action</th>
                 </tr>
@@ -1794,6 +1802,7 @@ export default function ReportsModule() {
                   return (
                     <tr key={t.id} className="border-t border-border hover:bg-muted/50">
                       <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
+                      <td className="px-3 py-2 text-xs whitespace-nowrap">{t.check_in ? formatDateTime(t.check_in) : "—"}</td>
                       <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(t.date_time)}</td>
                       <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
                       <td className="px-3 py-2">{t.customer_name || "—"}</td>
@@ -1804,6 +1813,7 @@ export default function ReportsModule() {
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.amount_paid)}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(t.extra_bed_charges || 0)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-destructive font-medium">{formatPeso(t.maintenance_fee || 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-bold text-primary">{formatPeso(t.amount_paid + (t.extra_bed_charges || 0) + (t.maintenance_fee || 0))}</td>
                       <td className="px-3 py-2">{t.payment_method}</td>
                       <td className="px-3 py-2 text-center">
                         <button
@@ -1818,6 +1828,22 @@ export default function ReportsModule() {
                   );
                 })}
               </tbody>
+              {data.length > 0 && (
+                <tfoot className="bg-muted/30 font-black border-t-2 border-border">
+                  <tr>
+                    <td colSpan={5} className="px-3 py-3 text-right uppercase">Totals:</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{totalAdults}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{totalKids8}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{totalKids5}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{totalKids4}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatPeso(totalAmount)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatPeso(totalExtraBed)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatPeso(totalMaintFee)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-primary">{formatPeso(grandTotalAll)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </>
