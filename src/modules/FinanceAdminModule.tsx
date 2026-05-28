@@ -25,11 +25,12 @@ type Tab = "coa" | "journal" | "pl" | "gl" | "tb";
 
 // All accepted account types (QuickBooks-style extended list)
 const INCOME_TYPES = ["Income", "Other Income"];
-const EXPENSE_TYPES = ["Expense", "Other Expense", "Cost of Goods Sold"];
-const ASSET_TYPES = ["Asset", "Bank", "Accounts Receivable"];
-const LIABILITY_TYPES = ["Liability", "Accounts Payable"];
+const EXPENSE_TYPES = ["Expense", "Other Expense"];
+const COGS_TYPES = ["Cost of Goods Sold"];
+const ASSET_TYPES = ["Asset", "Bank", "Accounts Receivable", "Other Current Asset"];
+const LIABILITY_TYPES = ["Liability", "Accounts Payable", "Other Current Liability"];
 const EQUITY_TYPES = ["Equity"];
-const ALL_ACCOUNT_TYPES = [...ASSET_TYPES, ...LIABILITY_TYPES, ...EQUITY_TYPES, ...INCOME_TYPES, ...EXPENSE_TYPES];
+const ALL_ACCOUNT_TYPES = [...ASSET_TYPES, ...LIABILITY_TYPES, ...EQUITY_TYPES, ...INCOME_TYPES, ...COGS_TYPES, ...EXPENSE_TYPES];
 
 const TYPE_COLORS: Record<string, string> = {
   Asset: "bg-blue-500/10 text-blue-600",
@@ -157,13 +158,15 @@ export default function FinanceAdminModule() {
     const drinksSales = filteredTxns.reduce((s, t) => s + (t.drinks_corkage_fee || 0), 0);
     const liquorSales = filteredTxns.reduce((s, t) => s + (t.liquor_corkage_fee || 0), 0);
 
-    // Sum manual journal entries — support extended Income and Expense types
+    // Sum manual journal entries — support extended Income, COGS, and Expense types
     const jeIncomeMap: Record<string, number> = {};
     const jeExpenseMap: Record<string, number> = {};
+    const jeCogsMap: Record<string, number> = {};
 
     _accounts.forEach(a => {
       if (INCOME_TYPES.includes(a.account_type)) jeIncomeMap[a.account_name] = 0;
       if (EXPENSE_TYPES.includes(a.account_type)) jeExpenseMap[a.account_name] = 0;
+      if (COGS_TYPES.includes(a.account_type)) jeCogsMap[a.account_name] = 0;
     });
 
     filteredJournals.forEach(j => {
@@ -174,11 +177,15 @@ export default function FinanceAdminModule() {
       } else if (acc && EXPENSE_TYPES.includes(acc.account_type)) {
         // Expense normal balance is Debit. Debit increases, Credit decreases.
         jeExpenseMap[j.account_title] = (jeExpenseMap[j.account_title] || 0) + (j.debit - j.credit);
+      } else if (acc && COGS_TYPES.includes(acc.account_type)) {
+        // COGS normal balance is Debit. Debit increases, Credit decreases.
+        jeCogsMap[j.account_title] = (jeCogsMap[j.account_title] || 0) + (j.debit - j.credit);
       }
     });
 
     const jeIncomeTotal = Object.values(jeIncomeMap).reduce((s, v) => s + v, 0);
     const jeExpenseTotal = Object.values(jeExpenseMap).reduce((s, v) => s + v, 0);
+    const jeCogsTotal = Object.values(jeCogsMap).reduce((s, v) => s + v, 0);
 
     const totalIncome = storeSales + bookingSales + foodSales + maintSales + drinksSales + liquorSales + jeIncomeTotal;
 
@@ -187,6 +194,7 @@ export default function FinanceAdminModule() {
       s + (r.petty_items || []).reduce((x, p) => x + (p.amount || 0), 0), 0);
 
     const totalExpense = storePetty + bookingPetty + jeExpenseTotal;
+    const totalCogs = jeCogsTotal;
 
     const incomeDetails = [
       { name: "Cashier Store Sales", amount: storeSales },
@@ -198,6 +206,10 @@ export default function FinanceAdminModule() {
       ...Object.entries(jeIncomeMap).filter(([, v]) => v !== 0).map(([k, v]) => ({ name: k, amount: v }))
     ];
 
+    const cogsDetails = [
+      ...Object.entries(jeCogsMap).filter(([, v]) => v !== 0).map(([k, v]) => ({ name: k, amount: v }))
+    ];
+
     const expenseDetails = [
       { name: "Expenses Summary - Store (Petty Cash)", amount: storePetty },
       { name: "Expenses Summary - Entrance (Petty Cash)", amount: bookingPetty },
@@ -206,9 +218,12 @@ export default function FinanceAdminModule() {
 
     setPlData({
       income: totalIncome,
+      cogs: totalCogs,
       expense: totalExpense,
-      net: totalIncome - totalExpense,
+      grossProfit: totalIncome - totalCogs,
+      net: totalIncome - totalCogs - totalExpense,
       incomeDetails,
+      cogsDetails,
       expenseDetails,
     });
   };
@@ -585,6 +600,12 @@ export default function FinanceAdminModule() {
       ...plData.incomeDetails.map((i: any) => [i.name, i.amount]),
       ["Total Income", plData.income],
       [],
+      ["COST OF GOODS SOLD (COGS)"],
+      ...plData.cogsDetails.map((c: any) => [c.name, c.amount]),
+      ["Total Cost of Goods Sold", plData.cogs],
+      [],
+      ["GROSS PROFIT", plData.grossProfit],
+      [],
       ["EXPENSES"],
       ...plData.expenseDetails.map((e: any) => [e.name, e.amount]),
       ["Total Expenses", plData.expense],
@@ -599,13 +620,16 @@ export default function FinanceAdminModule() {
   };
 
   const printPL = () => {
-    const rows = plData.incomeDetails.map((i: any) => `<tr><td>${i.name}</td><td class="right">₱${i.amount.toLocaleString()}</td></tr>`).join("");
+    const incRows = plData.incomeDetails.map((i: any) => `<tr><td>${i.name}</td><td class="right">₱${i.amount.toLocaleString()}</td></tr>`).join("");
+    const cogsRows = plData.cogsDetails.map((c: any) => `<tr><td>${c.name}</td><td class="right">₱${c.amount.toLocaleString()}</td></tr>`).join("");
     const expRows = plData.expenseDetails.map((e: any) => `<tr><td>${e.name}</td><td class="right">₱${e.amount.toLocaleString()}</td></tr>`).join("");
     const html = `
-      <style>body{font-family:Arial;font-size:12px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-bottom:12px}td,th{border:1px solid #ccc;padding:4px 8px}.right{text-align:right}.total{font-weight:bold}.net{font-size:14px;font-weight:bold}</style>
+      <style>body{font-family:Arial;font-size:12px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-bottom:12px}td,th{border:1px solid #ccc;padding:4px 8px}.right{text-align:right}.total{font-weight:bold}.net{font-size:14px;font-weight:bold}.gross{font-weight:bold;background-color:#f9f9f9}</style>
       <h2>SERENITY INLAND RESORT</h2><h2>PROFIT AND LOSS STATEMENT</h2>
       <p style="text-align:center">${plDateFrom || "All"} – ${plDateTo || "Present"}</p>
-      <h3>INCOME</h3><table>${rows}<tr class="total"><td>Total Income</td><td class="right">₱${plData.income.toLocaleString()}</td></tr></table>
+      <h3>INCOME</h3><table>${incRows}<tr class="total"><td>Total Income</td><td class="right">₱${plData.income.toLocaleString()}</td></tr></table>
+      <h3>COST OF GOODS SOLD</h3><table>${cogsRows}<tr class="total"><td>Total Cost of Goods Sold</td><td class="right">₱${plData.cogs.toLocaleString()}</td></tr></table>
+      <table><tr class="gross"><td>GROSS PROFIT</td><td class="right">₱${plData.grossProfit.toLocaleString()}</td></tr></table>
       <h3>EXPENSES</h3><table>${expRows}<tr class="total"><td>Total Expenses</td><td class="right">₱${plData.expense.toLocaleString()}</td></tr></table>
       <table><tr class="net"><td>NET INCOME</td><td class="right">₱${plData.net.toLocaleString()}</td></tr></table>
     `;
@@ -725,6 +749,9 @@ export default function FinanceAdminModule() {
                 </optgroup>
                 <optgroup label="Income">
                   {INCOME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+                <optgroup label="Cost of Goods Sold">
+                  {COGS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </optgroup>
                 <optgroup label="Expenses">
                   {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1206,6 +1233,40 @@ export default function FinanceAdminModule() {
             </div>
           </div>
 
+          {/* Cost of Goods Sold */}
+          <div className="pos-card overflow-hidden shadow-md">
+            <div className="bg-yellow-500/10 px-6 py-3 border-b border-yellow-500/20">
+              <h3 className="font-black text-yellow-700 dark:text-yellow-500 text-lg">COST OF GOODS SOLD (COGS)</h3>
+            </div>
+            <div className="p-5 space-y-1">
+              {plData.cogsDetails && plData.cogsDetails.length === 0 ? (
+                <div className="text-sm py-2 px-2 text-muted-foreground italic text-center">
+                  No COGS transactions recorded.
+                </div>
+              ) : (
+                plData.cogsDetails?.map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center text-sm py-2 px-2 hover:bg-muted/30 rounded-lg transition-colors">
+                    <span className="text-foreground/80">{item.name}</span>
+                    <span className="tabular-nums font-semibold">{formatPeso(item.amount)}</span>
+                  </div>
+                ))
+              )}
+              <div className="flex justify-between items-center pt-3 border-t border-border font-black text-base text-yellow-600 px-2">
+                <span>Total Cost of Goods Sold</span>
+                <span>{formatPeso(plData.cogs)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Gross Profit Summary Card */}
+          <div className="pos-card p-5 flex justify-between items-center border border-border shadow-sm bg-muted/30">
+            <div>
+              <h4 className="font-bold text-sm">GROSS PROFIT</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">Total Income minus Cost of Goods Sold</p>
+            </div>
+            <span className="text-lg font-black tabular-nums">{formatPeso(plData.grossProfit)}</span>
+          </div>
+
           {/* Expenses */}
           <div className="pos-card overflow-hidden shadow-md">
             <div className="bg-red-500/10 px-6 py-3 border-b border-red-500/20">
@@ -1381,6 +1442,9 @@ export default function FinanceAdminModule() {
                   </optgroup>
                   <optgroup label="Income">
                     {INCOME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </optgroup>
+                  <optgroup label="Cost of Goods Sold">
+                    {COGS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </optgroup>
                   <optgroup label="Expenses">
                     {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}

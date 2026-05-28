@@ -717,7 +717,7 @@ export async function deleteFoodSale(id: number): Promise<void> {
 export interface ChartOfAccount {
   id?: number;
   account_name: string;
-  account_type: "Asset" | "Liability" | "Equity" | "Income" | "Expense" | "Other Income" | "Other Expense" | "Bank" | "Accounts Receivable" | "Accounts Payable" | "Cost of Goods Sold";
+  account_type: "Asset" | "Liability" | "Equity" | "Income" | "Expense" | "Other Income" | "Other Expense" | "Bank" | "Accounts Receivable" | "Accounts Payable" | "Cost of Goods Sold" | "Other Current Asset" | "Other Current Liability";
   beginning_balance: number;
   as_of_date?: string;
 }
