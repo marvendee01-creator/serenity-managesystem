@@ -23,12 +23,30 @@ const formatDate = (d: string) => {
 
 type Tab = "coa" | "journal" | "pl" | "gl" | "tb";
 
+// All accepted account types (QuickBooks-style extended list)
+const INCOME_TYPES = ["Income", "Other Income"];
+const EXPENSE_TYPES = ["Expense", "Other Expense", "Cost of Goods Sold"];
+const ASSET_TYPES = ["Bank", "Accounts Receivable", "Other Current Asset", "Fixed Asset", "Other Asset"];
+const LIABILITY_TYPES = ["Accounts Payable", "Credit Card", "Other Current Liability", "Long Term Liability"];
+const EQUITY_TYPES = ["Equity"];
+const ALL_ACCOUNT_TYPES = [...ASSET_TYPES, ...LIABILITY_TYPES, ...EQUITY_TYPES, ...INCOME_TYPES, ...EXPENSE_TYPES];
+
 const TYPE_COLORS: Record<string, string> = {
-  Asset: "bg-blue-500/10 text-blue-600",
-  Liability: "bg-red-500/10 text-red-600",
+  Bank: "bg-blue-500/10 text-blue-600",
+  "Accounts Receivable": "bg-cyan-500/10 text-cyan-600",
+  "Other Current Asset": "bg-sky-500/10 text-sky-600",
+  "Fixed Asset": "bg-indigo-500/10 text-indigo-600",
+  "Other Asset": "bg-blue-400/10 text-blue-500",
+  "Accounts Payable": "bg-red-500/10 text-red-600",
+  "Credit Card": "bg-rose-500/10 text-rose-600",
+  "Other Current Liability": "bg-red-400/10 text-red-500",
+  "Long Term Liability": "bg-pink-500/10 text-pink-600",
   Equity: "bg-purple-500/10 text-purple-600",
   Income: "bg-green-500/10 text-green-600",
+  "Other Income": "bg-emerald-500/10 text-emerald-600",
+  "Cost of Goods Sold": "bg-yellow-500/10 text-yellow-700",
   Expense: "bg-orange-500/10 text-orange-600",
+  "Other Expense": "bg-amber-500/10 text-amber-600",
 };
 
 export default function FinanceAdminModule() {
@@ -63,24 +81,30 @@ export default function FinanceAdminModule() {
   });
   const [plDateFrom, setPlDateFrom] = useState("");
   const [plDateTo, setPlDateTo] = useState("");
+  const [plFilterApplied, setPlFilterApplied] = useState(false);
 
   useEffect(() => {
     getSystemConfig("finance_pin").then(val => { if (val) setDbPin(val); });
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (dateFrom?: string, dateTo?: string) => {
     setLoading(true);
     try {
       const [accs, jnls] = await Promise.all([getChartOfAccounts(), getJournalEntries()]);
       setAccounts(accs);
       setJournals(jnls);
-      await recomputePL(accs, jnls);
+      await recomputePL(accs, jnls, dateFrom, dateTo);
     } finally {
       setLoading(false);
     }
   };
 
-  const recomputePL = async (_accounts: ChartOfAccount[], _journals: JournalEntry[]) => {
+  const recomputePL = async (
+    _accounts: ChartOfAccount[],
+    _journals: JournalEntry[],
+    dateFrom?: string,
+    dateTo?: string
+  ) => {
     const [txns, foods, cashierStore, cashierBooking] = await Promise.all([
       getTransactions(),
       getFoodSales(),
@@ -88,11 +112,12 @@ export default function FinanceAdminModule() {
       getBookingCashierReports(),
     ]);
 
+    // Strict date filter: only apply if both from and to are provided
     const filterDate = (dateStr: string) => {
-      if (!plDateFrom && !plDateTo) return true;
+      if (!dateFrom && !dateTo) return true;
       const d = dateStr.slice(0, 10);
-      if (plDateFrom && d < plDateFrom) return false;
-      if (plDateTo && d > plDateTo) return false;
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
       return true;
     };
 
@@ -109,22 +134,22 @@ export default function FinanceAdminModule() {
     const drinksSales = filteredTxns.reduce((s, t) => s + (t.drinks_corkage_fee || 0), 0);
     const liquorSales = filteredTxns.reduce((s, t) => s + (t.liquor_corkage_fee || 0), 0);
 
-    // Sum manual journal entries for Income and Expenses
+    // Sum manual journal entries — support extended Income and Expense types
     const jeIncomeMap: Record<string, number> = {};
     const jeExpenseMap: Record<string, number> = {};
 
     _accounts.forEach(a => {
-      if (a.account_type === "Income") jeIncomeMap[a.account_name] = 0;
-      if (a.account_type === "Expense") jeExpenseMap[a.account_name] = 0;
+      if (INCOME_TYPES.includes(a.account_type)) jeIncomeMap[a.account_name] = 0;
+      if (EXPENSE_TYPES.includes(a.account_type)) jeExpenseMap[a.account_name] = 0;
     });
 
     filteredJournals.forEach(j => {
       const acc = _accounts.find(a => a.account_name === j.account_title);
-      if (acc?.account_type === "Income") {
-        // Income normal balance is credit. Credit increases, debit decreases.
+      if (acc && INCOME_TYPES.includes(acc.account_type)) {
+        // Income normal balance is Credit. Credit increases, Debit decreases.
         jeIncomeMap[j.account_title] = (jeIncomeMap[j.account_title] || 0) + (j.credit - j.debit);
-      } else if (acc?.account_type === "Expense") {
-        // Expense normal balance is debit. Debit increases, credit decreases.
+      } else if (acc && EXPENSE_TYPES.includes(acc.account_type)) {
+        // Expense normal balance is Debit. Debit increases, Credit decreases.
         jeExpenseMap[j.account_title] = (jeExpenseMap[j.account_title] || 0) + (j.debit - j.credit);
       }
     });
@@ -137,7 +162,7 @@ export default function FinanceAdminModule() {
     const storePetty = filteredStore.reduce((s, r) => s + r.petty_cash, 0);
     const bookingPetty = filteredBooking.reduce((s, r) =>
       s + (r.petty_items || []).reduce((x, p) => x + (p.amount || 0), 0), 0);
-    
+
     const totalExpense = storePetty + bookingPetty + jeExpenseTotal;
 
     const incomeDetails = [
@@ -236,14 +261,14 @@ export default function FinanceAdminModule() {
           
           let account_name = accKey ? String(row[accKey]).trim() : "";
           let account_type = typeKey ? String(row[typeKey]).trim() : "Expense";
-          
+
           if (!account_name) continue; // skip blank rows
 
-          // Capitalize first letter of type, or fallback
-          if (!["Asset", "Liability", "Equity", "Income", "Expense"].includes(account_type)) {
-            const capitalized = account_type.charAt(0).toUpperCase() + account_type.slice(1).toLowerCase();
-            account_type = ["Asset", "Liability", "Equity", "Income", "Expense"].includes(capitalized) ? capitalized : "Expense";
-          }
+          // Normalize: try exact match first (case-insensitive), then fallback to Expense
+          const matchedType = ALL_ACCOUNT_TYPES.find(
+            t => t.toLowerCase() === account_type.toLowerCase()
+          );
+          account_type = matchedType ?? "Expense";
 
           const existing = accounts.find(a => a.account_name.toLowerCase() === account_name.toLowerCase());
           
@@ -506,11 +531,21 @@ export default function FinanceAdminModule() {
               />
               <select className="pos-input h-9 text-sm" value={coaTypeFilter} onChange={e => setCoaTypeFilter(e.target.value)}>
                 <option value="All">All Types</option>
-                <option value="Asset">Asset</option>
-                <option value="Liability">Liability</option>
-                <option value="Equity">Equity</option>
-                <option value="Income">Income</option>
-                <option value="Expense">Expense</option>
+                <optgroup label="Assets">
+                  {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+                <optgroup label="Liabilities">
+                  {LIABILITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+                <optgroup label="Equity">
+                  {EQUITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+                <optgroup label="Income">
+                  {INCOME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+                <optgroup label="Expenses">
+                  {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
               </select>
               <label className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent cursor-pointer active:scale-95 transition-all">
                 <Upload size={14} /> Import Excel
@@ -690,9 +725,28 @@ export default function FinanceAdminModule() {
               <label className="text-xs font-bold text-muted-foreground block mb-1">Date To</label>
               <input type="date" className="pos-input h-9 text-sm" value={plDateTo} onChange={e => setPlDateTo(e.target.value)} />
             </div>
-            <button onClick={() => loadData()} className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all">
+            <button
+              onClick={() => {
+                setPlFilterApplied(true);
+                loadData(plDateFrom || undefined, plDateTo || undefined);
+              }}
+              className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all"
+            >
               <RefreshCw size={14} /> Apply Filter
             </button>
+            {plFilterApplied && (
+              <button
+                onClick={() => {
+                  setPlDateFrom("");
+                  setPlDateTo("");
+                  setPlFilterApplied(false);
+                  loadData(undefined, undefined);
+                }}
+                className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 active:scale-95 transition-all"
+              >
+                ✕ Clear Filter
+              </button>
+            )}
             <div className="ml-auto flex gap-2">
               <button onClick={printPL} className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">
                 <Printer size={14} /> Print Preview
@@ -892,12 +946,22 @@ export default function FinanceAdminModule() {
               </div>
               <div>
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Account Type *</label>
-                <select className="pos-input w-full" value={coaForm.account_type || "Asset"} onChange={e => setCoaForm({ ...coaForm, account_type: e.target.value as any })}>
-                  <option value="Asset">Asset</option>
-                  <option value="Liability">Liability</option>
-                  <option value="Equity">Equity</option>
-                  <option value="Income">Income</option>
-                  <option value="Expense">Expense</option>
+                <select className="pos-input w-full" value={coaForm.account_type || "Bank"} onChange={e => setCoaForm({ ...coaForm, account_type: e.target.value as any })}>
+                  <optgroup label="Assets">
+                    {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </optgroup>
+                  <optgroup label="Liabilities">
+                    {LIABILITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </optgroup>
+                  <optgroup label="Equity">
+                    {EQUITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </optgroup>
+                  <optgroup label="Income">
+                    {INCOME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </optgroup>
+                  <optgroup label="Expenses">
+                    {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </optgroup>
                 </select>
               </div>
               <div>
