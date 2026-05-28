@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      chart_of_accounts: {
+        Row: {
+          id: number
+          account_name: string
+          account_type: string
+          beginning_balance: number | null
+          as_of_date: string | null
+          account_code: string | null
+          category: string | null
+          subcategory: string | null
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          account_name: string
+          account_type: string
+          beginning_balance?: number | null
+          as_of_date?: string | null
+          account_code?: string | null
+          category?: string | null
+          subcategory?: string | null
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          account_name?: string
+          account_type?: string
+          beginning_balance?: number | null
+          as_of_date?: string | null
+          account_code?: string | null
+          category?: string | null
+          subcategory?: string | null
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      journal_entries: {
+        Row: {
+          id: number
+          entry_date: string
+          account_title: string
+          debit: number | null
+          credit: number | null
+          memo: string | null
+          source_module: string | null
+          source_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          entry_date: string
+          account_title: string
+          debit?: number | null
+          credit?: number | null
+          memo?: string | null
+          source_module?: string | null
+          source_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          entry_date?: string
+          account_title?: string
+          debit?: number | null
+          credit?: number | null
+          memo?: string | null
+          source_module?: string | null
+          source_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       booking_cashier_reports: {
         Row: {
           actual_cash: number

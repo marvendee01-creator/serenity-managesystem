@@ -2,10 +2,12 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Banknote, Download, Plus, Trash2, Printer, Save, ArrowLeft } from "lucide-react";
 import { saveCashierReport, deleteCashierReport, getCashierReports, getSystemConfig, setSystemConfig, type CashierReport, getChartOfAccounts, type ChartOfAccount } from "@/lib/db";
 import { toast } from "sonner";
+import COAAutocomplete from "@/components/COAAutocomplete";
 
 interface PettyItem {
   date: string;
   particulars: string;
+  category: string;
   receipt_no: string;
   amount: string;
 }
@@ -42,7 +44,7 @@ export function buildCashierReportHTML(report: {
   expected_ending_cash: number;
   actual_cash: number;
   cash_over_short: number;
-  petty_items?: { date: string; particulars: string; receipt_no: string; amount: number }[];
+  petty_items?: { date: string; particulars: string; category?: string; receipt_no: string; amount: number }[];
   denoms?: { label: string; value: number; quantity: number }[];
 }) {
   const d = new Date(report.date);
@@ -61,7 +63,7 @@ export function buildCashierReportHTML(report: {
       table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: auto; }
       td, th { border: 1px solid #999; padding: 4px 8px; font-size: 11px; word-break: normal; white-space: normal; }
       th { background: #f0f0f0; text-align: left; }
-      td.particulars { min-width: 220px; max-width: 400px; word-break: break-word; white-space: normal; }
+      td.particulars { min-width: 180px; max-width: 300px; word-break: break-word; white-space: normal; }
       .right { text-align: right; }
       .bold { font-weight: bold; }
       .negative { color: red; }
@@ -81,9 +83,15 @@ export function buildCashierReportHTML(report: {
     </table>
     <h3>B. PETTY CASH EXPENSE DETAILS</h3>
     <table>
-      <tr><th style="width:90px">Date</th><th style="min-width:220px">Particulars</th><th style="width:100px">Receipt No.</th><th class="right" style="width:100px">Amount</th></tr>
-      ${pettyItems.map(p => `<tr><td>${p.date}</td><td class="particulars">${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
-      <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
+      <tr>
+        <th style="width:90px">Date</th>
+        <th style="min-width:180px">Particulars</th>
+        <th style="min-width:120px">Category</th>
+        <th style="width:100px">Receipt No.</th>
+        <th class="right" style="width:100px">Amount</th>
+      </tr>
+      ${pettyItems.map(p => `<tr><td>${p.date}</td><td class="particulars">${p.particulars}</td><td>${p.category || '—'}</td><td>${p.receipt_no || '—'}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="4" class="right">Total</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
     </table>
     <h3>C. CASH DENOMINATION</h3>
     <table>
@@ -113,12 +121,16 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
 
   const [pettyItems, setPettyItems] = useState<PettyItem[]>(
     editReport?.petty_items?.length
-      ? editReport.petty_items.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: p.amount.toString() }))
-      : [{ date: "", particulars: "", receipt_no: "", amount: "" }]
+      ? editReport.petty_items.map(p => ({ date: p.date, particulars: p.particulars, category: p.category || "", receipt_no: p.receipt_no, amount: p.amount.toString() }))
+      : [{ date: "", particulars: "", category: "", receipt_no: "", amount: "" }]
   );
 
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
-  const [activeDropdownIdx, setActiveDropdownIdx] = useState<number | null>(null);
+  
+  const refreshAccounts = async () => {
+    const accs = await getChartOfAccounts();
+    setAccounts(accs);
+  };
   
   const [denoms, setDenoms] = useState<DenomRow[]>(
     editReport?.denoms?.length
@@ -166,7 +178,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
   const expected = totalCashAvailable - totalPettyCash;
   const overShort = totalActualCash - expected;
 
-  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", receipt_no: "", amount: "" }]);
+  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", category: "", receipt_no: "", amount: "" }]);
   const removePettyRow = (i: number) => setPettyItems(prev => prev.filter((_, idx) => idx !== i));
   const updatePetty = (i: number, field: keyof PettyItem, val: string) =>
     setPettyItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
@@ -182,7 +194,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
     expected_ending_cash: expected,
     actual_cash: totalActualCash,
     cash_over_short: overShort,
-    petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+    petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
     denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
   });
 
@@ -213,14 +225,14 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
       toast.success("Cashier report saved!");
       if (!editReport) {
         setBeginningCash(""); setSales("");
-        setPettyItems([{ date: "", particulars: "", receipt_no: "", amount: "" }]);
+        setPettyItems([{ date: "", particulars: "", category: "", receipt_no: "", amount: "" }]);
         setDenoms(DEFAULT_DENOMS.map(d => ({ ...d })));
         firstRef.current?.focus();
       }
       if (onBack) onBack();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [bc, s, totalPettyCash, expected, totalActualCash, overShort, editReport, onBack, reportDate]);
+  }, [bc, s, totalPettyCash, expected, totalActualCash, overShort, editReport, onBack, reportDate, pettyItems, denoms]);
 
   const handleDelete = useCallback(async () => {
     if (!editReport?.id) return;
@@ -251,9 +263,9 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
       ["Cash Over/Short", overShort.toLocaleString()],
       [],
       ["B. PETTY CASH EXPENSE DETAILS"],
-      ["Date", "Particulars", "Receipt No.", "Amount"],
-      ...pettyItems.map(p => [p.date, p.particulars, p.receipt_no, (parseFloat(p.amount) || 0).toLocaleString()]),
-      ["", "", "Total", totalPettyCash.toLocaleString()],
+      ["Date", "Particulars", "Category", "Receipt No.", "Amount"],
+      ...pettyItems.map(p => [p.date, p.particulars, p.category || "", p.receipt_no, (parseFloat(p.amount) || 0).toLocaleString()]),
+      ["", "", "", "Total", totalPettyCash.toLocaleString()],
       [],
       ["C. CASH DENOMINATION"],
       ["Denomination", "Quantity", "Amount"],
@@ -343,10 +355,11 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
             <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
               <thead className="bg-muted">
                 <tr>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap" style={{ width: "120px" }}>Date</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "260px" }}>Particulars / Category</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "130px" }}>Receipt #</th>
-                  <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "120px" }}>Amount</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap" style={{ width: "110px" }}>Date</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "200px" }}>Particulars</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "150px" }}>Category</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "110px" }}>Receipt #</th>
+                  <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "110px" }}>Amount</th>
                   <th className="text-center px-2 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "44px" }}></th>
                 </tr>
               </thead>
@@ -356,42 +369,32 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
                     <td className="px-2 py-1.5">
                       <input type="date" className={`${inputClass} text-xs h-9 w-full`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
                     </td>
-                    <td className="px-2 py-1.5 relative" style={{ minWidth: "260px" }}>
-                      <input
-                        type="text"
-                        className={`${inputClass} text-xs h-9 w-full`}
-                        style={{ whiteSpace: "normal", wordBreak: "normal", minWidth: "220px" }}
+                    <td className="px-2 py-1.5" style={{ minWidth: "200px" }}>
+                      <COAAutocomplete
                         value={item.particulars}
-                        onChange={e => updatePetty(i, "particulars", e.target.value)}
-                        onFocus={() => setActiveDropdownIdx(i)}
-                        onBlur={() => setTimeout(() => setActiveDropdownIdx(null), 200)}
-                        placeholder="Search or type account name..."
-                        autoComplete="off"
+                        onChange={(val, account) => {
+                          updatePetty(i, "particulars", val);
+                          if (account?.category) {
+                            updatePetty(i, "category", account.category);
+                          }
+                        }}
+                        placeholder="Particulars"
+                        accounts={accounts}
+                        refreshAccounts={refreshAccounts}
+                        isTextArea={true}
+                        fieldName="particulars"
                       />
-                      {activeDropdownIdx === i && (
-                        <div className="absolute left-2 right-2 mt-0.5 max-h-48 overflow-y-auto bg-popover text-popover-foreground border border-border rounded-lg shadow-xl z-50">
-                          {accounts
-                            .filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase()))
-                            .map(a => (
-                              <button
-                                key={a.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground transition-colors border-b border-border/50 last:border-0"
-                                style={{ whiteSpace: "normal", wordBreak: "break-word" }}
-                                onMouseDown={() => {
-                                  updatePetty(i, "particulars", a.account_name);
-                                  setActiveDropdownIdx(null);
-                                }}
-                              >
-                                <span className="font-medium">{a.account_name}</span>
-                                <span className="text-muted-foreground ml-2 text-[10px]">({a.account_type})</span>
-                              </button>
-                            ))}
-                          {accounts.filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase())).length === 0 && (
-                            <div className="px-3 py-2 text-xs text-muted-foreground italic">No matching accounts</div>
-                          )}
-                        </div>
-                      )}
+                    </td>
+                    <td className="px-2 py-1.5" style={{ minWidth: "150px" }}>
+                      <COAAutocomplete
+                        value={item.category}
+                        onChange={(val) => updatePetty(i, "category", val)}
+                        placeholder="Category"
+                        accounts={accounts}
+                        refreshAccounts={refreshAccounts}
+                        isTextArea={false}
+                        fieldName="category"
+                      />
                     </td>
                     <td className="px-2 py-1.5">
                       <input type="text" className={`${inputClass} text-xs h-9 w-full`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" />

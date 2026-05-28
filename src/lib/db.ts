@@ -92,6 +92,7 @@ export interface Settings {
 export interface CashierReportPettyItem {
   date: string;
   particulars: string;
+  category?: string;
   receipt_no: string;
   amount: number;
 }
@@ -720,6 +721,10 @@ export interface ChartOfAccount {
   account_type: "Asset" | "Liability" | "Equity" | "Income" | "Expense" | "Other Income" | "Other Expense" | "Bank" | "Accounts Receivable" | "Accounts Payable" | "Cost of Goods Sold" | "Other Current Asset" | "Other Current Liability";
   beginning_balance: number;
   as_of_date?: string;
+  account_code?: string;
+  category?: string;
+  subcategory?: string;
+  description?: string;
 }
 
 export async function getChartOfAccounts(): Promise<ChartOfAccount[]> {
@@ -731,6 +736,10 @@ export async function getChartOfAccounts(): Promise<ChartOfAccount[]> {
     account_type: r.account_type,
     beginning_balance: Number(r.beginning_balance || 0),
     as_of_date: r.as_of_date ?? undefined,
+    account_code: r.account_code ?? undefined,
+    category: r.category ?? undefined,
+    subcategory: r.subcategory ?? undefined,
+    description: r.description ?? undefined,
   }));
 }
 
@@ -740,6 +749,10 @@ export async function addChartOfAccount(account: Omit<ChartOfAccount, "id">): Pr
     account_type: account.account_type,
     beginning_balance: account.beginning_balance,
     as_of_date: account.as_of_date ?? null,
+    account_code: account.account_code ?? null,
+    category: account.category ?? null,
+    subcategory: account.subcategory ?? null,
+    description: account.description ?? null,
   });
   if (error) throw error;
 }

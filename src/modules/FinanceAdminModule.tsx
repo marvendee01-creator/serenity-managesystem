@@ -587,7 +587,10 @@ export default function FinanceAdminModule() {
 
   const filteredAccounts = useMemo(() => {
     return accounts.filter(a => {
-      const matchSearch = a.account_name.toLowerCase().includes(coaSearch.toLowerCase());
+      const matchSearch = a.account_name.toLowerCase().includes(coaSearch.toLowerCase()) ||
+                          (a.account_code || "").toLowerCase().includes(coaSearch.toLowerCase()) ||
+                          (a.category || "").toLowerCase().includes(coaSearch.toLowerCase()) ||
+                          (a.subcategory || "").toLowerCase().includes(coaSearch.toLowerCase());
       const matchType = coaTypeFilter === "All" || a.account_type === coaTypeFilter;
       return matchSearch && matchType;
     });
@@ -1062,15 +1065,31 @@ export default function FinanceAdminModule() {
                 <tr>
                   <th
                     className="text-left px-4 py-3 font-semibold border-b border-border"
-                    style={{ minWidth: "300px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                    style={{ width: "120px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Code</th>
+                  <th
+                    className="text-left px-4 py-3 font-semibold border-b border-border"
+                    style={{ minWidth: "200px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
                   >Account Name</th>
                   <th
                     className="text-left px-4 py-3 font-semibold border-b border-border"
-                    style={{ minWidth: "180px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                    style={{ minWidth: "120px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
                   >Type</th>
                   <th
+                    className="text-left px-4 py-3 font-semibold border-b border-border"
+                    style={{ minWidth: "150px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Category</th>
+                  <th
+                    className="text-left px-4 py-3 font-semibold border-b border-border"
+                    style={{ minWidth: "150px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Subcategory</th>
+                  <th
+                    className="text-left px-4 py-3 font-semibold border-b border-border"
+                    style={{ minWidth: "200px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Description</th>
+                  <th
                     className="text-right px-4 py-3 font-semibold border-b border-border"
-                    style={{ minWidth: "160px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                    style={{ minWidth: "140px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
                   >Beginning Balance</th>
                   <th
                     className="text-center px-4 py-3 font-semibold border-b border-border"
@@ -1081,7 +1100,7 @@ export default function FinanceAdminModule() {
               <tbody className="divide-y divide-border">
                 {filteredAccounts.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
                       {accounts.length === 0
                         ? "No accounts yet. Import from Excel or add manually."
                         : "No accounts match your search."}
@@ -1090,10 +1109,11 @@ export default function FinanceAdminModule() {
                 )}
                 {filteredAccounts.map(a => (
                   <tr key={a.id} className="hover:bg-muted/40 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs">{a.account_code || "—"}</td>
                     <td
                       className="px-4 py-3 font-medium"
                       style={{
-                        maxWidth: "480px",
+                        maxWidth: "300px",
                         whiteSpace: "normal",
                         wordBreak: "break-word",
                         lineHeight: "1.4",
@@ -1104,6 +1124,9 @@ export default function FinanceAdminModule() {
                         {a.account_type}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{a.category || "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{a.subcategory || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-xs truncate" title={a.description}>{a.description || "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium" style={{ whiteSpace: "nowrap" }}>{formatPeso(a.beginning_balance)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center gap-2">
@@ -1484,18 +1507,29 @@ export default function FinanceAdminModule() {
           <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-black mb-5">{editingCOA.id ? "Edit Account" : "New Account"}</h3>
             <div className="space-y-4 mb-6">
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Account Name *</label>
-                <input
-                  className="pos-input w-full"
-                  value={coaForm.account_name || ""}
-                  onChange={e => setCoaForm({ ...coaForm, account_name: e.target.value })}
-                  placeholder="e.g. Cash on Hand"
-                  autoFocus
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Code</label>
+                  <input
+                    className="pos-input w-full"
+                    value={coaForm.account_code || ""}
+                    onChange={e => setCoaForm({ ...coaForm, account_code: e.target.value })}
+                    placeholder="e.g. 1010"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Account Name *</label>
+                  <input
+                    className="pos-input w-full"
+                    value={coaForm.account_name || ""}
+                    onChange={e => setCoaForm({ ...coaForm, account_name: e.target.value })}
+                    placeholder="e.g. Cash on Hand"
+                    autoFocus
+                  />
+                </div>
               </div>
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Account Type *</label>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Account Type *</label>
                 <select className="pos-input w-full" value={coaForm.account_type || "Bank"} onChange={e => setCoaForm({ ...coaForm, account_type: e.target.value as any })}>
                   <optgroup label="Assets">
                     {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1517,23 +1551,54 @@ export default function FinanceAdminModule() {
                   </optgroup>
                 </select>
               </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Beginning Balance</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="pos-input w-full"
-                  value={coaForm.beginning_balance ?? 0}
-                  onChange={e => setCoaForm({ ...coaForm, beginning_balance: parseFloat(e.target.value) || 0 })}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Category</label>
+                  <input
+                    className="pos-input w-full"
+                    value={coaForm.category || ""}
+                    onChange={e => setCoaForm({ ...coaForm, category: e.target.value })}
+                    placeholder="e.g. Current Assets"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Subcategory</label>
+                  <input
+                    className="pos-input w-full"
+                    value={coaForm.subcategory || ""}
+                    onChange={e => setCoaForm({ ...coaForm, subcategory: e.target.value })}
+                    placeholder="e.g. Cash & Equivalents"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Beginning Balance</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="pos-input w-full"
+                    value={coaForm.beginning_balance ?? 0}
+                    onChange={e => setCoaForm({ ...coaForm, beginning_balance: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">As of Date</label>
+                  <input
+                    type="date"
+                    className="pos-input w-full"
+                    value={coaForm.as_of_date || ""}
+                    onChange={e => setCoaForm({ ...coaForm, as_of_date: e.target.value || undefined })}
+                  />
+                </div>
               </div>
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">As of Date</label>
-                <input
-                  type="date"
-                  className="pos-input w-full"
-                  value={coaForm.as_of_date || ""}
-                  onChange={e => setCoaForm({ ...coaForm, as_of_date: e.target.value || undefined })}
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Description</label>
+                <textarea
+                  className="pos-input w-full min-h-[60px] py-1.5 px-3 resize-none"
+                  value={coaForm.description || ""}
+                  onChange={e => setCoaForm({ ...coaForm, description: e.target.value })}
+                  placeholder="Describe this account..."
                 />
               </div>
             </div>
