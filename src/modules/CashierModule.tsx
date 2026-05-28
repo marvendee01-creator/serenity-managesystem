@@ -85,13 +85,12 @@ export function buildCashierReportHTML(report: {
     <table>
       <tr>
         <th style="width:90px">Date</th>
-        <th style="min-width:180px">Particulars</th>
-        <th style="min-width:120px">Category</th>
-        <th style="width:100px">Receipt No.</th>
+        <th style="min-width:280px">Particulars</th>
+        <th style="width:120px">Receipt No.</th>
         <th class="right" style="width:100px">Amount</th>
       </tr>
-      ${pettyItems.map(p => `<tr><td>${p.date}</td><td class="particulars">${p.particulars}</td><td>${p.category || '—'}</td><td>${p.receipt_no || '—'}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
-      <tr class="bold"><td colspan="4" class="right">Total</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
+      ${pettyItems.map(p => `<tr><td>${p.date}</td><td class="particulars">${p.particulars}</td><td>${p.receipt_no || '—'}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
     </table>
     <h3>C. CASH DENOMINATION</h3>
     <table>
@@ -263,9 +262,9 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
       ["Cash Over/Short", overShort.toLocaleString()],
       [],
       ["B. PETTY CASH EXPENSE DETAILS"],
-      ["Date", "Particulars", "Category", "Receipt No.", "Amount"],
-      ...pettyItems.map(p => [p.date, p.particulars, p.category || "", p.receipt_no, (parseFloat(p.amount) || 0).toLocaleString()]),
-      ["", "", "", "Total", totalPettyCash.toLocaleString()],
+      ["Date", "Particulars", "Receipt No.", "Amount"],
+      ...pettyItems.map(p => [p.date, p.particulars, p.receipt_no, (parseFloat(p.amount) || 0).toLocaleString()]),
+      ["", "", "Total", totalPettyCash.toLocaleString()],
       [],
       ["C. CASH DENOMINATION"],
       ["Denomination", "Quantity", "Amount"],
@@ -352,13 +351,12 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
           </div>
           {/* Full-width landscape table for petty cash */}
           <div className="overflow-x-auto rounded-lg border border-border" style={{ minWidth: 0 }}>
-            <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
+            <table className="w-full text-sm border-collapse" style={{ minWidth: "900px" }}>
               <thead className="bg-muted">
                 <tr>
                   <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap" style={{ width: "110px" }}>Date</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "200px" }}>Particulars</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "150px" }}>Category</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "110px" }}>Receipt #</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "480px" }}>Particulars (Chart of Accounts)</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "120px" }}>Receipt #</th>
                   <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "110px" }}>Amount</th>
                   <th className="text-center px-2 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "44px" }}></th>
                 </tr>
@@ -366,43 +364,28 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
               <tbody className="divide-y divide-border">
                 {pettyItems.map((item, i) => (
                   <tr key={i} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-1.5" style={{ width: "110px" }}>
                       <input type="date" className={`${inputClass} text-xs h-9 w-full`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
                     </td>
-                    <td className="px-2 py-1.5" style={{ minWidth: "200px" }}>
+                    <td className="px-2 py-1.5" style={{ minWidth: "480px" }}>
                       <COAAutocomplete
                         value={item.particulars}
                         onChange={(val, account) => {
                           updatePetty(i, "particulars", val);
-                          if (account?.category) {
-                            updatePetty(i, "category", account.category);
-                          }
+                          if (account?.category) updatePetty(i, "category", account.category);
                         }}
-                        placeholder="Particulars"
+                        placeholder="Search account name or code..."
                         accounts={accounts}
                         refreshAccounts={refreshAccounts}
-                        isTextArea={true}
-                        fieldName="particulars"
                       />
                     </td>
-                    <td className="px-2 py-1.5" style={{ minWidth: "150px" }}>
-                      <COAAutocomplete
-                        value={item.category}
-                        onChange={(val) => updatePetty(i, "category", val)}
-                        placeholder="Category"
-                        accounts={accounts}
-                        refreshAccounts={refreshAccounts}
-                        isTextArea={false}
-                        fieldName="category"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-1.5" style={{ width: "120px" }}>
                       <input type="text" className={`${inputClass} text-xs h-9 w-full`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" />
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-1.5" style={{ width: "110px" }}>
                       <input type="number" className={`${inputClass} text-xs h-9 w-full text-right`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" />
                     </td>
-                    <td className="px-1 py-1.5 text-center">
+                    <td className="px-1 py-1.5 text-center" style={{ width: "44px" }}>
                       <button onClick={() => removePettyRow(i)} className="w-8 h-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all mx-auto" disabled={pettyItems.length === 1}>
                         <Trash2 size={13} />
                       </button>

@@ -8,22 +8,18 @@ interface COAAutocompleteProps {
   placeholder?: string;
   accounts: ChartOfAccount[];
   refreshAccounts: () => Promise<void>;
-  isTextArea?: boolean;
   disabled?: boolean;
   className?: string;
-  fieldName: "particulars" | "category";
 }
 
 export default function COAAutocomplete({
   value,
   onChange,
-  placeholder = "Search or type...",
+  placeholder = "Search account name or code...",
   accounts,
   refreshAccounts,
-  isTextArea = false,
   disabled = false,
   className = "",
-  fieldName,
 }: COAAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchVal, setSearchVal] = useState(value);
@@ -39,34 +35,25 @@ export default function COAAutocomplete({
     category: "",
     subcategory: "",
     description: "",
-    account_type: "Expense" as any,
+    account_type: "Expense" as ChartOfAccount["account_type"],
   });
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const elementRef = isTextArea ? textareaRef : inputRef;
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Keep internal input text synchronized with value prop
+  // Keep internal input text synchronised with value prop
   useEffect(() => {
     setSearchVal(value);
   }, [value]);
 
-  // Debounce search query (150ms)
+  // Debounce search query (120ms for instant feel)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchVal);
-    }, 150);
+    }, 120);
     return () => clearTimeout(timer);
   }, [searchVal]);
-
-  // Auto-expand textarea height
-  useEffect(() => {
-    if (isTextArea && textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [searchVal, isTextArea]);
 
   // Filter accounts based on debounced search
   const filteredAccounts = React.useMemo(() => {
@@ -94,17 +81,25 @@ export default function COAAutocomplete({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        elementRef.current &&
-        !elementRef.current.contains(event.target as Node)
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [elementRef]);
+  }, []);
+
+  // Scroll active item into view inside dropdown
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const activeEl = dropdownRef.current.querySelector(
+        `[data-idx="${activeIndex}"]`
+      ) as HTMLElement | null;
+      activeEl?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeIndex, isOpen]);
 
   const handleSelect = (account: ChartOfAccount) => {
     onChange(account.account_name, account);
@@ -135,7 +130,6 @@ export default function COAAutocomplete({
         handleSelect(filteredAccounts[activeIndex]);
       } else if (debouncedSearch.trim() && filteredAccounts.length === 0) {
         e.preventDefault();
-        // Trigger New Account Detection popup
         setNewAccountForm((prev) => ({
           ...prev,
           account_name: searchVal.trim(),
@@ -149,31 +143,18 @@ export default function COAAutocomplete({
   };
 
   const handleBlur = () => {
-    // Small delay to allow clicking dropdown items before closing
     setTimeout(() => {
       if (
-        document.activeElement !== elementRef.current &&
-        (!dropdownRef.current || !dropdownRef.current.contains(document.activeElement))
+        document.activeElement !== inputRef.current &&
+        (!dropdownRef.current ||
+          !dropdownRef.current.contains(document.activeElement))
       ) {
         setIsOpen(false);
-        // If query is typed but doesn't exist, show new account prompt
-        if (
-          searchVal.trim() &&
-          accounts.length > 0 &&
-          !accounts.some((a) => a.account_name.toLowerCase() === searchVal.trim().toLowerCase()) &&
-          filteredAccounts.length === 0
-        ) {
-          setNewAccountForm((prev) => ({
-            ...prev,
-            account_name: searchVal.trim(),
-          }));
-          setShowConfirmModal(true);
-        }
       }
     }, 200);
   };
 
-  // Helper to highlight matching characters
+  // Highlight matching keywords inside text
   const highlightText = (text: string, query: string) => {
     if (!text) return "";
     if (!query.trim()) return <span>{text}</span>;
@@ -192,7 +173,13 @@ export default function COAAutocomplete({
           regex.test(part) ? (
             <mark
               key={i}
-              className="bg-primary/20 text-primary font-bold px-0.5 rounded"
+              style={{
+                background: "hsl(var(--primary) / 0.25)",
+                color: "hsl(var(--primary))",
+                fontWeight: 700,
+                padding: "0 2px",
+                borderRadius: "3px",
+              }}
             >
               {part}
             </mark>
@@ -208,7 +195,6 @@ export default function COAAutocomplete({
     if (!newAccountForm.account_name.trim()) {
       return toast.error("Account Name is required.");
     }
-    // Prevent duplicate name check (case-insensitive)
     const exists = accounts.some(
       (a) =>
         a.account_name.toLowerCase() ===
@@ -229,10 +215,9 @@ export default function COAAutocomplete({
         description: newAccountForm.description.trim() || undefined,
       });
 
-      toast.success("Account added directly to Chart of Accounts!");
+      toast.success("Account added to Chart of Accounts!");
       await refreshAccounts();
 
-      // Automatically select the new account
       const newAcc: ChartOfAccount = {
         account_name: newAccountForm.account_name.trim(),
         account_type: newAccountForm.account_type,
@@ -253,118 +238,149 @@ export default function COAAutocomplete({
   };
 
   return (
-    <div className="relative w-full">
-      {isTextArea ? (
-        <textarea
-          ref={textareaRef}
-          value={searchVal}
-          onChange={(e) => {
-            setSearchVal(e.target.value);
-            onChange(e.target.value);
-            setIsOpen(true);
-          }}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setIsOpen(true)}
-          onBlur={handleBlur}
-          disabled={disabled}
-          placeholder={placeholder}
-          className={`pos-input text-xs w-full min-h-[36px] overflow-hidden resize-none py-2 px-3 leading-normal block ${className}`}
-          rows={1}
-          autoComplete="off"
-        />
-      ) : (
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchVal}
-          onChange={(e) => {
-            setSearchVal(e.target.value);
-            onChange(e.target.value);
-            setIsOpen(true);
-          }}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setIsOpen(true)}
-          onBlur={handleBlur}
-          disabled={disabled}
-          placeholder={placeholder}
-          className={`pos-input text-xs w-full h-9 px-3 leading-none block ${className}`}
-          autoComplete="off"
-        />
-      )}
+    <div ref={wrapperRef} className="relative w-full" style={{ minWidth: 0 }}>
+      <input
+        ref={inputRef}
+        type="text"
+        value={searchVal}
+        onChange={(e) => {
+          setSearchVal(e.target.value);
+          onChange(e.target.value);
+          setIsOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setIsOpen(true)}
+        onBlur={handleBlur}
+        disabled={disabled}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={`pos-input text-xs w-full h-9 px-3 leading-none block ${className}`}
+        style={{ minWidth: 0 }}
+      />
 
       {/* Autocomplete Dropdown */}
       {isOpen && !disabled && (
         <div
           ref={dropdownRef}
-          className="absolute left-0 right-0 mt-1 max-h-[350px] overflow-y-auto bg-popover text-popover-foreground border border-border rounded-lg shadow-xl z-50"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: "calc(100% + 4px)",
+            minWidth: "600px",
+            maxWidth: "760px",
+            maxHeight: "350px",
+            overflowY: "auto",
+            zIndex: 9999,
+            background: "hsl(var(--popover))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: "10px",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+          }}
         >
+          {/* Sticky header showing count */}
+          <div
+            style={{
+              position: "sticky",
+              top: 0,
+              padding: "6px 12px",
+              background: "hsl(var(--muted))",
+              borderBottom: "1px solid hsl(var(--border))",
+              fontSize: "10px",
+              color: "hsl(var(--muted-foreground))",
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span>CHART OF ACCOUNTS</span>
+            <span>{filteredAccounts.length} result{filteredAccounts.length !== 1 ? "s" : ""}</span>
+          </div>
+
           {filteredAccounts.length > 0 ? (
             filteredAccounts.map((a, idx) => {
               const isSelected = idx === activeIndex;
               return (
                 <button
                   key={a.id || idx}
+                  data-idx={idx}
                   type="button"
+                  onMouseEnter={() => setActiveIndex(idx)}
                   onClick={() => handleSelect(a)}
-                  className={`w-full text-left px-3 py-2 text-xs border-b border-border/50 last:border-0 transition-colors flex flex-col gap-0.5 ${
-                    isSelected
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-accent hover:text-accent-foreground"
-                  }`}
-                  style={{ whiteSpace: "normal", wordBreak: "break-word" }}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 14px",
+                    borderBottom: "1px solid hsl(var(--border) / 0.4)",
+                    background: isSelected
+                      ? "hsl(var(--primary))"
+                      : "transparent",
+                    color: isSelected
+                      ? "hsl(var(--primary-foreground))"
+                      : "hsl(var(--popover-foreground))",
+                    cursor: "pointer",
+                    transition: "background 0.1s",
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
+                  }}
                 >
-                  <div className="flex justify-between items-center w-full gap-2">
-                    <span className="font-bold flex-1">
-                      {a.account_code && (
-                        <span
-                          className={`mr-1.5 font-mono ${
-                            isSelected
-                              ? "text-primary-foreground/90"
-                              : "text-muted-foreground"
-                          }`}
+                  {/* Account code badge + full account name */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                    {a.account_code && (
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          fontSize: "10px",
+                          fontFamily: "monospace",
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: "4px",
+                          background: isSelected
+                            ? "rgba(255,255,255,0.2)"
+                            : "hsl(var(--muted))",
+                          color: isSelected
+                            ? "hsl(var(--primary-foreground))"
+                            : "hsl(var(--muted-foreground))",
+                          marginTop: "1px",
+                        }}
+                      >
+                        {highlightText(a.account_code, debouncedSearch)}
+                      </span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4 }}>
+                        {highlightText(a.account_name, debouncedSearch)}
+                      </div>
+                      {(a.category || a.account_type) && (
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            marginTop: "2px",
+                            opacity: 0.75,
+                            display: "flex",
+                            gap: "8px",
+                          }}
                         >
-                          {a.account_code} -
-                        </span>
-                      )}
-                      {highlightText(a.account_name, debouncedSearch)}
-                    </span>
-                    <span
-                      className={`text-[9px] uppercase tracking-wider font-semibold px-1 py-0.5 rounded ${
-                        isSelected
-                          ? "bg-primary-foreground/20 text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {a.account_type}
-                    </span>
-                  </div>
-                  {(a.category || a.subcategory) && (
-                    <div
-                      className={`text-[10px] ${
-                        isSelected
-                          ? "text-primary-foreground/80"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {a.category && (
-                        <span>
-                          Category: {highlightText(a.category, debouncedSearch)}
-                        </span>
-                      )}
-                      {a.subcategory && (
-                        <span className="ml-2 border-l border-border/30 pl-2">
-                          Sub: {highlightText(a.subcategory, debouncedSearch)}
-                        </span>
+                          <span>{a.account_type}</span>
+                          {a.category && (
+                            <span>· {highlightText(a.category, debouncedSearch)}</span>
+                          )}
+                          {a.subcategory && (
+                            <span>· {highlightText(a.subcategory, debouncedSearch)}</span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+                  </div>
                 </button>
               );
             })
           ) : (
-            <div className="p-3 text-center">
-              <p className="text-xs text-muted-foreground italic mb-2">
-                No matching accounts
+            <div style={{ padding: "16px", textAlign: "center" }}>
+              <p style={{ fontSize: "12px", color: "hsl(var(--muted-foreground))", fontStyle: "italic", marginBottom: "8px" }}>
+                No matching accounts found
               </p>
               <button
                 type="button"
@@ -376,7 +392,15 @@ export default function COAAutocomplete({
                   setShowConfirmModal(true);
                   setIsOpen(false);
                 }}
-                className="text-xs font-bold text-primary hover:underline"
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "hsl(var(--primary))",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                  background: "none",
+                  border: "none",
+                }}
               >
                 + Add "{searchVal}" to Chart of Accounts
               </button>
@@ -385,13 +409,13 @@ export default function COAAutocomplete({
         </div>
       )}
 
-      {/* Confirmation Dialog Popup */}
+      {/* Confirm Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-card rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-black mb-3">Account Not Found</h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Do you want to add new Account in Chart of Accounts?
+              Do you want to add <strong>"{searchVal}"</strong> to Chart of Accounts?
             </p>
             <div className="flex gap-3">
               <button
@@ -432,10 +456,7 @@ export default function COAAutocomplete({
                   className="pos-input w-full h-10 px-3"
                   value={newAccountForm.account_name}
                   onChange={(e) =>
-                    setNewAccountForm({
-                      ...newAccountForm,
-                      account_name: e.target.value,
-                    })
+                    setNewAccountForm({ ...newAccountForm, account_name: e.target.value })
                   }
                   placeholder="Account Name"
                 />
@@ -451,10 +472,7 @@ export default function COAAutocomplete({
                     className="pos-input w-full h-10 px-3"
                     value={newAccountForm.account_code}
                     onChange={(e) =>
-                      setNewAccountForm({
-                        ...newAccountForm,
-                        account_code: e.target.value,
-                      })
+                      setNewAccountForm({ ...newAccountForm, account_code: e.target.value })
                     }
                     placeholder="e.g. 5010"
                   />
@@ -469,7 +487,7 @@ export default function COAAutocomplete({
                     onChange={(e) =>
                       setNewAccountForm({
                         ...newAccountForm,
-                        account_type: e.target.value as any,
+                        account_type: e.target.value as ChartOfAccount["account_type"],
                       })
                     }
                   >
@@ -494,10 +512,7 @@ export default function COAAutocomplete({
                     className="pos-input w-full h-10 px-3"
                     value={newAccountForm.category}
                     onChange={(e) =>
-                      setNewAccountForm({
-                        ...newAccountForm,
-                        category: e.target.value,
-                      })
+                      setNewAccountForm({ ...newAccountForm, category: e.target.value })
                     }
                     placeholder="e.g. Operating Expenses"
                   />
@@ -511,10 +526,7 @@ export default function COAAutocomplete({
                     className="pos-input w-full h-10 px-3"
                     value={newAccountForm.subcategory}
                     onChange={(e) =>
-                      setNewAccountForm({
-                        ...newAccountForm,
-                        subcategory: e.target.value,
-                      })
+                      setNewAccountForm({ ...newAccountForm, subcategory: e.target.value })
                     }
                     placeholder="e.g. Office Supplies"
                   />
@@ -526,13 +538,10 @@ export default function COAAutocomplete({
                   Description
                 </label>
                 <textarea
-                  className="pos-input w-full min-h-[70px] py-2 px-3 resize-none"
+                  className="pos-input w-full min-h-[60px] py-2 px-3 resize-none"
                   value={newAccountForm.description}
                   onChange={(e) =>
-                    setNewAccountForm({
-                      ...newAccountForm,
-                      description: e.target.value,
-                    })
+                    setNewAccountForm({ ...newAccountForm, description: e.target.value })
                   }
                   placeholder="Describe the account..."
                 />
