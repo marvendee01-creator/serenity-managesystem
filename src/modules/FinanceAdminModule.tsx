@@ -55,11 +55,8 @@ export default function FinanceAdminModule() {
   const [coaTypeFilter, setCoaTypeFilter] = useState("All");
 
   // Journal State
-  const [editingJE, setEditingJE] = useState<JournalEntry | null>(null);
-  const [jeForm, setJeForm] = useState<Partial<JournalEntry>>({
-    debit: 0, credit: 0, entry_date: new Date().toISOString().slice(0, 10),
-  });
-
+  const [editingJE, setEditingJE] = useState<{ id?: number; entry_date: string; memo: string; lines: Partial<JournalEntry>[] } | null>(null);
+  
   // P&L State
   const [plData, setPlData] = useState<any>({
     income: 0, expense: 0, net: 0, incomeDetails: [], expenseDetails: [],
@@ -77,13 +74,13 @@ export default function FinanceAdminModule() {
       const [accs, jnls] = await Promise.all([getChartOfAccounts(), getJournalEntries()]);
       setAccounts(accs);
       setJournals(jnls);
-      await recomputePL(accs);
+      await recomputePL(accs, jnls);
     } finally {
       setLoading(false);
     }
   };
 
-  const recomputePL = async (_accounts?: ChartOfAccount[]) => {
+  const recomputePL = async (_accounts: ChartOfAccount[], _journals: JournalEntry[]) => {
     const [txns, foods, cashierStore, cashierBooking] = await Promise.all([
       getTransactions(),
       getFoodSales(),
@@ -103,6 +100,7 @@ export default function FinanceAdminModule() {
     const filteredFoods = foods.filter(f => filterDate(f.date));
     const filteredStore = cashierStore.filter(r => filterDate(r.date));
     const filteredBooking = cashierBooking.filter(r => filterDate(r.report_date));
+    const filteredJournals = _journals.filter(j => filterDate(j.entry_date));
 
     const storeSales = filteredStore.reduce((s, r) => s + r.sales, 0);
     const bookingSales = filteredBooking.reduce((s, r) => s + r.entrance_sales, 0);
@@ -110,29 +108,60 @@ export default function FinanceAdminModule() {
     const maintSales = filteredTxns.reduce((s, t) => s + (t.maintenance_fee || 0), 0);
     const drinksSales = filteredTxns.reduce((s, t) => s + (t.drinks_corkage_fee || 0), 0);
     const liquorSales = filteredTxns.reduce((s, t) => s + (t.liquor_corkage_fee || 0), 0);
-    const totalIncome = storeSales + bookingSales + foodSales + maintSales + drinksSales + liquorSales;
+
+    // Sum manual journal entries for Income and Expenses
+    const jeIncomeMap: Record<string, number> = {};
+    const jeExpenseMap: Record<string, number> = {};
+
+    _accounts.forEach(a => {
+      if (a.account_type === "Income") jeIncomeMap[a.account_name] = 0;
+      if (a.account_type === "Expense") jeExpenseMap[a.account_name] = 0;
+    });
+
+    filteredJournals.forEach(j => {
+      const acc = _accounts.find(a => a.account_name === j.account_title);
+      if (acc?.account_type === "Income") {
+        // Income normal balance is credit. Credit increases, debit decreases.
+        jeIncomeMap[j.account_title] = (jeIncomeMap[j.account_title] || 0) + (j.credit - j.debit);
+      } else if (acc?.account_type === "Expense") {
+        // Expense normal balance is debit. Debit increases, credit decreases.
+        jeExpenseMap[j.account_title] = (jeExpenseMap[j.account_title] || 0) + (j.debit - j.credit);
+      }
+    });
+
+    const jeIncomeTotal = Object.values(jeIncomeMap).reduce((s, v) => s + v, 0);
+    const jeExpenseTotal = Object.values(jeExpenseMap).reduce((s, v) => s + v, 0);
+
+    const totalIncome = storeSales + bookingSales + foodSales + maintSales + drinksSales + liquorSales + jeIncomeTotal;
 
     const storePetty = filteredStore.reduce((s, r) => s + r.petty_cash, 0);
     const bookingPetty = filteredBooking.reduce((s, r) =>
       s + (r.petty_items || []).reduce((x, p) => x + (p.amount || 0), 0), 0);
-    const totalExpense = storePetty + bookingPetty;
+    
+    const totalExpense = storePetty + bookingPetty + jeExpenseTotal;
+
+    const incomeDetails = [
+      { name: "Cashier Store Sales", amount: storeSales },
+      { name: "Cashier Booking / Entrance Sales", amount: bookingSales },
+      { name: "Food Restaurant POS", amount: foodSales },
+      { name: "Maintenance Fee", amount: maintSales },
+      { name: "Drinks Corkage", amount: drinksSales },
+      { name: "Liquor Corkage", amount: liquorSales },
+      ...Object.entries(jeIncomeMap).filter(([, v]) => v !== 0).map(([k, v]) => ({ name: k, amount: v }))
+    ];
+
+    const expenseDetails = [
+      { name: "Expenses Summary - Store (Petty Cash)", amount: storePetty },
+      { name: "Expenses Summary - Entrance (Petty Cash)", amount: bookingPetty },
+      ...Object.entries(jeExpenseMap).filter(([, v]) => v !== 0).map(([k, v]) => ({ name: k, amount: v }))
+    ];
 
     setPlData({
       income: totalIncome,
       expense: totalExpense,
       net: totalIncome - totalExpense,
-      incomeDetails: [
-        { name: "Cashier Store Sales", amount: storeSales },
-        { name: "Cashier Booking / Entrance Sales", amount: bookingSales },
-        { name: "Food Restaurant POS", amount: foodSales },
-        { name: "Maintenance Fee", amount: maintSales },
-        { name: "Drinks Corkage", amount: drinksSales },
-        { name: "Liquor Corkage", amount: liquorSales },
-      ],
-      expenseDetails: [
-        { name: "Cashier Store – Petty Cash", amount: storePetty },
-        { name: "Cashier Booking – Petty Cash", amount: bookingPetty },
-      ],
+      incomeDetails,
+      expenseDetails,
     });
   };
 
@@ -167,17 +196,35 @@ export default function FinanceAdminModule() {
       const bstr = evt.target?.result;
       const wb = XLSX.read(bstr, { type: "binary" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws) as any[];
+      // Force header: 1 to get an array of arrays representing raw columns
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
       let count = 0;
-      for (const row of rows) {
-        const account_name = row["Account"] || row["account"] || row["Account Name"];
-        const account_type = row["Type"] || row["type"] || "Expense";
+      
+      // Assumes first row might be headers like "Account" and "Type"
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row.length) continue;
+        const account_name = row[0]; // Column A
+        let account_type = row[1]; // Column B
+        
         if (!account_name) continue;
-        if (accounts.some(a => a.account_name.toLowerCase() === String(account_name).toLowerCase())) continue;
-        await addChartOfAccount({ account_name: String(account_name), account_type: account_type as any, beginning_balance: Number(row["Beginning Balance"] || 0), as_of_date: row["As of Date"] || undefined });
+        if (!account_type || !["Asset","Liability","Equity","Income","Expense"].includes(account_type)) {
+          account_type = "Expense"; // fallback
+        }
+        
+        if (accounts.some(a => a.account_name.toLowerCase() === String(account_name).toLowerCase())) {
+          continue; // skip duplicates
+        }
+        
+        await addChartOfAccount({ 
+          account_name: String(account_name), 
+          account_type: account_type as any, 
+          beginning_balance: Number(row[2] || 0), 
+          as_of_date: row[3] || undefined 
+        });
         count++;
       }
-      toast.success(`Imported ${count} account${count !== 1 ? "s" : ""}.`);
+      toast.success(`Imported ${count} account${count !== 1 ? "s" : ""}. Duplicate accounts were skipped.`);
       loadData();
     };
     reader.readAsBinaryString(file);
@@ -204,21 +251,47 @@ export default function FinanceAdminModule() {
   };
 
   const saveJE = async () => {
-    if (!jeForm.account_title || !jeForm.entry_date) return toast.error("Date and Account Title are required.");
-    const dr = Number(jeForm.debit) || 0;
-    const cr = Number(jeForm.credit) || 0;
-    if (dr === 0 && cr === 0) return toast.error("Enter a Debit or Credit amount.");
-    if (dr > 0 && cr > 0) return toast.error("Only Debit OR Credit can be non-zero per line.");
+    if (!editingJE) return;
+    if (!editingJE.entry_date) return toast.error("Date is required.");
+    
+    let totalDebit = 0;
+    let totalCredit = 0;
+    for (const line of editingJE.lines) {
+      if (!line.account_title) return toast.error("Account Title is required for all lines.");
+      totalDebit += Number(line.debit) || 0;
+      totalCredit += Number(line.credit) || 0;
+    }
+
+    if (totalDebit !== totalCredit) {
+      return toast.error("Journal Entry is not balanced. Total Debits must equal Total Credits.");
+    }
+
     try {
-      if (editingJE?.id) {
-        await updateJournalEntry(editingJE.id, { ...jeForm, debit: dr, credit: cr });
+      if (editingJE.id) {
+        // If editing a single line JE (legacy support or if we only allowed editing single lines)
+        await updateJournalEntry(editingJE.id, { 
+          entry_date: editingJE.entry_date,
+          memo: editingJE.memo,
+          account_title: editingJE.lines[0].account_title!,
+          debit: editingJE.lines[0].debit || 0,
+          credit: editingJE.lines[0].credit || 0,
+        });
         toast.success("Journal entry updated.");
       } else {
-        await addJournalEntry({ ...jeForm as any, debit: dr, credit: cr });
-        toast.success("Journal entry saved.");
+        // Save each line
+        for (const line of editingJE.lines) {
+          if (line.debit === 0 && line.credit === 0) continue;
+          await addJournalEntry({
+            entry_date: editingJE.entry_date,
+            memo: editingJE.memo,
+            account_title: line.account_title!,
+            debit: line.debit || 0,
+            credit: line.credit || 0
+          });
+        }
+        toast.success("Balanced Journal Entry saved.");
       }
       setEditingJE(null);
-      setJeForm({ debit: 0, credit: 0, entry_date: new Date().toISOString().slice(0, 10) });
       loadData();
     } catch { toast.error("Failed to save journal entry."); }
   };
@@ -481,7 +554,7 @@ export default function FinanceAdminModule() {
               <p className="text-xs text-muted-foreground">{journals.length} entries total</p>
             </div>
             <button
-              onClick={() => { setEditingJE({} as any); setJeForm({ debit: 0, credit: 0, entry_date: new Date().toISOString().slice(0, 10) }); }}
+              onClick={() => { setEditingJE({ entry_date: new Date().toISOString().slice(0, 10), memo: "", lines: [{}, {}] }); }}
               className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all"
             >
               <Plus size={14} /> Add Entry
@@ -522,7 +595,7 @@ export default function FinanceAdminModule() {
                     <td className="px-4 py-3">
                       <div className="flex justify-center gap-2">
                         <button
-                          onClick={() => { setEditingJE(j); setJeForm({ ...j }); }}
+                          onClick={() => { setEditingJE({ id: j.id, entry_date: j.entry_date, memo: j.memo || "", lines: [j] }); }}
                           className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20"
                         >
                           <Pencil size={13} />
@@ -576,12 +649,12 @@ export default function FinanceAdminModule() {
               <label className="text-xs font-bold text-muted-foreground block mb-1">Date To</label>
               <input type="date" className="pos-input h-9 text-sm" value={plDateTo} onChange={e => setPlDateTo(e.target.value)} />
             </div>
-            <button onClick={() => recomputePL()} className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all">
-              <RefreshCw size={14} /> Apply
+            <button onClick={() => loadData()} className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all">
+              <RefreshCw size={14} /> Apply Filter
             </button>
             <div className="ml-auto flex gap-2">
               <button onClick={printPL} className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">
-                <Printer size={14} /> Print
+                <Printer size={14} /> Print Preview
               </button>
               <button onClick={exportPL} className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">
                 <Download size={14} /> Export Excel
@@ -637,7 +710,7 @@ export default function FinanceAdminModule() {
           {/* Net Income */}
           <div className={`pos-card p-6 flex justify-between items-center border-2 shadow-xl ${plData.net >= 0 ? "bg-green-500/5 border-green-500/30" : "bg-red-500/5 border-red-500/30"}`}>
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Net Income</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Net Profit</p>
               <h3 className="text-2xl font-black">{plData.net >= 0 ? "Profitable" : "Net Loss"}</h3>
             </div>
             <span className={`text-3xl font-black tabular-nums ${plData.net >= 0 ? "text-green-600" : "text-red-600"}`}>
@@ -818,71 +891,128 @@ export default function FinanceAdminModule() {
         </div>
       )}
 
-      {/* ── JE MODAL ── */}
+      {/* ── JE MULTI-LINE MODAL ── */}
       {editingJE && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full p-6 animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-black mb-5">{editingJE.id ? "Edit Journal Entry" : "New Journal Entry"}</h3>
             <div className="space-y-4 mb-6">
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Entry Date *</label>
-                <input type="date" className="pos-input w-full" value={jeForm.entry_date || ""} onChange={e => setJeForm({ ...jeForm, entry_date: e.target.value })} />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Account Title *</label>
-                <select className="pos-input w-full" value={jeForm.account_title || ""} onChange={e => setJeForm({ ...jeForm, account_title: e.target.value })}>
-                  <option value="">Select Account...</option>
-                  {["Asset","Liability","Equity","Income","Expense"].map(type => (
-                    <optgroup key={type} label={type}>
-                      {accounts.filter(a => a.account_type === type).map(a => (
-                        <option key={a.id} value={a.account_name}>{a.account_name}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-green-600 uppercase tracking-widest block mb-1.5">Debit</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="pos-input w-full border-green-500/30 focus:border-green-500"
-                    value={jeForm.debit ?? 0}
-                    onChange={e => setJeForm({ ...jeForm, debit: parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
-                  />
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Entry Date *</label>
+                  <input type="date" className="pos-input w-full" value={editingJE.entry_date || ""} onChange={e => setEditingJE({ ...editingJE, entry_date: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-red-600 uppercase tracking-widest block mb-1.5">Credit</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="pos-input w-full border-red-500/30 focus:border-red-500"
-                    value={jeForm.credit ?? 0}
-                    onChange={e => setJeForm({ ...jeForm, credit: parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
-                  />
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Memo / Description</label>
+                  <input type="text" className="pos-input w-full" value={editingJE.memo || ""} onChange={e => setEditingJE({ ...editingJE, memo: e.target.value })} placeholder="Optional description..." />
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1.5">Memo / Description</label>
-                <textarea
-                  className="pos-input w-full min-h-[72px] py-2 resize-none"
-                  value={jeForm.memo || ""}
-                  onChange={e => setJeForm({ ...jeForm, memo: e.target.value })}
-                  placeholder="Optional description..."
-                />
+
+              <div className="border border-border rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">Account Title</th>
+                      <th className="text-left px-3 py-2 font-semibold">Type</th>
+                      <th className="text-right px-3 py-2 font-semibold text-green-600">Debit</th>
+                      <th className="text-right px-3 py-2 font-semibold text-red-600">Credit</th>
+                      <th className="px-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editingJE.lines.map((line, i) => {
+                      const acc = accounts.find(a => a.account_name === line.account_title);
+                      return (
+                        <tr key={i} className="border-t border-border">
+                          <td className="px-2 py-2">
+                            <input
+                              list="je-accounts-list"
+                              className="pos-input w-full text-xs h-9"
+                              placeholder="Account..."
+                              value={line.account_title || ""}
+                              onChange={e => {
+                                const newLines = [...editingJE.lines];
+                                newLines[i].account_title = e.target.value;
+                                setEditingJE({ ...editingJE, lines: newLines });
+                              }}
+                            />
+                            <datalist id="je-accounts-list">
+                              {accounts.map(a => <option key={a.id} value={a.account_name} />)}
+                            </datalist>
+                          </td>
+                          <td className="px-2 py-2">
+                            <input type="text" className="pos-input w-24 text-xs h-9 bg-muted cursor-not-allowed opacity-70" value={acc?.account_type || ""} readOnly placeholder="Type" />
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="number" step="0.01" min="0"
+                              className="pos-input w-24 text-xs h-9 text-right"
+                              value={line.debit || ""}
+                              onChange={e => {
+                                const newLines = [...editingJE.lines];
+                                newLines[i].debit = parseFloat(e.target.value) || 0;
+                                setEditingJE({ ...editingJE, lines: newLines });
+                              }}
+                              placeholder="0.00"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="number" step="0.01" min="0"
+                              className="pos-input w-24 text-xs h-9 text-right"
+                              value={line.credit || ""}
+                              onChange={e => {
+                                const newLines = [...editingJE.lines];
+                                newLines[i].credit = parseFloat(e.target.value) || 0;
+                                setEditingJE({ ...editingJE, lines: newLines });
+                              }}
+                              placeholder="0.00"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <button
+                              onClick={() => {
+                                const newLines = editingJE.lines.filter((_, idx) => idx !== i);
+                                if (newLines.length === 0) newLines.push({});
+                                setEditingJE({ ...editingJE, lines: newLines });
+                              }}
+                              className="w-7 h-7 rounded-lg text-destructive/70 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-muted/50 font-bold border-t border-border">
+                    <tr>
+                      <td colSpan={2} className="px-3 py-2 text-right">
+                        <button
+                          onClick={() => setEditingJE({ ...editingJE, lines: [...editingJE.lines, {}] })}
+                          className="text-xs text-primary hover:underline flex items-center gap-1 ml-2"
+                        >
+                          <Plus size={12} /> Add Line
+                        </button>
+                      </td>
+                      <td className="px-3 py-2 text-right text-green-600">
+                        {formatPeso(editingJE.lines.reduce((s, l) => s + (l.debit || 0), 0))}
+                      </td>
+                      <td className="px-3 py-2 text-right text-red-600">
+                        {formatPeso(editingJE.lines.reduce((s, l) => s + (l.credit || 0), 0))}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 mt-6">
               <button onClick={() => setEditingJE(null)} className="flex-1 h-12 rounded-xl bg-secondary text-secondary-foreground font-bold hover:bg-accent active:scale-95 transition-all">
                 Cancel
               </button>
               <button onClick={saveJE} className="flex-1 h-12 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 active:scale-95 transition-all">
-                Save Entry
+                Save Balanced Entry
               </button>
             </div>
           </div>
