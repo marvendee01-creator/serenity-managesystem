@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil, Trash2, BarChart3, TrendingUp, Trophy } from "lucide-react";
-import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, deleteCashierReport, deleteBookingCashierReport, getFoodSales, type Transaction, type CashierReport, type FoodSale } from "@/lib/db";
+import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, deleteCashierReport, deleteBookingCashierReport, getFoodSales, getJournalEntries, type Transaction, type CashierReport, type FoodSale } from "@/lib/db";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CashierModule, { buildCashierReportHTML, printCashierReport } from "@/modules/CashierModule";
 import BookingCashierModule, { buildBookingCashierHTML, loadBookingCashierReports, type BookingCashierReport } from "@/modules/BookingCashierModule";
@@ -1396,7 +1396,8 @@ function MaintenanceFeeMonitoringReport() {
     Promise.all([
       getTransactions(), 
       getCashierReports(),
-    ]).then(([txns, storeCashier]) => {
+      getJournalEntries(),
+    ]).then(([txns, storeCashier, journals]) => {
       const allEvents: any[] = [];
 
       // 1. Collect all Maintenance Income
@@ -1427,6 +1428,33 @@ function MaintenanceFeeMonitoringReport() {
               });
             }
           });
+        }
+      });
+
+      // 3. Collect from Journal Entries
+      journals.forEach(j => {
+        if (j.memo && j.memo.toLowerCase().includes("maintenance fee")) {
+          // If it's an adjustment, decide if it's income or expense based on debit/credit
+          // A credit to a Maintenance Fee (Income) account increases the balance (so amount > 0)
+          // A debit increases expenses.
+          if (j.credit > 0) {
+            allEvents.push({
+              date: j.entry_date,
+              customer: j.account_title || "Journal Entry",
+              source: "Journal Entry",
+              amount: j.credit,
+              expense: 0,
+            });
+          }
+          if (j.debit > 0) {
+            allEvents.push({
+              date: j.entry_date,
+              customer: j.account_title || "Journal Entry",
+              source: "Journal Entry",
+              amount: 0,
+              expense: j.debit,
+            });
+          }
         }
       });
 

@@ -247,14 +247,9 @@ export default function FinanceAdminModule() {
 
           const existing = accounts.find(a => a.account_name.toLowerCase() === account_name.toLowerCase());
           
-          if (existing && existing.id) {
-            // Update existing or skip (user spec: update_existing_or_skip, we will update)
-            await updateChartOfAccount(existing.id, {
-              account_name,
-              account_type: account_type as any,
-              beginning_balance: Number(row["Beginning Balance"] || existing.beginning_balance || 0),
-            });
-            updateCount++;
+          if (existing) {
+            // User spec: skip duplicate
+            continue;
           } else {
             await addChartOfAccount({ 
               account_name, 
@@ -266,7 +261,7 @@ export default function FinanceAdminModule() {
           }
         }
         
-        toast.success(`Import successful: ${count} added, ${updateCount} updated.`);
+        toast.success(`Import successful: ${count} accounts added. Duplicates were skipped.`);
         loadData();
       } catch (err) {
         toast.error("Failed to process Excel file.");
