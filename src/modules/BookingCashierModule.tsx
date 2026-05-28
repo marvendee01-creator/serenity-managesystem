@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Banknote, Plus, Trash2, Save, Printer, Download, ArrowLeft } from "lucide-react";
-import { getTransactions, getBookingCashierReports, saveBookingCashierReport, getSystemConfig, setSystemConfig, type BookingCashierReportDB } from "@/lib/db";
+import { getTransactions, getBookingCashierReports, saveBookingCashierReport, getSystemConfig, setSystemConfig, type BookingCashierReportDB, getChartOfAccounts, type ChartOfAccount } from "@/lib/db";
 import { toast } from "sonner";
 
 interface PettyItem {
@@ -138,7 +138,12 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
       : DEFAULT_DENOMS.map(d => ({ ...d }))
   );
 
-  useEffect(() => { firstRef.current?.focus(); }, []);
+  const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
+
+  useEffect(() => { 
+    firstRef.current?.focus(); 
+    getChartOfAccounts().then(setAccounts);
+  }, []);
 
   // Auto-fill beginning cash from cloud config
   useEffect(() => {
@@ -389,7 +394,12 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
-                  <input type="text" className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" disabled={item.is_budoy} />
+                  <input list="booking-coa-list" type="text" className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Item" disabled={item.is_budoy} />
+                  {!item.is_budoy && (
+                    <datalist id="booking-coa-list">
+                      {accounts.map(a => <option key={a.id} value={a.account_name} />)}
+                    </datalist>
+                  )}
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}

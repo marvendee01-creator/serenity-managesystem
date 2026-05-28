@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Banknote, Download, Plus, Trash2, Printer, Save, ArrowLeft } from "lucide-react";
-import { saveCashierReport, deleteCashierReport, getCashierReports, getSystemConfig, setSystemConfig, type CashierReport } from "@/lib/db";
+import { saveCashierReport, deleteCashierReport, getCashierReports, getSystemConfig, setSystemConfig, type CashierReport, getChartOfAccounts, type ChartOfAccount } from "@/lib/db";
 import { toast } from "sonner";
 
 interface PettyItem {
@@ -114,13 +114,18 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
       : [{ date: "", particulars: "", receipt_no: "", amount: "" }]
   );
 
+  const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
+  
   const [denoms, setDenoms] = useState<DenomRow[]>(
     editReport?.denoms?.length
       ? editReport.denoms.map(d => ({ label: d.label, value: d.value, quantity: d.quantity ? d.quantity.toString() : "" }))
       : DEFAULT_DENOMS.map(d => ({ ...d }))
   );
 
-  useEffect(() => { firstRef.current?.focus(); }, []);
+  useEffect(() => { 
+    firstRef.current?.focus(); 
+    getChartOfAccounts().then(setAccounts);
+  }, []);
 
   // Auto-fill beginning cash from the most recent cashier report BEFORE the selected report date.
   // Re-runs whenever the user changes Report Date so each day carries forward correctly
@@ -338,13 +343,10 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Category</label>}
-                  <select className={`${inputClass} text-sm h-10`} value={["Utilities","Supplies","Maintenance Fee"].includes(item.particulars) ? item.particulars : ""} onChange={e => updatePetty(i, "particulars", e.target.value)}>
-                    <option value="">Custom…</option>
-                    <option value="Utilities">Utilities</option>
-                    <option value="Supplies">Supplies</option>
-                    <option value="Maintenance Fee">Maintenance Fee</option>
-                  </select>
-                  <input type="text" className={`${inputClass} text-sm h-9 mt-1`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Particulars" />
+                  <input list="coa-list" type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Particulars" />
+                  <datalist id="coa-list">
+                    {accounts.map(a => <option key={a.id} value={a.account_name} />)}
+                  </datalist>
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}

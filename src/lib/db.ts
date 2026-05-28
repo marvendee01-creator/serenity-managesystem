@@ -711,3 +711,96 @@ export async function deleteFoodSale(id: number): Promise<void> {
   const { error } = await supabase.from("food_sales" as any).delete().eq("id", id);
   if (error) throw error;
 }
+
+// ─── Finance & Admin: Chart of Accounts ───
+
+export interface ChartOfAccount {
+  id?: number;
+  account_name: string;
+  account_type: "Asset" | "Liability" | "Equity" | "Income" | "Expense";
+  beginning_balance: number;
+  as_of_date?: string;
+}
+
+export async function getChartOfAccounts(): Promise<ChartOfAccount[]> {
+  const { data, error } = await supabase.from("chart_of_accounts" as any).select("*").order("account_name");
+  if (error) return [];
+  return data.map((r: any) => ({
+    id: r.id,
+    account_name: r.account_name,
+    account_type: r.account_type,
+    beginning_balance: Number(r.beginning_balance || 0),
+    as_of_date: r.as_of_date ?? undefined,
+  }));
+}
+
+export async function addChartOfAccount(account: Omit<ChartOfAccount, "id">): Promise<void> {
+  const { error } = await supabase.from("chart_of_accounts" as any).insert({
+    account_name: account.account_name,
+    account_type: account.account_type,
+    beginning_balance: account.beginning_balance,
+    as_of_date: account.as_of_date ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function updateChartOfAccount(id: number, updates: Partial<ChartOfAccount>): Promise<void> {
+  const { error } = await supabase.from("chart_of_accounts" as any).update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteChartOfAccount(id: number): Promise<void> {
+  const { error } = await supabase.from("chart_of_accounts" as any).delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Finance & Admin: Journal Entries ───
+
+export interface JournalEntry {
+  id?: number;
+  entry_date: string;
+  account_title: string;
+  debit: number;
+  credit: number;
+  memo?: string;
+  source_module?: string;
+  source_id?: string;
+}
+
+export async function getJournalEntries(): Promise<JournalEntry[]> {
+  const { data, error } = await supabase.from("journal_entries" as any).select("*").order("entry_date", { ascending: false });
+  if (error) return [];
+  return data.map((r: any) => ({
+    id: r.id,
+    entry_date: r.entry_date,
+    account_title: r.account_title,
+    debit: Number(r.debit || 0),
+    credit: Number(r.credit || 0),
+    memo: r.memo ?? undefined,
+    source_module: r.source_module ?? undefined,
+    source_id: r.source_id ?? undefined,
+  }));
+}
+
+export async function addJournalEntry(entry: Omit<JournalEntry, "id">): Promise<void> {
+  const { error } = await supabase.from("journal_entries" as any).insert({
+    entry_date: entry.entry_date,
+    account_title: entry.account_title,
+    debit: entry.debit,
+    credit: entry.credit,
+    memo: entry.memo ?? null,
+    source_module: entry.source_module ?? null,
+    source_id: entry.source_id ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function updateJournalEntry(id: number, updates: Partial<JournalEntry>): Promise<void> {
+  const { error } = await supabase.from("journal_entries" as any).update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteJournalEntry(id: number): Promise<void> {
+  const { error } = await supabase.from("journal_entries" as any).delete().eq("id", id);
+  if (error) throw error;
+}
