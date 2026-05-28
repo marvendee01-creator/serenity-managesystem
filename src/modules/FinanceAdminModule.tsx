@@ -341,22 +341,25 @@ export default function FinanceAdminModule() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
+        const data = evt.target?.result;
+        if (!data) throw new Error("Could not read file contents.");
+        
         // Safe file reading using Array Buffer
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const wb = XLSX.read(data, { type: "array" });
         const firstSheetName = wb.SheetNames[0];
         const ws = wb.Sheets[firstSheetName];
         
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-        handleParsedData(data);
+        const sheetData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+        handleParsedData(sheetData);
       } catch (err) {
         console.error(err);
+        toast.error("Failed to parse file: " + (err instanceof Error ? err.message : String(err)));
       } finally {
         setImportProgress(null);
         setSelectedFile(null);
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const updatePreviewRow = (id: string, field: keyof SmartImportRow, value: any) => {
@@ -411,25 +414,42 @@ export default function FinanceAdminModule() {
     }
     
     let count = 0;
-    // Bulk insert safe mode: insert valid rows only, skipping failures automatically
-    for (const row of validRows) {
-      try {
-        await addChartOfAccount({
-          account_name: row.account_name,
-          account_type: row.account_type as any,
-          beginning_balance: Number(row.beginning_balance || 0),
-          as_of_date: row.as_of_date || undefined
-        });
-        count++;
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    const errors: string[] = [];
     
-    toast.success(`Import successful: ${count} accounts added.`);
-    loadData();
-    setIsSmartImportOpen(false);
-    setPreviewRows([]);
+    setLoading(true);
+    try {
+      // Bulk insert safe mode: insert valid rows only, skipping failures automatically
+      for (const row of validRows) {
+        try {
+          await addChartOfAccount({
+            account_name: row.account_name,
+            account_type: row.account_type as any,
+            beginning_balance: Number(row.beginning_balance || 0),
+            as_of_date: row.as_of_date || undefined
+          });
+          count++;
+        } catch (err) {
+          console.error(err);
+          errors.push(`${row.account_name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      
+      await loadData();
+      
+      if (count === 0) {
+        toast.error("Failed to import accounts. " + (errors.length > 0 ? errors[0] : "Check console for details."));
+      } else if (errors.length > 0) {
+        toast.warning(`Imported ${count} accounts with ${errors.length} errors.`);
+        setIsSmartImportOpen(false);
+        setPreviewRows([]);
+      } else {
+        toast.success(`Import successful: ${count} accounts added.`);
+        setIsSmartImportOpen(false);
+        setPreviewRows([]);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {

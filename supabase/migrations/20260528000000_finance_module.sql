@@ -18,3 +18,12 @@ CREATE TABLE IF NOT EXISTS public.journal_entries (
     source_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.chart_of_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for public access (similar to other tables)
+CREATE POLICY "Public access" ON public.chart_of_accounts FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public access" ON public.journal_entries FOR ALL USING (true) WITH CHECK (true);
+
