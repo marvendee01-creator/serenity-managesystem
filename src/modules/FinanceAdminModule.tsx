@@ -191,41 +191,87 @@ export default function FinanceAdminModule() {
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Validate file extension
+    const name = file.name.toLowerCase();
+    if (!name.endsWith(".xlsx") && !name.endsWith(".xls") && !name.endsWith(".csv")) {
+      toast.error("Invalid File Type. Supported formats: .xlsx, .xls, .csv");
+      e.target.value = "";
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: "binary" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      // Force header: 1 to get an array of arrays representing raw columns
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-      let count = 0;
-      
-      // Assumes first row might be headers like "Account" and "Type"
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || !row.length) continue;
-        const account_name = row[0]; // Column A
-        let account_type = row[1]; // Column B
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
         
-        if (!account_name) continue;
-        if (!account_type || !["Asset","Liability","Equity","Income","Expense"].includes(account_type)) {
-          account_type = "Expense"; // fallback
+        // Read as JSON objects (assumes first row is header)
+        const rows = XLSX.utils.sheet_to_json(ws) as Record<string, any>[];
+        
+        if (rows.length === 0) {
+          return toast.error("Excel file is empty.");
+        }
+
+        // Check required headers
+        const firstRow = rows[0];
+        const headers = Object.keys(firstRow).map(k => k.trim().toLowerCase());
+        const hasAccount = headers.includes("account");
+        const hasType = headers.includes("type");
+
+        if (!hasAccount || !hasType) {
+          toast.error("Invalid Excel Format. Required headers: Account and Type.");
+          return;
+        }
+
+        let count = 0;
+        let updateCount = 0;
+        
+        for (const row of rows) {
+          // Normalize keys to find 'Account' and 'Type' regardless of case/spacing
+          const rowKeys = Object.keys(row);
+          const accKey = rowKeys.find(k => k.trim().toLowerCase() === "account");
+          const typeKey = rowKeys.find(k => k.trim().toLowerCase() === "type");
+          
+          let account_name = accKey ? String(row[accKey]).trim() : "";
+          let account_type = typeKey ? String(row[typeKey]).trim() : "Expense";
+          
+          if (!account_name) continue; // skip blank rows
+
+          // Capitalize first letter of type, or fallback
+          if (!["Asset", "Liability", "Equity", "Income", "Expense"].includes(account_type)) {
+            const capitalized = account_type.charAt(0).toUpperCase() + account_type.slice(1).toLowerCase();
+            account_type = ["Asset", "Liability", "Equity", "Income", "Expense"].includes(capitalized) ? capitalized : "Expense";
+          }
+
+          const existing = accounts.find(a => a.account_name.toLowerCase() === account_name.toLowerCase());
+          
+          if (existing && existing.id) {
+            // Update existing or skip (user spec: update_existing_or_skip, we will update)
+            await updateChartOfAccount(existing.id, {
+              account_name,
+              account_type: account_type as any,
+              beginning_balance: Number(row["Beginning Balance"] || existing.beginning_balance || 0),
+            });
+            updateCount++;
+          } else {
+            await addChartOfAccount({ 
+              account_name, 
+              account_type: account_type as any, 
+              beginning_balance: Number(row["Beginning Balance"] || 0),
+              as_of_date: row["As of Date"] || undefined 
+            });
+            count++;
+          }
         }
         
-        if (accounts.some(a => a.account_name.toLowerCase() === String(account_name).toLowerCase())) {
-          continue; // skip duplicates
-        }
-        
-        await addChartOfAccount({ 
-          account_name: String(account_name), 
-          account_type: account_type as any, 
-          beginning_balance: Number(row[2] || 0), 
-          as_of_date: row[3] || undefined 
-        });
-        count++;
+        toast.success(`Import successful: ${count} added, ${updateCount} updated.`);
+        loadData();
+      } catch (err) {
+        toast.error("Failed to process Excel file.");
+        console.error(err);
       }
-      toast.success(`Imported ${count} account${count !== 1 ? "s" : ""}. Duplicate accounts were skipped.`);
-      loadData();
     };
     reader.readAsBinaryString(file);
     e.target.value = "";
