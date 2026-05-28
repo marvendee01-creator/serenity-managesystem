@@ -430,7 +430,9 @@ export default function FinanceAdminModule() {
           count++;
         } catch (err) {
           console.error(err);
-          errors.push(`${row.account_name}: ${err instanceof Error ? err.message : String(err)}`);
+          const pgErr = err as any;
+          const msg = pgErr?.message || pgErr?.details || (err instanceof Error ? err.message : String(err));
+          errors.push(`${row.account_name}: ${msg}`);
         }
       }
       
