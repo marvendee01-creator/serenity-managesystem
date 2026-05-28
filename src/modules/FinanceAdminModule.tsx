@@ -26,12 +26,14 @@ type Tab = "coa" | "journal" | "pl" | "gl" | "tb";
 // All accepted account types (QuickBooks-style extended list)
 const INCOME_TYPES = ["Income", "Other Income"];
 const EXPENSE_TYPES = ["Expense", "Other Expense", "Cost of Goods Sold"];
-const ASSET_TYPES = ["Bank", "Accounts Receivable", "Other Current Asset", "Fixed Asset", "Other Asset"];
-const LIABILITY_TYPES = ["Accounts Payable", "Credit Card", "Other Current Liability", "Long Term Liability"];
+const ASSET_TYPES = ["Asset", "Bank", "Accounts Receivable"];
+const LIABILITY_TYPES = ["Liability", "Accounts Payable"];
 const EQUITY_TYPES = ["Equity"];
 const ALL_ACCOUNT_TYPES = [...ASSET_TYPES, ...LIABILITY_TYPES, ...EQUITY_TYPES, ...INCOME_TYPES, ...EXPENSE_TYPES];
 
 const TYPE_COLORS: Record<string, string> = {
+  Asset: "bg-blue-500/10 text-blue-600",
+  Liability: "bg-red-500/10 text-red-600",
   Bank: "bg-blue-500/10 text-blue-600",
   "Accounts Receivable": "bg-cyan-500/10 text-cyan-600",
   "Other Current Asset": "bg-sky-500/10 text-sky-600",
@@ -71,6 +73,27 @@ export default function FinanceAdminModule() {
   const [coaForm, setCoaForm] = useState<Partial<ChartOfAccount>>({ account_type: "Asset", beginning_balance: 0 });
   const [coaSearch, setCoaSearch] = useState("");
   const [coaTypeFilter, setCoaTypeFilter] = useState("All");
+
+  // Excel Import State
+  const [showImportZone, setShowImportZone] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importProgress, setImportProgress] = useState<number | null>(null);
+
+  // Smart Import Engine State
+  const [isSmartImportOpen, setIsSmartImportOpen] = useState(false);
+  const [smartImportMode, setSmartImportMode] = useState<"file" | "paste" | "manual">("file");
+  const [pasteText, setPasteText] = useState("");
+  interface SmartImportRow {
+    id: string;
+    account_name: string;
+    account_type: string;
+    beginning_balance: number;
+    as_of_date: string;
+    isValid: boolean;
+    error?: string;
+  }
+  const [previewRows, setPreviewRows] = useState<SmartImportRow[]>([]);
 
   // Journal State
   const [editingJE, setEditingJE] = useState<{ id?: number; entry_date: string; memo: string; lines: Partial<JournalEntry>[] } | null>(null);
@@ -213,15 +236,105 @@ export default function FinanceAdminModule() {
     toast.success("Security PIN updated successfully.");
   };
 
-  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleParsedData = (data: any[][]) => {
+    if (data.length < 2) {
+      toast.error("No valid data found in file.");
+      return;
+    }
+    
+    // Normalize and detect headers
+    const rawHeaders = data[0] || [];
+    const normalizedHeaders = rawHeaders.map(h => String(h || "").trim().toLowerCase());
+    
+    // Auto-detect columns (A = Account, B = Type, case insensitive)
+    const columnA = normalizedHeaders[0] || "";
+    const columnB = normalizedHeaders[1] || "";
+    const validHeaders = columnA.includes("account") && columnB.includes("type");
+    
+    // Skip row 1 if headers detected
+    const startIndex = validHeaders ? 1 : 0;
+    
+    const existingNames = new Set(accounts.map(a => a.account_name.toLowerCase()));
+    const batchNames = new Set<string>();
+    
+    const newRows: SmartImportRow[] = [];
+    
+    for (let i = startIndex; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.length === 0) continue;
+      
+      let account_name = String(row[0] || "").trim().replace(/\s+/g, ' ');
+      let account_type = String(row[1] || "").trim().replace(/\s+/g, ' ');
+      let begBal = Number(row[2] || 0);
+      if (isNaN(begBal)) begBal = 0;
+      const asOf = row[3] ? String(row[3]).trim() : "";
+      
+      if (!account_name && !account_type) continue; // skip blank rows
+      
+      // Row-level validation
+      let isValid = true;
+      let error = "";
+      
+      if (!account_name) {
+        isValid = false;
+        error = "Account Name is empty.";
+      } else if (existingNames.has(account_name.toLowerCase())) {
+        isValid = false;
+        error = "Duplicate of existing account.";
+      } else if (batchNames.has(account_name.toLowerCase())) {
+        isValid = false;
+        error = "Duplicate in batch.";
+      } else {
+        batchNames.add(account_name.toLowerCase());
+      }
+      
+      const matchedType = ALL_ACCOUNT_TYPES.find(t => t.toLowerCase() === account_type.toLowerCase());
+      if (isValid && !matchedType) {
+        isValid = false;
+        error = `Invalid type. Supported: ${ALL_ACCOUNT_TYPES.join(", ")}`;
+      }
+      
+      newRows.push({
+        id: Math.random().toString(36).substr(2, 9),
+        account_name,
+        account_type: matchedType || account_type || "Expense",
+        beginning_balance: begBal,
+        as_of_date: asOf,
+        isValid,
+        error
+      });
+    }
+    
+    setPreviewRows(prev => [...prev, ...newRows]);
+    toast.success(`Loaded ${newRows.length} rows to preview.`);
+  };
+
+  const parsePastedText = () => {
+    if (!pasteText.trim()) {
+      toast.error("Please paste some data first.");
+      return;
+    }
+    const lines = pasteText.split(/\r?\n/);
+    const rows = lines.map(line => {
+      if (line.includes("\t")) {
+        return line.split("\t");
+      }
+      return line.split(",");
+    });
+    handleParsedData(rows);
+    setPasteText("");
+  };
+
+  const processImportFile = async (file: File) => {
+    setSelectedFile(file);
+    setImportProgress(0);
     
     // Validate file extension
     const name = file.name.toLowerCase();
     if (!name.endsWith(".xlsx") && !name.endsWith(".xls") && !name.endsWith(".csv")) {
       toast.error("Invalid File Type. Supported formats: .xlsx, .xls, .csv");
-      e.target.value = "";
+      setImportProgress(null);
+      setSelectedFile(null);
       return;
     }
 
@@ -229,72 +342,120 @@ export default function FinanceAdminModule() {
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
+        // Safe file reading using Array Buffer
         const wb = XLSX.read(bstr, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
+        const firstSheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[firstSheetName];
         
-        // Read as JSON objects (assumes first row is header)
-        const rows = XLSX.utils.sheet_to_json(ws) as Record<string, any>[];
-        
-        if (rows.length === 0) {
-          return toast.error("Excel file is empty.");
-        }
-
-        // Check required headers
-        const firstRow = rows[0];
-        const headers = Object.keys(firstRow).map(k => k.trim().toLowerCase());
-        const hasAccount = headers.includes("account");
-        const hasType = headers.includes("type");
-
-        if (!hasAccount || !hasType) {
-          toast.error("Invalid Excel Format. Required headers: Account and Type.");
-          return;
-        }
-
-        let count = 0;
-        let updateCount = 0;
-        
-        for (const row of rows) {
-          // Normalize keys to find 'Account' and 'Type' regardless of case/spacing
-          const rowKeys = Object.keys(row);
-          const accKey = rowKeys.find(k => k.trim().toLowerCase() === "account");
-          const typeKey = rowKeys.find(k => k.trim().toLowerCase() === "type");
-          
-          let account_name = accKey ? String(row[accKey]).trim() : "";
-          let account_type = typeKey ? String(row[typeKey]).trim() : "Expense";
-
-          if (!account_name) continue; // skip blank rows
-
-          // Normalize: try exact match first (case-insensitive), then fallback to Expense
-          const matchedType = ALL_ACCOUNT_TYPES.find(
-            t => t.toLowerCase() === account_type.toLowerCase()
-          );
-          account_type = matchedType ?? "Expense";
-
-          const existing = accounts.find(a => a.account_name.toLowerCase() === account_name.toLowerCase());
-          
-          if (existing) {
-            // User spec: skip duplicate
-            continue;
-          } else {
-            await addChartOfAccount({ 
-              account_name, 
-              account_type: account_type as any, 
-              beginning_balance: Number(row["Beginning Balance"] || 0),
-              as_of_date: row["As of Date"] || undefined 
-            });
-            count++;
-          }
-        }
-        
-        toast.success(`Import successful: ${count} accounts added. Duplicates were skipped.`);
-        loadData();
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+        handleParsedData(data);
       } catch (err) {
-        toast.error("Failed to process Excel file.");
         console.error(err);
+      } finally {
+        setImportProgress(null);
+        setSelectedFile(null);
       }
     };
     reader.readAsBinaryString(file);
+  };
+
+  const updatePreviewRow = (id: string, field: keyof SmartImportRow, value: any) => {
+    setPreviewRows(prev => {
+      return prev.map(row => {
+        if (row.id !== id) return row;
+        const newRow = { ...row, [field]: value };
+        
+        const existingNames = new Set(accounts.map(a => a.account_name.toLowerCase()));
+        const otherBatchNames = new Set(
+          prev.filter(r => r.id !== id && r.isValid).map(r => r.account_name.toLowerCase())
+        );
+        
+        let isValid = true;
+        let error = "";
+        
+        let name = String(newRow.account_name || "").trim().replace(/\s+/g, ' ');
+        if (!name) {
+          isValid = false;
+          error = "Account Name is empty.";
+        } else if (existingNames.has(name.toLowerCase())) {
+          isValid = false;
+          error = "Duplicate of existing account.";
+        } else if (otherBatchNames.has(name.toLowerCase())) {
+          isValid = false;
+          error = "Duplicate in batch.";
+        }
+        
+        const type = String(newRow.account_type || "").trim().replace(/\s+/g, ' ');
+        const matchedType = ALL_ACCOUNT_TYPES.find(t => t.toLowerCase() === type.toLowerCase());
+        if (isValid && !matchedType) {
+          isValid = false;
+          error = `Invalid type. Supported: ${ALL_ACCOUNT_TYPES.join(", ")}`;
+        }
+        
+        return {
+          ...newRow,
+          account_name: name,
+          account_type: matchedType || newRow.account_type,
+          isValid,
+          error
+        };
+      });
+    });
+  };
+
+  const executeSmartImport = async () => {
+    const validRows = previewRows.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      toast.error("No valid rows to import.");
+      return;
+    }
+    
+    let count = 0;
+    // Bulk insert safe mode: insert valid rows only, skipping failures automatically
+    for (const row of validRows) {
+      try {
+        await addChartOfAccount({
+          account_name: row.account_name,
+          account_type: row.account_type as any,
+          beginning_balance: Number(row.beginning_balance || 0),
+          as_of_date: row.as_of_date || undefined
+        });
+        count++;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
+    toast.success(`Import successful: ${count} accounts added.`);
+    loadData();
+    setIsSmartImportOpen(false);
+    setPreviewRows([]);
+  };
+
+  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImportFile(file);
+    }
     e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processImportFile(file);
+    }
   };
 
   const saveCOA = async () => {
@@ -547,10 +708,16 @@ export default function FinanceAdminModule() {
                   {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </optgroup>
               </select>
-              <label className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent cursor-pointer active:scale-95 transition-all">
-                <Upload size={14} /> Import Excel
-                <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleExcelImport} />
-              </label>
+              <button
+                onClick={() => {
+                  setIsSmartImportOpen(true);
+                  setPreviewRows([]);
+                  setSmartImportMode("file");
+                }}
+                className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all border border-border"
+              >
+                <Upload size={14} /> Import Chart of Accounts (Smart Import)
+              </button>
               <button
                 onClick={() => { setEditingCOA({} as any); setCoaForm({ account_type: "Asset", beginning_balance: 0 }); }}
                 className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all"
@@ -559,6 +726,240 @@ export default function FinanceAdminModule() {
               </button>
             </div>
           </div>
+
+          {/* Smart Table Import Engine Modal */}
+          {isSmartImportOpen && (
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-card text-card-foreground border border-border w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden reveal-up">
+                
+                {/* Modal Header */}
+                <div className="p-6 border-b border-border flex justify-between items-center bg-muted/40">
+                  <div>
+                    <h3 className="text-lg font-bold tracking-tight">Smart Chart of Accounts Import</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Parse file data, paste tabular rows, or construct manually with real-time validation.</p>
+                  </div>
+                  <button
+                    onClick={() => setIsSmartImportOpen(false)}
+                    className="w-8 h-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                  {/* Mode Selectors */}
+                  <div className="flex gap-2 p-1 bg-muted rounded-xl w-fit">
+                    {(["file", "paste", "manual"] as const).map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setSmartImportMode(mode)}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider ${
+                          smartImportMode === mode
+                            ? "bg-card text-card-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {mode === "file" ? "📁 Upload File" : mode === "paste" ? "📋 Paste Text" : "✍️ Manual Grid"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Mode Content */}
+                  {smartImportMode === "file" && (
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`p-10 rounded-xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center gap-4 ${
+                        dragOver
+                          ? "border-primary bg-primary/5 scale-[0.99]"
+                          : "border-border bg-muted/20"
+                      }`}
+                    >
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary animate-pulse">
+                        <Upload size={24} />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <h4 className="font-bold text-sm">Drag & Drop Excel or CSV File Here</h4>
+                        <p className="text-xs text-muted-foreground">Supports .xlsx, .xls, and .csv formats</p>
+                      </div>
+                      
+                      <label className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all cursor-pointer">
+                        Browse Files
+                        <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleExcelImport} />
+                      </label>
+                    </div>
+                  )}
+
+                  {smartImportMode === "paste" && (
+                    <div className="space-y-3">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Paste Spreadsheet / Tabular Data</label>
+                      <textarea
+                        className="pos-input w-full min-h-[120px] font-mono text-xs p-3"
+                        placeholder="AccountName&#9;AccountType&#9;BeginningBalance&#9;AsOfDate&#10;Cash in Hand&#9;Bank&#9;5000&#9;2026-05-28&#10;Pasted values can be tab-separated (from Excel) or comma-separated (CSV)..."
+                        value={pasteText}
+                        onChange={e => setPasteText(e.target.value)}
+                      />
+                      <button
+                        onClick={parsePastedText}
+                        className="px-4 h-9 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all"
+                      >
+                        Parse & Load Data
+                      </button>
+                    </div>
+                  )}
+
+                  {smartImportMode === "manual" && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setPreviewRows(prev => [
+                            ...prev,
+                            {
+                              id: Math.random().toString(36).substr(2, 9),
+                              account_name: "",
+                              account_type: "Expense",
+                              beginning_balance: 0,
+                              as_of_date: "",
+                              isValid: false,
+                              error: "Account Name is empty."
+                            }
+                          ]);
+                        }}
+                        className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all"
+                      >
+                        <Plus size={14} /> Add Blank Row
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Interactive Preview Grid */}
+                  {previewRows.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Interactive Grid Preview ({previewRows.length} total rows)</h4>
+                        <span className="text-xs font-medium text-muted-foreground">
+                          <strong className="text-green-600">{previewRows.filter(r => r.isValid).length}</strong> valid rows to import
+                        </span>
+                      </div>
+                      
+                      <div className="overflow-x-auto rounded-xl border border-border bg-card max-h-[300px]">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted sticky top-0 z-10">
+                            <tr>
+                              <th className="px-3 py-2 text-left w-12">Status</th>
+                              <th className="px-3 py-2 text-left">Account Name</th>
+                              <th className="px-3 py-2 text-left w-44">Account Type</th>
+                              <th className="px-3 py-2 text-right w-36">Beginning Balance</th>
+                              <th className="px-3 py-2 text-left w-36">As of Date</th>
+                              <th className="px-3 py-2 text-center w-12">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {previewRows.map((row) => (
+                              <tr key={row.id} className={`hover:bg-muted/30 transition-colors ${!row.isValid ? "bg-red-500/[0.02]" : ""}`}>
+                                <td className="px-3 py-2 text-center">
+                                  {row.isValid ? (
+                                    <span className="text-green-600 font-bold text-base" title="Ready to import">✓</span>
+                                  ) : (
+                                    <span className="text-destructive font-bold text-base cursor-help" title={row.error}>⚠️</span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input
+                                    type="text"
+                                    className={`pos-input h-8 text-xs w-full ${!row.isValid && !row.account_name ? "border-destructive/60 bg-destructive/5" : ""}`}
+                                    value={row.account_name}
+                                    onChange={e => updatePreviewRow(row.id, "account_name", e.target.value)}
+                                    placeholder="Account Name"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <select
+                                    className="pos-input h-8 text-xs w-full"
+                                    value={row.account_type}
+                                    onChange={e => updatePreviewRow(row.id, "account_type", e.target.value)}
+                                  >
+                                    {ALL_ACCOUNT_TYPES.map(t => (
+                                      <option key={t} value={t}>{t}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input
+                                    type="number"
+                                    className="pos-input h-8 text-xs w-full text-right"
+                                    value={row.beginning_balance || ""}
+                                    onChange={e => updatePreviewRow(row.id, "beginning_balance", parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input
+                                    type="date"
+                                    className="pos-input h-8 text-xs w-full"
+                                    value={row.as_of_date}
+                                    onChange={e => updatePreviewRow(row.id, "as_of_date", e.target.value)}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <button
+                                    onClick={() => setPreviewRows(prev => prev.filter(r => r.id !== row.id))}
+                                    className="w-6 h-6 rounded hover:bg-destructive/10 text-destructive/80 hover:text-destructive flex items-center justify-center transition-colors"
+                                    title="Remove row"
+                                  >
+                                    🗑️
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {previewRows.some(r => !r.isValid) && (
+                        <p className="text-[10px] text-destructive italic font-medium flex items-center gap-1">
+                          ⚠️ Invalid rows (marked with ⚠️) will be automatically skipped instead of causing import failure. You can correct their details in the grid to import them.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-6 border-t border-border flex justify-between items-center bg-muted/40">
+                  <button
+                    onClick={() => {
+                      setPreviewRows([]);
+                      setIsSmartImportOpen(false);
+                    }}
+                    className="px-4 h-10 rounded-lg bg-secondary text-secondary-foreground text-xs font-bold hover:bg-accent active:scale-95 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <div className="flex gap-2">
+                    {previewRows.length > 0 && (
+                      <button
+                        onClick={() => setPreviewRows([])}
+                        className="px-4 h-10 rounded-lg bg-destructive/10 text-destructive text-xs font-bold hover:bg-destructive/20 active:scale-95 transition-all"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                    <button
+                      onClick={executeSmartImport}
+                      disabled={previewRows.filter(r => r.isValid).length === 0}
+                      className="px-5 h-10 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Save & Import ({previewRows.filter(r => r.isValid).length} Valid Accounts)
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
 
           <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
             <table className="w-full text-sm">

@@ -115,6 +115,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
   );
 
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
+  const [activeDropdownIdx, setActiveDropdownIdx] = useState<number | null>(null);
   
   const [denoms, setDenoms] = useState<DenomRow[]>(
     editReport?.denoms?.length
@@ -341,12 +342,40 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>}
                   <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
                 </div>
-                <div>
+                <div className="relative">
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Category</label>}
-                  <input list="coa-list" type="text" className={`${inputClass} text-sm h-10`} value={item.particulars} onChange={e => updatePetty(i, "particulars", e.target.value)} placeholder="Particulars" />
-                  <datalist id="coa-list">
-                    {accounts.map(a => <option key={a.id} value={a.account_name} />)}
-                  </datalist>
+                  <input
+                    type="text"
+                    className={`${inputClass} text-sm h-10`}
+                    value={item.particulars}
+                    onChange={e => updatePetty(i, "particulars", e.target.value)}
+                    onFocus={() => setActiveDropdownIdx(i)}
+                    onBlur={() => setTimeout(() => setActiveDropdownIdx(null), 200)}
+                    placeholder="Particulars"
+                    autoComplete="off"
+                  />
+                  {activeDropdownIdx === i && (
+                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50">
+                      {accounts
+                        .filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase()))
+                        .map(a => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                            onMouseDown={() => {
+                              updatePetty(i, "particulars", a.account_name);
+                              setActiveDropdownIdx(null);
+                            }}
+                          >
+                            {a.account_name}
+                          </button>
+                        ))}
+                      {accounts.filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-2 text-xs text-muted-foreground italic">No matching accounts</div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}
