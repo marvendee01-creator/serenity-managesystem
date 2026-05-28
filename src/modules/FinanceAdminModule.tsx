@@ -74,6 +74,8 @@ export default function FinanceAdminModule() {
   const [coaForm, setCoaForm] = useState<Partial<ChartOfAccount>>({ account_type: "Asset", beginning_balance: 0 });
   const [coaSearch, setCoaSearch] = useState("");
   const [coaTypeFilter, setCoaTypeFilter] = useState("All");
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
 
   // Excel Import State
   const [showImportZone, setShowImportZone] = useState(false);
@@ -768,11 +770,49 @@ export default function FinanceAdminModule() {
                 <Upload size={14} /> Import Chart of Accounts (Smart Import)
               </button>
               <button
-                onClick={() => { setEditingCOA({} as any); setCoaForm({ account_type: "Asset", beginning_balance: 0 }); }}
+                onClick={() =>
+                  { setEditingCOA({} as any); setCoaForm({ account_type: "Asset", beginning_balance: 0 }); }}
                 className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-95 transition-all"
               >
                 <Plus size={14} /> Add Account
               </button>
+              {accounts.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (!deleteAllConfirm) {
+                      setDeleteAllConfirm(true);
+                      return;
+                    }
+                    setDeleteAllLoading(true);
+                    try {
+                      // Delete all accounts one by one
+                      await Promise.all(accounts.map(a => deleteChartOfAccount(a.id!)));
+                      await loadData();
+                      toast.success(`All ${accounts.length} accounts deleted successfully.`);
+                    } catch (e: any) {
+                      toast.error("Failed to delete all accounts: " + (e?.message || String(e)));
+                    }
+                    setDeleteAllLoading(false);
+                    setDeleteAllConfirm(false);
+                  }}
+                  onBlur={() => setTimeout(() => setDeleteAllConfirm(false), 3000)}
+                  disabled={deleteAllLoading}
+                  className={`flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium active:scale-95 transition-all disabled:opacity-60 ${
+                    deleteAllConfirm
+                      ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 animate-pulse"
+                      : "bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/20"
+                  }`}
+                  title="Permanently delete ALL Chart of Accounts entries"
+                >
+                  {deleteAllLoading ? (
+                    <><RefreshCw size={14} className="animate-spin" /> Deleting...</>
+                  ) : deleteAllConfirm ? (
+                    <><Trash2 size={14} /> Confirm Delete All ({accounts.length})</>
+                  ) : (
+                    <><Trash2 size={14} /> Delete All Accounts</>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1010,14 +1050,32 @@ export default function FinanceAdminModule() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-            <table className="w-full text-sm">
-              <thead className="bg-muted">
+          <div
+            className="rounded-xl border border-border bg-card shadow-sm"
+            style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}
+          >
+            <table
+              className="w-full text-sm border-collapse"
+              style={{ minWidth: "900px", tableLayout: "auto" }}
+            >
+              <thead className="bg-muted" style={{ position: "sticky", top: 0, zIndex: 10 }}>
                 <tr>
-                  <th className="text-left px-4 py-3 font-semibold">Account Name</th>
-                  <th className="text-left px-4 py-3 font-semibold">Type</th>
-                  <th className="text-right px-4 py-3 font-semibold">Beginning Balance</th>
-                  <th className="text-center px-4 py-3 font-semibold">Actions</th>
+                  <th
+                    className="text-left px-4 py-3 font-semibold border-b border-border"
+                    style={{ minWidth: "300px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Account Name</th>
+                  <th
+                    className="text-left px-4 py-3 font-semibold border-b border-border"
+                    style={{ minWidth: "180px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Type</th>
+                  <th
+                    className="text-right px-4 py-3 font-semibold border-b border-border"
+                    style={{ minWidth: "160px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Beginning Balance</th>
+                  <th
+                    className="text-center px-4 py-3 font-semibold border-b border-border"
+                    style={{ width: "100px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -1032,13 +1090,21 @@ export default function FinanceAdminModule() {
                 )}
                 {filteredAccounts.map(a => (
                   <tr key={a.id} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-4 py-3 font-medium">{a.account_name}</td>
-                    <td className="px-4 py-3">
+                    <td
+                      className="px-4 py-3 font-medium"
+                      style={{
+                        maxWidth: "480px",
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
+                        lineHeight: "1.4",
+                      }}
+                    >{a.account_name}</td>
+                    <td className="px-4 py-3" style={{ whiteSpace: "nowrap" }}>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${TYPE_COLORS[a.account_type] || "bg-secondary"}`}>
                         {a.account_type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium">{formatPeso(a.beginning_balance)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium" style={{ whiteSpace: "nowrap" }}>{formatPeso(a.beginning_balance)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center gap-2">
                         <button

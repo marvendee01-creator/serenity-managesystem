@@ -60,12 +60,15 @@ export function buildBookingCashierHTML(report: BookingCashierReport) {
 
   return `
     <style>
+      @page { size: A4 landscape; margin: 15mm; }
+      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
       body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
       h2 { text-align: center; font-size: 14px; margin: 4px 0; }
       h3 { font-size: 12px; margin: 12px 0 4px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-      td, th { border: 1px solid #999; padding: 3px 6px; font-size: 11px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: auto; }
+      td, th { border: 1px solid #999; padding: 4px 8px; font-size: 11px; word-break: normal; white-space: normal; }
       th { background: #f0f0f0; text-align: left; }
+      td.particulars { min-width: 220px; max-width: 400px; word-break: break-word; white-space: normal; }
       .right { text-align: right; }
       .bold { font-weight: bold; }
       .negative { color: red; }
@@ -85,8 +88,8 @@ export function buildBookingCashierHTML(report: BookingCashierReport) {
     </table>
     <h3>B. PETTY CASH EXPENSE DETAILS</h3>
     <table>
-      <tr><th>Date</th><th>Particulars</th><th>Receipt No.</th><th class="right">Amount</th></tr>
-      ${report.pettyItems.map(p => `<tr><td>${p.date}</td><td>${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
+      <tr><th style="width:90px">Date</th><th style="min-width:220px">Particulars</th><th style="width:100px">Receipt No.</th><th class="right" style="width:100px">Amount</th></tr>
+      ${report.pettyItems.map(p => `<tr><td>${p.date}</td><td class="particulars">${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
       <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${totalPetty.toLocaleString()}</td></tr>
     </table>
     <h3>C. CASH DENOMINATION</h3>
@@ -261,9 +264,9 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
       actual_cash: totalActualCash,
       actualCash: totalActualCash,
     };
-    const w = window.open("", "_blank", "width=800,height=1000");
+    const w = window.open("", "_blank", "width=1100,height=800");
     if (!w) return;
-    w.document.write(`<html><head><title>Booking Cashier Report</title></head><body>${buildBookingCashierHTML(report)}<script>window.print();</script></body></html>`);
+    w.document.write(`<html><head><title>Booking Cashier Report</title><meta charset="utf-8"><style>@page{size:A4 landscape;margin:15mm;}</style></head><body>${buildBookingCashierHTML(report)}<script>window.onload=function(){window.print();}<\/script></body></html>`);
     w.document.close();
   };
 
@@ -306,7 +309,7 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
   const computedClass = "pos-input w-full bg-muted cursor-not-allowed opacity-80";
 
   return (
-    <div className="reveal-up max-w-lg mx-auto">
+    <div className="reveal-up w-full max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
           <Banknote size={20} />
@@ -386,62 +389,77 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
               </button>
             </div>
           </div>
-          <div className="space-y-2">
-            {pettyItems.map((item, i) => (
-              <div key={i} className={`grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end ${item.is_budoy ? "bg-orange-500/5 rounded-lg p-1" : ""}`}>
-                <div>
-                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>}
-                  <input type="date" className={`${inputClass} text-sm h-10`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} disabled={item.is_budoy} />
-                </div>
-                <div className="relative">
-                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Particulars</label>}
-                  <input
-                    type="text"
-                    className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`}
-                    value={item.particulars}
-                    onChange={e => updatePetty(i, "particulars", e.target.value)}
-                    onFocus={() => !item.is_budoy && setActiveDropdownIdx(i)}
-                    onBlur={() => setTimeout(() => setActiveDropdownIdx(null), 200)}
-                    placeholder="Item"
-                    disabled={item.is_budoy}
-                    autoComplete="off"
-                  />
-                  {!item.is_budoy && activeDropdownIdx === i && (
-                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50">
-                      {accounts
-                        .filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase()))
-                        .map(a => (
-                          <button
-                            key={a.id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground transition-colors"
-                            onMouseDown={() => {
-                              updatePetty(i, "particulars", a.account_name);
-                              setActiveDropdownIdx(null);
-                            }}
-                          >
-                            {a.account_name}
-                          </button>
-                        ))}
-                      {accounts.filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase())).length === 0 && (
-                        <div className="px-3 py-2 text-xs text-muted-foreground italic">No matching accounts</div>
+          {/* Full-width landscape table for petty cash */}
+          <div className="overflow-x-auto rounded-lg border border-border" style={{ minWidth: 0 }}>
+            <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap" style={{ width: "120px" }}>Date</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "260px" }}>Particulars / Category</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "130px" }}>Receipt #</th>
+                  <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "120px" }}>Amount</th>
+                  <th className="text-center px-2 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "44px" }}></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {pettyItems.map((item, i) => (
+                  <tr key={i} className={`hover:bg-muted/30 transition-colors ${item.is_budoy ? "bg-orange-500/5" : ""}`}>
+                    <td className="px-2 py-1.5">
+                      <input type="date" className={`${inputClass} text-xs h-9 w-full`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} disabled={item.is_budoy} />
+                    </td>
+                    <td className="px-2 py-1.5 relative" style={{ minWidth: "260px" }}>
+                      <input
+                        type="text"
+                        className={`${item.is_budoy ? computedClass : inputClass} text-xs h-9 w-full`}
+                        style={{ whiteSpace: "normal", wordBreak: "normal", minWidth: "220px" }}
+                        value={item.particulars}
+                        onChange={e => updatePetty(i, "particulars", e.target.value)}
+                        onFocus={() => !item.is_budoy && setActiveDropdownIdx(i)}
+                        onBlur={() => setTimeout(() => setActiveDropdownIdx(null), 200)}
+                        placeholder="Search or type account name..."
+                        disabled={item.is_budoy}
+                        autoComplete="off"
+                      />
+                      {!item.is_budoy && activeDropdownIdx === i && (
+                        <div className="absolute left-2 right-2 mt-0.5 max-h-48 overflow-y-auto bg-popover text-popover-foreground border border-border rounded-lg shadow-xl z-50">
+                          {accounts
+                            .filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase()))
+                            .map(a => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground transition-colors border-b border-border/50 last:border-0"
+                                style={{ whiteSpace: "normal", wordBreak: "break-word" }}
+                                onMouseDown={() => {
+                                  updatePetty(i, "particulars", a.account_name);
+                                  setActiveDropdownIdx(null);
+                                }}
+                              >
+                                <span className="font-medium">{a.account_name}</span>
+                                <span className="text-muted-foreground ml-2 text-[10px]">({a.account_type})</span>
+                              </button>
+                            ))}
+                          {accounts.filter(a => a.account_name.toLowerCase().includes(item.particulars.toLowerCase())).length === 0 && (
+                            <div className="px-3 py-2 text-xs text-muted-foreground italic">No matching accounts</div>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Receipt #</label>}
-                  <input type="text" className={`${inputClass} text-sm h-10`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" disabled={item.is_budoy} />
-                </div>
-                <div>
-                  {i === 0 && <label className="text-[10px] font-medium text-muted-foreground block mb-1">Amount</label>}
-                  <input type="number" className={`${item.is_budoy ? computedClass : inputClass} text-sm h-10`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" disabled={item.is_budoy} />
-                </div>
-                <button onClick={() => removePettyRow(i)} className="w-8 h-10 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all" disabled={pettyItems.length === 1}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="text" className={`${inputClass} text-xs h-9 w-full`} value={item.receipt_no} onChange={e => updatePetty(i, "receipt_no", e.target.value)} placeholder="—" disabled={item.is_budoy} />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input type="number" className={`${item.is_budoy ? computedClass : inputClass} text-xs h-9 w-full text-right`} value={item.amount} onChange={e => updatePetty(i, "amount", e.target.value)} placeholder="0.00" disabled={item.is_budoy} />
+                    </td>
+                    <td className="px-1 py-1.5 text-center">
+                      <button onClick={() => removePettyRow(i)} className="w-8 h-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-all mx-auto" disabled={pettyItems.length === 1}>
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <div className="flex justify-between items-center pt-2 border-t border-border">
             <span className="text-sm font-medium text-muted-foreground">Total Petty Cash</span>
