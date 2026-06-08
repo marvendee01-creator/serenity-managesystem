@@ -159,20 +159,127 @@ export default function FinanceAdminModule() {
   const allLedgerLines = useMemo(() => {
     const lines: LedgerLine[] = [];
 
-    const findAccount = (type: string, keyword: string, defaultName: string) => {
+    // ── Robust Multi-Keyword Income Account Resolver ──────────────────────────
+    // Tries (in order): 1) exact default name, 2) income account with any keyword,
+    // 3) any account with any keyword, 4) first income account, 5) defaultName.
+    const findIncomeAccount = (keywords: string[], defaultName: string): string => {
+      // 1. Exact match on defaultName
       let acc = accounts.find(a => a.account_name.toLowerCase() === defaultName.toLowerCase());
       if (acc) return acc.account_name;
-      acc = accounts.find(a => a.account_type === type && a.account_name.toLowerCase().includes(keyword.toLowerCase()));
+
+      // 2. Income/Other Income account containing any keyword
+      for (const kw of keywords) {
+        acc = accounts.find(
+          a => INCOME_TYPES.includes(a.account_type) &&
+               a.account_name.toLowerCase().includes(kw.toLowerCase())
+        );
+        if (acc) return acc.account_name;
+      }
+
+      // 3. ANY account type containing any keyword (catch-all)
+      for (const kw of keywords) {
+        acc = accounts.find(a => a.account_name.toLowerCase().includes(kw.toLowerCase()));
+        if (acc) return acc.account_name;
+      }
+
+      // 4. First available income account
+      acc = accounts.find(a => INCOME_TYPES.includes(a.account_type));
       if (acc) return acc.account_name;
-      acc = accounts.find(a => a.account_type === type);
-      if (acc) return acc.account_name;
+
       return defaultName;
     };
 
-    const findAssetAccount = (paymentMethod: string) => {
-      if (paymentMethod === "GCash") return findAccount("Asset", "gcash", "GCash / Bank");
-      if (paymentMethod === "Charge to Booking") return findAccount("Asset", "receivable", "Accounts Receivable");
-      return findAccount("Asset", "cash on hand", "Cash on Hand");
+    // ── Robust Cash/Asset Account Resolver ───────────────────────────────────
+    const findCashAccount = (paymentMethod: string): string => {
+      if (paymentMethod === "GCash") {
+        const kws = ["gcash", "g-cash", "g cash"];
+        for (const kw of kws) {
+          const a = accounts.find(ac =>
+            (ASSET_TYPES.includes(ac.account_type)) &&
+            ac.account_name.toLowerCase().includes(kw)
+          );
+          if (a) return a.account_name;
+        }
+        return "GCash / Bank";
+      }
+      if (paymentMethod === "Charge to Booking") {
+        const kws = ["receivable", "charge"];
+        for (const kw of kws) {
+          const a = accounts.find(ac =>
+            (ac.account_type === "Accounts Receivable" || ASSET_TYPES.includes(ac.account_type)) &&
+            ac.account_name.toLowerCase().includes(kw)
+          );
+          if (a) return a.account_name;
+        }
+        return "Accounts Receivable";
+      }
+      // Default: Cash on Hand
+      const cashKws = ["cash on hand", "cash in hand", "petty cash fund", "cash drawer"];
+      for (const kw of cashKws) {
+        const a = accounts.find(ac =>
+          ASSET_TYPES.includes(ac.account_type) &&
+          ac.account_name.toLowerCase().includes(kw)
+        );
+        if (a) return a.account_name;
+      }
+      // Any asset/bank account with "cash" in name
+      const anyCash = accounts.find(ac =>
+        ASSET_TYPES.includes(ac.account_type) &&
+        ac.account_name.toLowerCase().includes("cash")
+      );
+      if (anyCash) return anyCash.account_name;
+      // Any asset account
+      const anyAsset = accounts.find(ac => ASSET_TYPES.includes(ac.account_type));
+      if (anyAsset) return anyAsset.account_name;
+      return "Cash on Hand";
+    };
+
+    // ── Petty Cash / Expense Account Resolver ─────────────────────────────────
+    const findExpenseAccount = (particulars: string, category?: string): string => {
+      // 1. Exact name match
+      const direct = accounts.find(a => a.account_name.toLowerCase() === particulars.toLowerCase());
+      if (direct) return direct.account_name;
+      // 2. Expense account with particulars keyword
+      const byParticulars = accounts.find(a =>
+        EXPENSE_TYPES.concat(COGS_TYPES).includes(a.account_type) &&
+        a.account_name.toLowerCase().includes(particulars.toLowerCase())
+      );
+      if (byParticulars) return byParticulars.account_name;
+      // 3. Expense account with category keyword
+      if (category) {
+        const byCat = accounts.find(a =>
+          EXPENSE_TYPES.concat(COGS_TYPES).includes(a.account_type) &&
+          a.account_name.toLowerCase().includes(category.toLowerCase())
+        );
+        if (byCat) return byCat.account_name;
+      }
+      // 4. Miscellaneous expense fallback
+      const misc = accounts.find(a =>
+        EXPENSE_TYPES.includes(a.account_type) &&
+        (a.account_name.toLowerCase().includes("miscellaneous") || a.account_name.toLowerCase().includes("misc"))
+      );
+      if (misc) return misc.account_name;
+      // 5. First expense account
+      const firstExp = accounts.find(a => EXPENSE_TYPES.includes(a.account_type));
+      if (firstExp) return firstExp.account_name;
+      return "Miscellaneous Expense";
+    };
+
+    const findPettyCashAccount = (): string => {
+      const kws = ["petty cash", "petty", "cash fund"];
+      for (const kw of kws) {
+        const a = accounts.find(ac =>
+          ASSET_TYPES.includes(ac.account_type) &&
+          ac.account_name.toLowerCase().includes(kw)
+        );
+        if (a) return a.account_name;
+      }
+      // Fall through to any cash asset
+      const anyCash = accounts.find(ac =>
+        ASSET_TYPES.includes(ac.account_type) &&
+        ac.account_name.toLowerCase().includes("cash")
+      );
+      return anyCash ? anyCash.account_name : "Petty Cash";
     };
 
     // 1. Chart of Accounts Beginning Balances offset against Opening Balance Equity
@@ -234,67 +341,126 @@ export default function FinanceAdminModule() {
 
       const breakdown: { account: string; type: string; amount: number }[] = [];
 
+      // ── Per-module income account resolution using multi-keyword resolver ──
       if (t.module === "Entrance") {
-        if (maint > 0) breakdown.push({ account: findAccount("Income", "maintenance", "Maintenance Fee Income"), type: "Income", amount: maint });
-        if (drinks > 0) breakdown.push({ account: findAccount("Income", "drinks", "Drinks Corkage Income"), type: "Income", amount: drinks });
-        if (liquor > 0) breakdown.push({ account: findAccount("Income", "liquor", "Liquor Corkage Income"), type: "Income", amount: liquor });
-        if (hall > 0) breakdown.push({ account: findAccount("Income", "function hall", "Function Hall Income"), type: "Income", amount: hall });
-
-        const tentAddon = t.with_tent ? 300 : 0;
-        if (tentAddon > 0) breakdown.push({ account: findAccount("Income", "tent", "Tent Income"), type: "Income", amount: tentAddon });
-
+        // Sub-fee breakdowns first
+        if (maint > 0) breakdown.push({
+          account: findIncomeAccount(
+            ["maintenance fee", "maintenance income", "maintenance"],
+            "Maintenance Fee Income"
+          ), type: "Income", amount: maint
+        });
+        if (drinks > 0) breakdown.push({
+          account: findIncomeAccount(
+            ["drinks corkage", "drinks income", "corkage drink", "drinks"],
+            "Drinks Corkage Income"
+          ), type: "Income", amount: drinks
+        });
+        if (liquor > 0) breakdown.push({
+          account: findIncomeAccount(
+            ["liquor corkage", "liquor income", "corkage liquor", "liquor"],
+            "Liquor Corkage Income"
+          ), type: "Income", amount: liquor
+        });
+        if (hall > 0) breakdown.push({
+          account: findIncomeAccount(
+            ["function hall", "hall income", "hall rent", "hall fee", "hall"],
+            "Function Hall Income"
+          ), type: "Income", amount: hall
+        });
+        const tentAddon = Number(t.tent_fee) || (t.with_tent ? 300 : 0);
+        if (tentAddon > 0) breakdown.push({
+          account: findIncomeAccount(
+            ["tent income", "tent rent", "tent fee", "tent"],
+            "Tent Income"
+          ), type: "Income", amount: tentAddon
+        });
+        // Base entrance fee = total minus all sub-fees
         const allocated = breakdown.reduce((sum, item) => sum + item.amount, 0);
         const baseEntrance = Math.max(0, totalAmount - allocated);
         if (baseEntrance > 0 || breakdown.length === 0) {
-          breakdown.push({ account: findAccount("Income", "entrance", "Entrance Income"), type: "Income", amount: baseEntrance });
+          breakdown.push({
+            account: findIncomeAccount(
+              ["entrance fee", "entrance income", "entrance revenue", "admission fee", "admission", "gate fee", "entrance"],
+              "Entrance Fee Income"
+            ), type: "Income", amount: Math.max(0, baseEntrance)
+          });
         }
       } else if (t.module === "Room") {
-        breakdown.push({ account: findAccount("Income", "room", "Room Income"), type: "Income", amount: totalAmount });
+        breakdown.push({
+          account: findIncomeAccount(
+            ["room income", "room revenue", "room rent", "room fee", "room", "accommodation", "lodging"],
+            "Room Income"
+          ), type: "Income", amount: totalAmount
+        });
       } else if (t.module === "Tent") {
-        breakdown.push({ account: findAccount("Income", "tent", "Tent Income"), type: "Income", amount: totalAmount });
+        breakdown.push({
+          account: findIncomeAccount(
+            ["tent income", "tent rent", "tent fee", "tent"],
+            "Tent Income"
+          ), type: "Income", amount: totalAmount
+        });
       } else if (t.module === "Games Rental") {
-        breakdown.push({ account: findAccount("Income", "game", "Games Income"), type: "Income", amount: totalAmount });
+        breakdown.push({
+          account: findIncomeAccount(
+            ["games rental", "game rental", "games income", "game income", "games revenue", "game revenue", "games", "game"],
+            "Games Rental Income"
+          ), type: "Income", amount: totalAmount
+        });
       } else if (t.module === "Table Rent") {
-        breakdown.push({ account: findAccount("Income", "table", "Table Rent Income"), type: "Income", amount: totalAmount });
+        breakdown.push({
+          account: findIncomeAccount(
+            ["table rent", "table income", "table revenue", "table fee", "table"],
+            "Table Rent Income"
+          ), type: "Income", amount: totalAmount
+        });
       } else if (t.module === "Booking") {
-        breakdown.push({ account: findAccount("Income", "booking", "Booking Income"), type: "Income", amount: totalAmount });
+        breakdown.push({
+          account: findIncomeAccount(
+            ["booking income", "booking revenue", "booking fee", "reservation income", "reservation", "booking"],
+            "Booking Income"
+          ), type: "Income", amount: totalAmount
+        });
       } else {
-        breakdown.push({ account: findAccount("Income", t.module, `${t.module} Income`), type: "Income", amount: totalAmount });
+        breakdown.push({
+          account: findIncomeAccount(
+            [t.module.toLowerCase(), t.module.toLowerCase() + " income"],
+            `${t.module} Income`
+          ), type: "Income", amount: totalAmount
+        });
       }
 
-      // Check sum of breakdown. If it differs from totalAmount, adjust the main item.
+      // Reconcile: if breakdown sum ≠ totalAmount, adjust the primary item
       const breakdownSum = breakdown.reduce((s, b) => s + b.amount, 0);
-      if (breakdownSum > 0 && breakdownSum !== totalAmount) {
-        const mainIdx = breakdown.findIndex(b => b.account.toLowerCase().includes(t.module.toLowerCase()));
-        if (mainIdx !== -1) {
-          breakdown[mainIdx].amount += totalAmount - breakdownSum;
-        } else {
-          breakdown[0].amount += totalAmount - breakdownSum;
-        }
+      if (breakdownSum > 0 && Math.abs(breakdownSum - totalAmount) > 0.01) {
+        const mainIdx = breakdown.findIndex(b => b.account.toLowerCase().includes(t.module.toLowerCase().split(" ")[0]));
+        const adjIdx = mainIdx !== -1 ? mainIdx : 0;
+        breakdown[adjIdx].amount += totalAmount - breakdownSum;
       }
 
-      // Debit Cash/Receivables
-      const debitAccName = findAssetAccount(t.payment_method);
+      // Debit Cash / Receivables
+      const debitAccName = findCashAccount(t.payment_method);
       lines.push({
         id: `txn-dr-${t.id || Math.random().toString()}`,
         date: dateStr,
         account_name: debitAccName,
-        account_type: "Asset",
-        description: `${t.module} sales transaction from ${t.customer_name || "Guest"} (Ref: ${t.transaction_no})`,
+        account_type: accounts.find(a => a.account_name === debitAccName)?.account_type || "Asset",
+        description: `${t.module} payment from ${t.customer_name || "Guest"} — ₱${totalAmount.toLocaleString()} via ${t.payment_method || "Cash"} (Ref: ${t.transaction_no})`,
         debit: totalAmount,
         credit: 0,
         source: t.module,
       });
 
-      // Credit Income(s)
+      // Credit Income account(s)
       breakdown.forEach((item, idx) => {
         if (item.amount <= 0) return;
+        const accType = accounts.find(a => a.account_name === item.account)?.account_type || "Income";
         lines.push({
           id: `txn-cr-${t.id || Math.random().toString()}-${idx}`,
           date: dateStr,
           account_name: item.account,
-          account_type: "Income",
-          description: `${t.module} Revenue: ${item.account} (Ref: ${t.transaction_no})`,
+          account_type: accType,
+          description: `${t.module} Revenue — ${item.account} | ${t.customer_name || "Guest"} (Ref: ${t.transaction_no})`,
           debit: 0,
           credit: item.amount,
           source: t.module,
@@ -308,8 +474,11 @@ export default function FinanceAdminModule() {
       if (amount <= 0) return;
       const dateStr = (f.sale_date || new Date().toISOString()).slice(0, 10);
 
-      const debitAcc = findAccount("Asset", "cash on hand", "Cash on Hand");
-      const creditAcc = findAccount("Income", "food", "Food Restaurant POS Income");
+      const debitAcc = findCashAccount("Cash");
+      const creditAcc = findIncomeAccount(
+        ["food restaurant", "food pos", "restaurant income", "restaurant revenue", "food income", "food revenue", "food sales", "food", "restaurant", "pos"],
+        "Food Restaurant POS Income"
+      );
 
       lines.push({
         id: `food-dr-${f.id || Math.random().toString()}`,
@@ -353,10 +522,10 @@ export default function FinanceAdminModule() {
             (a.account_name.toLowerCase().includes(p.particulars.toLowerCase()) ||
              (p.category && a.account_name.toLowerCase().includes(p.category.toLowerCase())))
           );
-          debitAccName = expenseAcc ? expenseAcc.account_name : findAccount("Expense", "miscellaneous", "Miscellaneous Expense");
+          debitAccName = expenseAcc ? expenseAcc.account_name : findExpenseAccount(p.particulars, p.category);
         }
 
-        const creditAccName = findAccount("Asset", "petty cash", "Petty Cash");
+        const creditAccName = findPettyCashAccount();
 
         lines.push({
           id: `store-petty-dr-${r.id}-${idx}`,
@@ -401,10 +570,10 @@ export default function FinanceAdminModule() {
             (a.account_name.toLowerCase().includes(p.particulars.toLowerCase()) ||
              (p.category && a.account_name.toLowerCase().includes(p.category.toLowerCase())))
           );
-          debitAccName = expenseAcc ? expenseAcc.account_name : findAccount("Expense", "miscellaneous", "Miscellaneous Expense");
+          debitAccName = expenseAcc ? expenseAcc.account_name : findExpenseAccount(p.particulars, p.category);
         }
 
-        const creditAccName = findAccount("Asset", "petty cash", "Petty Cash");
+        const creditAccName = findPettyCashAccount();
 
         lines.push({
           id: `booking-petty-dr-${r.id}-${idx}`,
@@ -605,74 +774,80 @@ export default function FinanceAdminModule() {
 
   // Cash Flow Statement computed dynamically from dynamic ledger lines
   const cfData = useMemo(() => {
-    let entranceInflow = 0;
-    let tentInflow = 0;
-    let roomInflow = 0;
-    let bookingInflow = 0;
-    let gamesInflow = 0;
-    let tableInflow = 0;
-    let foodInflow = 0;
-    let maintInflow = 0;
-    let drinksInflow = 0;
-    let liquorInflow = 0;
-    let hallInflow = 0;
-
+    // ── Use line.source (exact module name) to categorize — NOT account name keywords ──
+    // This guarantees correct bucketing regardless of how the user named their COA accounts.
+    const buckets: Record<string, number> = {
+      "Entrance": 0,
+      "Tent": 0,
+      "Room": 0,
+      "Booking": 0,
+      "Games Rental": 0,
+      "Table Rent": 0,
+      "Food Restaurant POS": 0,
+      // Entrance sub-fees — distinguished by account name since they share source "Entrance"
+      "_Maintenance": 0,
+      "_Drinks": 0,
+      "_Liquor": 0,
+      "_Hall": 0,
+    };
     let storeOutflow = 0;
-    let bookingOutflow = 0;
+    let bookingCashierOutflow = 0;
 
     filteredLedgerLines.forEach(line => {
       const acc = accounts.find(a => a.account_name === line.account_name);
-      if (!acc) return;
-
-      if (INCOME_TYPES.includes(acc.account_type)) {
+      // Only credit-side income lines count as inflow
+      if (acc && INCOME_TYPES.includes(acc.account_type)) {
         const amt = line.credit - line.debit;
         if (amt <= 0) return;
+        const src = line.source;
+        const nm = line.account_name.toLowerCase();
 
-        const name = acc.account_name.toLowerCase();
-        if (name.includes("maintenance")) maintInflow += amt;
-        else if (name.includes("drinks corkage")) drinksInflow += amt;
-        else if (name.includes("liquor corkage")) liquorInflow += amt;
-        else if (name.includes("function hall")) hallInflow += amt;
-        else if (name.includes("entrance")) entranceInflow += amt;
-        else if (name.includes("tent")) tentInflow += amt;
-        else if (name.includes("room")) roomInflow += amt;
-        else if (name.includes("booking")) bookingInflow += amt;
-        else if (name.includes("game")) gamesInflow += amt;
-        else if (name.includes("table")) tableInflow += amt;
-        else if (name.includes("food") || name.includes("restaurant") || name.includes("pos")) foodInflow += amt;
-        else {
-          entranceInflow += amt;
+        if (src === "Entrance") {
+          // Differentiate Entrance sub-fees by account name
+          if (nm.includes("maintenance")) buckets["_Maintenance"] += amt;
+          else if (nm.includes("drinks") || nm.includes("corkage drink")) buckets["_Drinks"] += amt;
+          else if (nm.includes("liquor") || nm.includes("corkage liquor")) buckets["_Liquor"] += amt;
+          else if (nm.includes("hall") || nm.includes("function")) buckets["_Hall"] += amt;
+          else if (nm.includes("tent")) buckets["Tent"] += amt;
+          else buckets["Entrance"] += amt;
+        } else if (src in buckets) {
+          buckets[src] += amt;
+        } else {
+          // Unknown source — add to its own bucket or Entrance catch-all
+          buckets["Entrance"] += amt;
         }
-      } else if (EXPENSE_TYPES.includes(acc.account_type) || COGS_TYPES.includes(acc.account_type)) {
+      } else if (acc && (EXPENSE_TYPES.includes(acc.account_type) || COGS_TYPES.includes(acc.account_type))) {
         const amt = line.debit - line.credit;
         if (amt <= 0) return;
-
         if (line.source === "Cashier Store") storeOutflow += amt;
-        else if (line.source === "Cashier Booking") bookingOutflow += amt;
+        else if (line.source === "Cashier Booking") bookingCashierOutflow += amt;
       }
     });
 
-    const totalInflow = entranceInflow + tentInflow + roomInflow + bookingInflow + gamesInflow + tableInflow + foodInflow + maintInflow + drinksInflow + liquorInflow + hallInflow;
-    const totalOutflow = storeOutflow + bookingOutflow;
+    const totalInflow =
+      buckets["Entrance"] + buckets["Tent"] + buckets["Room"] + buckets["Booking"] +
+      buckets["Games Rental"] + buckets["Table Rent"] + buckets["Food Restaurant POS"] +
+      buckets["_Maintenance"] + buckets["_Drinks"] + buckets["_Liquor"] + buckets["_Hall"];
+    const totalOutflow = storeOutflow + bookingCashierOutflow;
     const netCashFlow = totalInflow - totalOutflow;
 
     return {
       inflows: [
-        { name: "Entrance Sales", amount: entranceInflow },
-        { name: "Tent Rent Sales", amount: tentInflow },
-        { name: "Room Rent Sales", amount: roomInflow },
-        { name: "Booking Sales", amount: bookingInflow },
-        { name: "Games Rental Sales", amount: gamesInflow },
-        { name: "Table Rent Sales", amount: tableInflow },
-        { name: "Food Restaurant POS", amount: foodInflow },
-        { name: "Maintenance Fees", amount: maintInflow },
-        { name: "Drinks Corkages", amount: drinksInflow },
-        { name: "Liquor Corkages", amount: liquorInflow },
-        { name: "Function Hall Rent", amount: hallInflow },
+        { name: "Entrance Sales",          amount: buckets["Entrance"] },
+        { name: "Tent Rent Sales",          amount: buckets["Tent"] },
+        { name: "Room Rent Sales",          amount: buckets["Room"] },
+        { name: "Booking Sales",            amount: buckets["Booking"] },
+        { name: "Games Rental Sales",       amount: buckets["Games Rental"] },
+        { name: "Table Rent Sales",         amount: buckets["Table Rent"] },
+        { name: "Food Restaurant POS",      amount: buckets["Food Restaurant POS"] },
+        { name: "Maintenance Fees",         amount: buckets["_Maintenance"] },
+        { name: "Drinks Corkage",           amount: buckets["_Drinks"] },
+        { name: "Liquor Corkage",           amount: buckets["_Liquor"] },
+        { name: "Function Hall Rent",       amount: buckets["_Hall"] },
       ],
       outflows: [
-        { name: "Cashier Store Petty Cash Expenses", amount: storeOutflow },
-        { name: "Cashier Booking Petty Cash Expenses", amount: bookingOutflow },
+        { name: "Cashier Store Petty Cash Expenses",    amount: storeOutflow },
+        { name: "Cashier Booking Petty Cash Expenses",  amount: bookingCashierOutflow },
       ],
       totalInflow,
       totalOutflow,
