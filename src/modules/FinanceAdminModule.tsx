@@ -21,7 +21,7 @@ const formatDate = (d: string) => {
   try { return format(new Date(d), "MMM dd, yyyy"); } catch { return d; }
 };
 
-type Tab = "coa" | "journal" | "pl" | "gl" | "tb";
+type Tab = "coa" | "journal" | "pl" | "gl" | "tb" | "cf";
 
 // All accepted account types (QuickBooks-style extended list)
 const INCOME_TYPES = ["Income", "Other Income"];
@@ -61,13 +61,21 @@ export default function FinanceAdminModule() {
   const [newPin, setNewPin] = useState("");
   const [confirmNewPin, setConfirmNewPin] = useState("");
 
-  // Navigation
   const [activeTab, setActiveTab] = useState<Tab>("coa");
 
   // Data
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [journals, setJournals] = useState<JournalEntry[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [foodSales, setFoodSales] = useState<any[]>([]);
+  const [cashierReports, setCashierReports] = useState<any[]>([]);
+  const [bookingCashierReports, setBookingCashierReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Date Filters
+  const [plDateFrom, setPlDateFrom] = useState("");
+  const [plDateTo, setPlDateTo] = useState("");
+  const [plFilterApplied, setPlFilterApplied] = useState(false);
 
   // COA State
   const [editingCOA, setEditingCOA] = useState<ChartOfAccount | null>(null);
@@ -100,135 +108,617 @@ export default function FinanceAdminModule() {
 
   // Journal State
   const [editingJE, setEditingJE] = useState<{ id?: number; entry_date: string; memo: string; lines: Partial<JournalEntry>[] } | null>(null);
-  
-  // P&L State
-  const [plData, setPlData] = useState<any>({
-    income: 0, expense: 0, net: 0, incomeDetails: [], expenseDetails: [],
-  });
-  const [plDateFrom, setPlDateFrom] = useState("");
-  const [plDateTo, setPlDateTo] = useState("");
-  const [plFilterApplied, setPlFilterApplied] = useState(false);
 
   useEffect(() => {
     getSystemConfig("finance_pin").then(val => { if (val) setDbPin(val); });
   }, []);
 
-  const loadData = async (dateFrom?: string, dateTo?: string) => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const [accs, jnls] = await Promise.all([getChartOfAccounts(), getJournalEntries()]);
+      const [accs, jnls, txns, foods, storeReports, bookingReports] = await Promise.all([
+        getChartOfAccounts(),
+        getJournalEntries(),
+        getTransactions(),
+        getFoodSales(),
+        getCashierReports(),
+        getBookingCashierReports(),
+      ]);
       setAccounts(accs);
       setJournals(jnls);
-      await recomputePL(accs, jnls, dateFrom, dateTo);
+      setTransactions(txns);
+      setFoodSales(foods);
+      setCashierReports(storeReports);
+      setBookingCashierReports(bookingReports);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load financial records.");
     } finally {
       setLoading(false);
     }
   };
 
-  const recomputePL = async (
-    _accounts: ChartOfAccount[],
-    _journals: JournalEntry[],
-    dateFrom?: string,
-    dateTo?: string
-  ) => {
-    const [txns, foods, cashierStore, cashierBooking] = await Promise.all([
-      getTransactions(),
-      getFoodSales(),
-      getCashierReports(),
-      getBookingCashierReports(),
-    ]);
+  const isDebitNormal = (type: string) => {
+    return type === "Asset" || type === "Bank" || type === "Accounts Receivable" || 
+           type === "Other Current Asset" || type === "Fixed Asset" || type === "Other Asset" ||
+           type === "Expense" || type === "Other Expense" || type === "Cost of Goods Sold";
+  };
 
-    // Strict date filter: only apply if both from and to are provided
-    const filterDate = (dateStr: string) => {
-      if (!dateFrom && !dateTo) return true;
-      const d = dateStr.slice(0, 10);
-      if (dateFrom && d < dateFrom) return false;
-      if (dateTo && d > dateTo) return false;
-      return true;
+  interface LedgerLine {
+    id: string;
+    date: string;
+    account_name: string;
+    account_type: string;
+    description: string;
+    debit: number;
+    credit: number;
+    source: string;
+  }
+
+  // Unified Double-Entry Ledger Lines Compiler (unfiltered all-time)
+  const allLedgerLines = useMemo(() => {
+    const lines: LedgerLine[] = [];
+
+    const findAccount = (type: string, keyword: string, defaultName: string) => {
+      let acc = accounts.find(a => a.account_name.toLowerCase() === defaultName.toLowerCase());
+      if (acc) return acc.account_name;
+      acc = accounts.find(a => a.account_type === type && a.account_name.toLowerCase().includes(keyword.toLowerCase()));
+      if (acc) return acc.account_name;
+      acc = accounts.find(a => a.account_type === type);
+      if (acc) return acc.account_name;
+      return defaultName;
     };
 
-    const filteredTxns = txns.filter(t => filterDate(t.date_time));
-    const filteredFoods = foods.filter(f => filterDate(f.date));
-    const filteredStore = cashierStore.filter(r => filterDate(r.date));
-    const filteredBooking = cashierBooking.filter(r => filterDate(r.report_date));
-    const filteredJournals = _journals.filter(j => filterDate(j.entry_date));
+    const findAssetAccount = (paymentMethod: string) => {
+      if (paymentMethod === "GCash") return findAccount("Asset", "gcash", "GCash / Bank");
+      if (paymentMethod === "Charge to Booking") return findAccount("Asset", "receivable", "Accounts Receivable");
+      return findAccount("Asset", "cash on hand", "Cash on Hand");
+    };
 
-    const storeSales = filteredStore.reduce((s, r) => s + r.sales, 0);
-    const bookingSales = filteredBooking.reduce((s, r) => s + r.entrance_sales, 0);
-    const foodSales = filteredFoods.reduce((s, f) => s + f.total_sales, 0);
-    const maintSales = filteredTxns.reduce((s, t) => s + (t.maintenance_fee || 0), 0);
-    const drinksSales = filteredTxns.reduce((s, t) => s + (t.drinks_corkage_fee || 0), 0);
-    const liquorSales = filteredTxns.reduce((s, t) => s + (t.liquor_corkage_fee || 0), 0);
+    // 1. Chart of Accounts Beginning Balances offset against Opening Balance Equity
+    accounts.forEach(a => {
+      const bal = Number(a.beginning_balance) || 0;
+      if (bal <= 0) return;
+      const date = a.as_of_date || "2026-01-01";
+      const isDebit = isDebitNormal(a.account_type);
 
-    // Sum manual journal entries — support extended Income, COGS, and Expense types
-    const jeIncomeMap: Record<string, number> = {};
-    const jeExpenseMap: Record<string, number> = {};
-    const jeCogsMap: Record<string, number> = {};
+      lines.push({
+        id: `begin-${a.id}-${a.account_name}`,
+        date,
+        account_name: a.account_name,
+        account_type: a.account_type,
+        description: `Beginning Balance for ${a.account_name}`,
+        debit: isDebit ? bal : 0,
+        credit: isDebit ? 0 : bal,
+        source: "Chart of Accounts",
+      });
 
-    _accounts.forEach(a => {
-      if (INCOME_TYPES.includes(a.account_type)) jeIncomeMap[a.account_name] = 0;
-      if (EXPENSE_TYPES.includes(a.account_type)) jeExpenseMap[a.account_name] = 0;
-      if (COGS_TYPES.includes(a.account_type)) jeCogsMap[a.account_name] = 0;
+      lines.push({
+        id: `begin-equity-${a.id}-${a.account_name}`,
+        date,
+        account_name: "Opening Balance Equity",
+        account_type: "Equity",
+        description: `Balancing Entry for ${a.account_name} beginning balance`,
+        debit: isDebit ? 0 : bal,
+        credit: isDebit ? bal : 0,
+        source: "Chart of Accounts",
+      });
     });
 
-    filteredJournals.forEach(j => {
-      const acc = _accounts.find(a => a.account_name === j.account_title);
-      if (acc && INCOME_TYPES.includes(acc.account_type)) {
-        // Income normal balance is Credit. Credit increases, Debit decreases.
-        jeIncomeMap[j.account_title] = (jeIncomeMap[j.account_title] || 0) + (j.credit - j.debit);
-      } else if (acc && EXPENSE_TYPES.includes(acc.account_type)) {
-        // Expense normal balance is Debit. Debit increases, Credit decreases.
-        jeExpenseMap[j.account_title] = (jeExpenseMap[j.account_title] || 0) + (j.debit - j.credit);
-      } else if (acc && COGS_TYPES.includes(acc.account_type)) {
-        // COGS normal balance is Debit. Debit increases, Credit decreases.
-        jeCogsMap[j.account_title] = (jeCogsMap[j.account_title] || 0) + (j.debit - j.credit);
+    // 2. Manual Journal Entries
+    journals.forEach(je => {
+      const acc = accounts.find(a => a.account_name === je.account_title);
+      lines.push({
+        id: `je-${je.id || Math.random().toString()}`,
+        date: je.entry_date.slice(0, 10),
+        account_name: je.account_title,
+        account_type: acc?.account_type || "Expense",
+        description: je.memo || "Manual Journal Entry",
+        debit: je.debit || 0,
+        credit: je.credit || 0,
+        source: "Journal Entries",
+      });
+    });
+
+    // 3. Transactions (Entrance, Room, Tent, Games, Booking, Table Rent)
+    transactions.forEach(t => {
+      if (t.status === "Cancelled") return;
+
+      const totalAmount = Number(t.amount_paid) || 0;
+      const dateStr = (t.date_time || new Date().toISOString()).slice(0, 10);
+
+      const maint = Number(t.maintenance_fee) || 0;
+      const drinks = Number(t.drinks_corkage_fee) || 0;
+      const liquor = Number(t.liquor_corkage_fee) || 0;
+      const hall = Number(t.function_hall_total || t.function_hall_fee || 0);
+
+      const breakdown: { account: string; type: string; amount: number }[] = [];
+
+      if (t.module === "Entrance") {
+        if (maint > 0) breakdown.push({ account: findAccount("Income", "maintenance", "Maintenance Fee Income"), type: "Income", amount: maint });
+        if (drinks > 0) breakdown.push({ account: findAccount("Income", "drinks", "Drinks Corkage Income"), type: "Income", amount: drinks });
+        if (liquor > 0) breakdown.push({ account: findAccount("Income", "liquor", "Liquor Corkage Income"), type: "Income", amount: liquor });
+        if (hall > 0) breakdown.push({ account: findAccount("Income", "function hall", "Function Hall Income"), type: "Income", amount: hall });
+
+        const tentAddon = t.with_tent ? 300 : 0;
+        if (tentAddon > 0) breakdown.push({ account: findAccount("Income", "tent", "Tent Income"), type: "Income", amount: tentAddon });
+
+        const allocated = breakdown.reduce((sum, item) => sum + item.amount, 0);
+        const baseEntrance = Math.max(0, totalAmount - allocated);
+        if (baseEntrance > 0 || breakdown.length === 0) {
+          breakdown.push({ account: findAccount("Income", "entrance", "Entrance Income"), type: "Income", amount: baseEntrance });
+        }
+      } else if (t.module === "Room") {
+        breakdown.push({ account: findAccount("Income", "room", "Room Income"), type: "Income", amount: totalAmount });
+      } else if (t.module === "Tent") {
+        breakdown.push({ account: findAccount("Income", "tent", "Tent Income"), type: "Income", amount: totalAmount });
+      } else if (t.module === "Games Rental") {
+        breakdown.push({ account: findAccount("Income", "game", "Games Income"), type: "Income", amount: totalAmount });
+      } else if (t.module === "Table Rent") {
+        breakdown.push({ account: findAccount("Income", "table", "Table Rent Income"), type: "Income", amount: totalAmount });
+      } else if (t.module === "Booking") {
+        breakdown.push({ account: findAccount("Income", "booking", "Booking Income"), type: "Income", amount: totalAmount });
+      } else {
+        breakdown.push({ account: findAccount("Income", t.module, `${t.module} Income`), type: "Income", amount: totalAmount });
+      }
+
+      // Check sum of breakdown. If it differs from totalAmount, adjust the main item.
+      const breakdownSum = breakdown.reduce((s, b) => s + b.amount, 0);
+      if (breakdownSum > 0 && breakdownSum !== totalAmount) {
+        const mainIdx = breakdown.findIndex(b => b.account.toLowerCase().includes(t.module.toLowerCase()));
+        if (mainIdx !== -1) {
+          breakdown[mainIdx].amount += totalAmount - breakdownSum;
+        } else {
+          breakdown[0].amount += totalAmount - breakdownSum;
+        }
+      }
+
+      // Debit Cash/Receivables
+      const debitAccName = findAssetAccount(t.payment_method);
+      lines.push({
+        id: `txn-dr-${t.id || Math.random().toString()}`,
+        date: dateStr,
+        account_name: debitAccName,
+        account_type: "Asset",
+        description: `${t.module} sales transaction from ${t.customer_name || "Guest"} (Ref: ${t.transaction_no})`,
+        debit: totalAmount,
+        credit: 0,
+        source: t.module,
+      });
+
+      // Credit Income(s)
+      breakdown.forEach((item, idx) => {
+        if (item.amount <= 0) return;
+        lines.push({
+          id: `txn-cr-${t.id || Math.random().toString()}-${idx}`,
+          date: dateStr,
+          account_name: item.account,
+          account_type: "Income",
+          description: `${t.module} Revenue: ${item.account} (Ref: ${t.transaction_no})`,
+          debit: 0,
+          credit: item.amount,
+          source: t.module,
+        });
+      });
+    });
+
+    // 4. Food Restaurant POS
+    foodSales.forEach(f => {
+      const amount = Number(f.total_sales) || 0;
+      if (amount <= 0) return;
+      const dateStr = (f.sale_date || new Date().toISOString()).slice(0, 10);
+
+      const debitAcc = findAccount("Asset", "cash on hand", "Cash on Hand");
+      const creditAcc = findAccount("Income", "food", "Food Restaurant POS Income");
+
+      lines.push({
+        id: `food-dr-${f.id || Math.random().toString()}`,
+        date: dateStr,
+        account_name: debitAcc,
+        account_type: "Asset",
+        description: `Food Restaurant POS Sales - Cash (Item: ${f.item_name})`,
+        debit: amount,
+        credit: 0,
+        source: "Food Restaurant POS",
+      });
+
+      lines.push({
+        id: `food-cr-${f.id || Math.random().toString()}`,
+        date: dateStr,
+        account_name: creditAcc,
+        account_type: "Income",
+        description: `Food Restaurant POS Sales - Income (Item: ${f.item_name})`,
+        debit: 0,
+        credit: amount,
+        source: "Food Restaurant POS",
+      });
+    });
+
+    // 5. Cashier Store Petty Cash
+    cashierReports.forEach(r => {
+      const dateStr = (r.date || new Date().toISOString()).slice(0, 10);
+      const pettyItems = r.petty_items || [];
+
+      pettyItems.forEach((p: any, idx: number) => {
+        const amount = Number(p.amount) || 0;
+        if (amount <= 0) return;
+
+        let debitAccName = "";
+        const directMatch = accounts.find(a => a.account_name.toLowerCase() === p.particulars.toLowerCase());
+        if (directMatch) {
+          debitAccName = directMatch.account_name;
+        } else {
+          const expenseAcc = accounts.find(a =>
+            (a.account_type === "Expense" || a.account_type === "Cost of Goods Sold" || a.account_type === "Other Expense") &&
+            (a.account_name.toLowerCase().includes(p.particulars.toLowerCase()) ||
+             (p.category && a.account_name.toLowerCase().includes(p.category.toLowerCase())))
+          );
+          debitAccName = expenseAcc ? expenseAcc.account_name : findAccount("Expense", "miscellaneous", "Miscellaneous Expense");
+        }
+
+        const creditAccName = findAccount("Asset", "petty cash", "Petty Cash");
+
+        lines.push({
+          id: `store-petty-dr-${r.id}-${idx}`,
+          date: dateStr,
+          account_name: debitAccName,
+          account_type: accounts.find(a => a.account_name === debitAccName)?.account_type || "Expense",
+          description: `Store Expense: ${p.particulars} (Ref: ${p.receipt_no || "—"})`,
+          debit: amount,
+          credit: 0,
+          source: "Cashier Store",
+        });
+
+        lines.push({
+          id: `store-petty-cr-${r.id}-${idx}`,
+          date: dateStr,
+          account_name: creditAccName,
+          account_type: "Asset",
+          description: `Disbursed from Petty Cash - Store (Ref: ${p.receipt_no || "—"})`,
+          debit: 0,
+          credit: amount,
+          source: "Cashier Store",
+        });
+      });
+    });
+
+    // 6. Cashier Booking Petty Cash
+    bookingCashierReports.forEach(r => {
+      const dateStr = (r.report_date || new Date().toISOString()).slice(0, 10);
+      const pettyItems = r.petty_items || [];
+
+      pettyItems.forEach((p: any, idx: number) => {
+        const amount = Number(p.amount) || 0;
+        if (amount <= 0) return;
+
+        let debitAccName = "";
+        const directMatch = accounts.find(a => a.account_name.toLowerCase() === p.particulars.toLowerCase());
+        if (directMatch) {
+          debitAccName = directMatch.account_name;
+        } else {
+          const expenseAcc = accounts.find(a =>
+            (a.account_type === "Expense" || a.account_type === "Cost of Goods Sold" || a.account_type === "Other Expense") &&
+            (a.account_name.toLowerCase().includes(p.particulars.toLowerCase()) ||
+             (p.category && a.account_name.toLowerCase().includes(p.category.toLowerCase())))
+          );
+          debitAccName = expenseAcc ? expenseAcc.account_name : findAccount("Expense", "miscellaneous", "Miscellaneous Expense");
+        }
+
+        const creditAccName = findAccount("Asset", "petty cash", "Petty Cash");
+
+        lines.push({
+          id: `booking-petty-dr-${r.id}-${idx}`,
+          date: dateStr,
+          account_name: debitAccName,
+          account_type: accounts.find(a => a.account_name === debitAccName)?.account_type || "Expense",
+          description: `Booking Cashier Expense: ${p.particulars} (Ref: ${p.receipt_no || "—"})`,
+          debit: amount,
+          credit: 0,
+          source: "Cashier Booking",
+        });
+
+        lines.push({
+          id: `booking-petty-cr-${r.id}-${idx}`,
+          date: dateStr,
+          account_name: creditAccName,
+          account_type: "Asset",
+          description: `Disbursed from Petty Cash - Booking (Ref: ${p.receipt_no || "—"})`,
+          debit: 0,
+          credit: amount,
+          source: "Cashier Booking",
+        });
+      });
+    });
+
+    return lines;
+  }, [accounts, journals, transactions, foodSales, cashierReports, bookingCashierReports]);
+
+  // Chart of Accounts balances computed over all-time
+  const coaBalances = useMemo(() => {
+    const balanceMap: Record<string, number> = {};
+    accounts.forEach(a => { balanceMap[a.account_name] = 0; });
+    balanceMap["Opening Balance Equity"] = 0;
+
+    allLedgerLines.forEach(line => {
+      const acc = accounts.find(a => a.account_name === line.account_name) || { account_type: "Equity" };
+      const isDebit = isDebitNormal(acc.account_type);
+      const net = line.debit - line.credit;
+      balanceMap[line.account_name] = (balanceMap[line.account_name] || 0) + (isDebit ? net : -net);
+    });
+
+    return balanceMap;
+  }, [accounts, allLedgerLines]);
+
+  // Dynamic compiler filtered strictly by plDateFrom and plDateTo
+  const filteredLedgerLines = useMemo(() => {
+    if (!plDateFrom && !plDateTo) return allLedgerLines;
+
+    return allLedgerLines.filter(line => {
+      if (line.source === "Chart of Accounts") return false;
+
+      const d = line.date;
+      if (plDateFrom && d < plDateFrom) return false;
+      if (plDateTo && d > plDateTo) return false;
+      return true;
+    });
+  }, [allLedgerLines, plDateFrom, plDateTo]);
+
+  // Computes ledger balance forwarded for GL
+  const getBeginningBalanceForwarded = (accName: string, accType: string) => {
+    const isDebit = isDebitNormal(accType);
+    const coa = accounts.find(a => a.account_name === accName);
+    let bal = Number(coa?.beginning_balance) || 0;
+
+    if (plDateFrom) {
+      allLedgerLines.forEach(line => {
+        if (line.account_name === accName && line.source !== "Chart of Accounts") {
+          if (line.date < plDateFrom) {
+            const net = line.debit - line.credit;
+            bal += isDebit ? net : -net;
+          }
+        }
+      });
+    }
+
+    return bal;
+  };
+
+  // General Ledger compiled from dynamic ledger lines
+  const generalLedger = useMemo(() => {
+    const gl: Record<string, { entries: LedgerLine[]; beginBal: number; accType: string }> = {};
+
+    accounts.forEach(a => {
+      const beginBal = getBeginningBalanceForwarded(a.account_name, a.account_type);
+      const entries = filteredLedgerLines.filter(line =>
+        line.account_name === a.account_name && line.source !== "Chart of Accounts"
+      ).sort((a, b) => a.date.localeCompare(b.date));
+
+      gl[a.account_name] = {
+        entries,
+        beginBal,
+        accType: a.account_type
+      };
+    });
+
+    return gl;
+  }, [accounts, allLedgerLines, filteredLedgerLines, plDateFrom]);
+
+  // Trial Balance computed from dynamic ledger lines
+  const trialBalance = useMemo(() => {
+    const lines: { account: string; debit: number; credit: number }[] = [];
+    let totalD = 0, totalC = 0;
+
+    const accBalances: Record<string, { debit: number; credit: number }> = {};
+    accounts.forEach(a => { accBalances[a.account_name] = { debit: 0, credit: 0 }; });
+    accBalances["Opening Balance Equity"] = { debit: 0, credit: 0 };
+
+    filteredLedgerLines.forEach(line => {
+      if (!accBalances[line.account_name]) accBalances[line.account_name] = { debit: 0, credit: 0 };
+      accBalances[line.account_name].debit += line.debit;
+      accBalances[line.account_name].credit += line.credit;
+    });
+
+    Object.entries(accBalances).forEach(([acc, balances]) => {
+      const accType = accounts.find(a => a.account_name === acc)?.account_type || "Equity";
+      const isDebit = isDebitNormal(accType);
+      const net = balances.debit - balances.credit;
+
+      if (net > 0) {
+        lines.push({ account: acc, debit: net, credit: 0 });
+        totalD += net;
+      } else if (net < 0) {
+        lines.push({ account: acc, debit: 0, credit: Math.abs(net) });
+        totalC += Math.abs(net);
       }
     });
 
-    const jeIncomeTotal = Object.values(jeIncomeMap).reduce((s, v) => s + v, 0);
-    const jeExpenseTotal = Object.values(jeExpenseMap).reduce((s, v) => s + v, 0);
-    const jeCogsTotal = Object.values(jeCogsMap).reduce((s, v) => s + v, 0);
+    return { lines, totalD, totalC };
+  }, [accounts, filteredLedgerLines]);
 
-    const totalIncome = storeSales + bookingSales + foodSales + maintSales + drinksSales + liquorSales + jeIncomeTotal;
+  // Profit & Loss statement computed dynamically from dynamic ledger lines
+  const plData = useMemo(() => {
+    const incomeDetails: { name: string; amount: number }[] = [];
+    const cogsDetails: { name: string; amount: number }[] = [];
+    const expenseDetails: { name: string; amount: number }[] = [];
 
-    const storePetty = filteredStore.reduce((s, r) => s + r.petty_cash, 0);
-    const bookingPetty = filteredBooking.reduce((s, r) =>
-      s + (r.petty_items || []).reduce((x, p) => x + (p.amount || 0), 0), 0);
+    const incomeBalances: Record<string, number> = {};
+    const cogsBalances: Record<string, number> = {};
+    const expenseBalances: Record<string, number> = {};
 
-    const totalExpense = storePetty + bookingPetty + jeExpenseTotal;
-    const totalCogs = jeCogsTotal;
+    accounts.forEach(a => {
+      if (INCOME_TYPES.includes(a.account_type)) incomeBalances[a.account_name] = 0;
+      if (COGS_TYPES.includes(a.account_type)) cogsBalances[a.account_name] = 0;
+      if (EXPENSE_TYPES.includes(a.account_type)) expenseBalances[a.account_name] = 0;
+    });
 
-    const incomeDetails = [
-      { name: "Cashier Store Sales", amount: storeSales },
-      { name: "Cashier Booking / Entrance Sales", amount: bookingSales },
-      { name: "Food Restaurant POS", amount: foodSales },
-      { name: "Maintenance Fee", amount: maintSales },
-      { name: "Drinks Corkage", amount: drinksSales },
-      { name: "Liquor Corkage", amount: liquorSales },
-      ...Object.entries(jeIncomeMap).filter(([, v]) => v !== 0).map(([k, v]) => ({ name: k, amount: v }))
-    ];
+    filteredLedgerLines.forEach(line => {
+      const acc = accounts.find(a => a.account_name === line.account_name);
+      if (!acc) return;
 
-    const cogsDetails = [
-      ...Object.entries(jeCogsMap).filter(([, v]) => v !== 0).map(([k, v]) => ({ name: k, amount: v }))
-    ];
+      if (INCOME_TYPES.includes(acc.account_type)) {
+        incomeBalances[line.account_name] = (incomeBalances[line.account_name] || 0) + (line.credit - line.debit);
+      } else if (COGS_TYPES.includes(acc.account_type)) {
+        cogsBalances[line.account_name] = (cogsBalances[line.account_name] || 0) + (line.debit - line.credit);
+      } else if (EXPENSE_TYPES.includes(acc.account_type)) {
+        expenseBalances[line.account_name] = (expenseBalances[line.account_name] || 0) + (line.debit - line.credit);
+      }
+    });
 
-    const expenseDetails = [
-      { name: "Expenses Summary - Store (Petty Cash)", amount: storePetty },
-      { name: "Expenses Summary - Entrance (Petty Cash)", amount: bookingPetty },
-      ...Object.entries(jeExpenseMap).filter(([, v]) => v !== 0).map(([k, v]) => ({ name: k, amount: v }))
-    ];
+    let totalIncome = 0;
+    Object.entries(incomeBalances).forEach(([name, amount]) => {
+      if (amount !== 0) {
+        incomeDetails.push({ name, amount });
+        totalIncome += amount;
+      }
+    });
 
-    setPlData({
+    let totalCogs = 0;
+    Object.entries(cogsBalances).forEach(([name, amount]) => {
+      if (amount !== 0) {
+        cogsDetails.push({ name, amount });
+        totalCogs += amount;
+      }
+    });
+
+    let totalExpense = 0;
+    Object.entries(expenseBalances).forEach(([name, amount]) => {
+      if (amount !== 0) {
+        expenseDetails.push({ name, amount });
+        totalExpense += amount;
+      }
+    });
+
+    const grossProfit = totalIncome - totalCogs;
+    const net = grossProfit - totalExpense;
+
+    return {
       income: totalIncome,
       cogs: totalCogs,
       expense: totalExpense,
-      grossProfit: totalIncome - totalCogs,
-      net: totalIncome - totalCogs - totalExpense,
+      grossProfit,
+      net,
       incomeDetails,
       cogsDetails,
-      expenseDetails,
+      expenseDetails
+    };
+  }, [accounts, filteredLedgerLines]);
+
+  // Cash Flow Statement computed dynamically from dynamic ledger lines
+  const cfData = useMemo(() => {
+    let entranceInflow = 0;
+    let tentInflow = 0;
+    let roomInflow = 0;
+    let bookingInflow = 0;
+    let gamesInflow = 0;
+    let tableInflow = 0;
+    let foodInflow = 0;
+    let maintInflow = 0;
+    let drinksInflow = 0;
+    let liquorInflow = 0;
+    let hallInflow = 0;
+
+    let storeOutflow = 0;
+    let bookingOutflow = 0;
+
+    filteredLedgerLines.forEach(line => {
+      const acc = accounts.find(a => a.account_name === line.account_name);
+      if (!acc) return;
+
+      if (INCOME_TYPES.includes(acc.account_type)) {
+        const amt = line.credit - line.debit;
+        if (amt <= 0) return;
+
+        const name = acc.account_name.toLowerCase();
+        if (name.includes("maintenance")) maintInflow += amt;
+        else if (name.includes("drinks corkage")) drinksInflow += amt;
+        else if (name.includes("liquor corkage")) liquorInflow += amt;
+        else if (name.includes("function hall")) hallInflow += amt;
+        else if (name.includes("entrance")) entranceInflow += amt;
+        else if (name.includes("tent")) tentInflow += amt;
+        else if (name.includes("room")) roomInflow += amt;
+        else if (name.includes("booking")) bookingInflow += amt;
+        else if (name.includes("game")) gamesInflow += amt;
+        else if (name.includes("table")) tableInflow += amt;
+        else if (name.includes("food") || name.includes("restaurant") || name.includes("pos")) foodInflow += amt;
+        else {
+          entranceInflow += amt;
+        }
+      } else if (EXPENSE_TYPES.includes(acc.account_type) || COGS_TYPES.includes(acc.account_type)) {
+        const amt = line.debit - line.credit;
+        if (amt <= 0) return;
+
+        if (line.source === "Cashier Store") storeOutflow += amt;
+        else if (line.source === "Cashier Booking") bookingOutflow += amt;
+      }
     });
+
+    const totalInflow = entranceInflow + tentInflow + roomInflow + bookingInflow + gamesInflow + tableInflow + foodInflow + maintInflow + drinksInflow + liquorInflow + hallInflow;
+    const totalOutflow = storeOutflow + bookingOutflow;
+    const netCashFlow = totalInflow - totalOutflow;
+
+    return {
+      inflows: [
+        { name: "Entrance Sales", amount: entranceInflow },
+        { name: "Tent Rent Sales", amount: tentInflow },
+        { name: "Room Rent Sales", amount: roomInflow },
+        { name: "Booking Sales", amount: bookingInflow },
+        { name: "Games Rental Sales", amount: gamesInflow },
+        { name: "Table Rent Sales", amount: tableInflow },
+        { name: "Food Restaurant POS", amount: foodInflow },
+        { name: "Maintenance Fees", amount: maintInflow },
+        { name: "Drinks Corkages", amount: drinksInflow },
+        { name: "Liquor Corkages", amount: liquorInflow },
+        { name: "Function Hall Rent", amount: hallInflow },
+      ],
+      outflows: [
+        { name: "Cashier Store Petty Cash Expenses", amount: storeOutflow },
+        { name: "Cashier Booking Petty Cash Expenses", amount: bookingOutflow },
+      ],
+      totalInflow,
+      totalOutflow,
+      netCashFlow
+    };
+  }, [accounts, filteredLedgerLines]);
+
+  const exportCF = () => {
+    const rows = [
+      ["SERENITY INLAND RESORT – CASH FLOW STATEMENT"],
+      [plDateFrom || "All dates", "to", plDateTo || "present"],
+      [],
+      ["CASH INFLOWS"],
+      ...cfData.inflows.map((i: any) => [i.name, i.amount]),
+      ["Total Cash Inflows", cfData.totalInflow],
+      [],
+      ["CASH OUTFLOWS"],
+      ...cfData.outflows.map((e: any) => [e.name, e.amount]),
+      ["Total Cash Outflows", cfData.totalOutflow],
+      [],
+      ["NET CASH FLOW", cfData.netCashFlow],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cash Flow");
+    XLSX.writeFile(wb, `cash_flow_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success("Cash Flow Statement exported to Excel.");
   };
+
+  const printCF = () => {
+    const infRows = cfData.inflows.map((i: any) => `<tr><td>${i.name}</td><td class="right">₱${i.amount.toLocaleString()}</td></tr>`).join("");
+    const outRows = cfData.outflows.map((e: any) => `<tr><td>${e.name}</td><td class="right">₱${e.amount.toLocaleString()}</td></tr>`).join("");
+    const html = `
+      <style>body{font-family:Arial;font-size:12px;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-bottom:12px}td,th{border:1px solid #ccc;padding:4px 8px}.right{text-align:right}.total{font-weight:bold}.net{font-size:14px;font-weight:bold}</style>
+      <h2>SERENITY INLAND RESORT</h2><h2>CASH FLOW STATEMENT</h2>
+      <p style="text-align:center">${plDateFrom || "All"} – ${plDateTo || "Present"}</p>
+      <h3>CASH INFLOWS</h3><table>${infRows}<tr class="total"><td>Total Cash Inflows</td><td class="right">₱${cfData.totalInflow.toLocaleString()}</td></tr></table>
+      <h3>CASH OUTFLOWS</h3><table>${outRows}<tr class="total"><td>Total Cash Outflows</td><td class="right">₱${cfData.totalOutflow.toLocaleString()}</td></tr></table>
+      <table><tr class="net"><td>NET CASH FLOW</td><td class="right">₱${cfData.netCashFlow.toLocaleString()}</td></tr></table>
+    `;
+    const w = window.open("", "_blank", "width=800,height=900");
+    if (!w) return;
+    w.document.write(`<html><head><title>Cash Flow Statement</title></head><body>${html}<script>window.print();</script></body></html>`);
+    w.document.close();
+  };
+
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -562,28 +1052,6 @@ export default function FinanceAdminModule() {
     } catch { toast.error("Failed to save journal entry."); }
   };
 
-  const generalLedger = useMemo(() => {
-    const gl: Record<string, { entries: JournalEntry[]; beginBal: number }> = {};
-    accounts.forEach(a => { gl[a.account_name] = { entries: [], beginBal: a.beginning_balance }; });
-    const sorted = [...journals].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
-    sorted.forEach(j => {
-      if (!gl[j.account_title]) gl[j.account_title] = { entries: [], beginBal: 0 };
-      gl[j.account_title].entries.push(j);
-    });
-    return gl;
-  }, [accounts, journals]);
-
-  const trialBalance = useMemo(() => {
-    const lines: { account: string; debit: number; credit: number }[] = [];
-    let totalD = 0, totalC = 0;
-    Object.entries(generalLedger).forEach(([acc, { entries, beginBal }]) => {
-      const netJE = entries.reduce((s, e) => s + e.debit - e.credit, 0);
-      const bal = beginBal + netJE;
-      if (bal > 0) { lines.push({ account: acc, debit: bal, credit: 0 }); totalD += bal; }
-      else if (bal < 0) { lines.push({ account: acc, debit: 0, credit: Math.abs(bal) }); totalC += Math.abs(bal); }
-    });
-    return { lines, totalD, totalC };
-  }, [generalLedger]);
 
   const filteredAccounts = useMemo(() => {
     return accounts.filter(a => {
@@ -707,7 +1175,7 @@ export default function FinanceAdminModule() {
 
       {/* Tab Bar */}
       <div className="flex flex-wrap gap-1 mb-6 border-b border-border">
-        {(["coa", "journal", "pl", "gl", "tb"] as Tab[]).map(t => (
+        {(["coa", "journal", "pl", "gl", "tb", "cf"] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setActiveTab(t)}
@@ -721,7 +1189,8 @@ export default function FinanceAdminModule() {
               : t === "journal" ? "Journal Entries"
               : t === "pl" ? "Profit & Loss"
               : t === "gl" ? "General Ledger"
-              : "Trial Balance"}
+              : t === "tb" ? "Trial Balance"
+              : "Cash Flow"}
           </button>
         ))}
       </div>
@@ -1092,6 +1561,10 @@ export default function FinanceAdminModule() {
                     style={{ minWidth: "140px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
                   >Beginning Balance</th>
                   <th
+                    className="text-right px-4 py-3 font-semibold border-b border-border text-primary font-bold"
+                    style={{ minWidth: "140px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
+                  >Running Balance</th>
+                  <th
                     className="text-center px-4 py-3 font-semibold border-b border-border"
                     style={{ width: "100px", position: "sticky", top: 0, background: "inherit", zIndex: 10 }}
                   >Actions</th>
@@ -1100,7 +1573,7 @@ export default function FinanceAdminModule() {
               <tbody className="divide-y divide-border">
                 {filteredAccounts.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={9} className="text-center py-12 text-muted-foreground">
                       {accounts.length === 0
                         ? "No accounts yet. Import from Excel or add manually."
                         : "No accounts match your search."}
@@ -1128,6 +1601,7 @@ export default function FinanceAdminModule() {
                     <td className="px-4 py-3 text-muted-foreground">{a.subcategory || "—"}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground max-w-xs truncate" title={a.description}>{a.description || "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium" style={{ whiteSpace: "nowrap" }}>{formatPeso(a.beginning_balance)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-black text-primary" style={{ whiteSpace: "nowrap" }}>{formatPeso(coaBalances[a.account_name] || 0)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center gap-2">
                         <button
@@ -1267,7 +1741,6 @@ export default function FinanceAdminModule() {
             <button
               onClick={() => {
                 setPlFilterApplied(true);
-                loadData(plDateFrom || undefined, plDateTo || undefined);
               }}
               className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all"
             >
@@ -1279,7 +1752,6 @@ export default function FinanceAdminModule() {
                   setPlDateFrom("");
                   setPlDateTo("");
                   setPlFilterApplied(false);
-                  loadData(undefined, undefined);
                 }}
                 className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 active:scale-95 transition-all"
               >
@@ -1390,21 +1862,43 @@ export default function FinanceAdminModule() {
 
       {/* ── GENERAL LEDGER ── */}
       {activeTab === "gl" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* GL Date Filter */}
+          <div className="flex flex-wrap items-end gap-3 bg-card p-4 rounded-xl border border-border shadow-sm">
+            <div>
+              <label className="text-xs font-bold text-muted-foreground block mb-1">Date From</label>
+              <input type="date" className="pos-input h-9 text-sm" value={plDateFrom} onChange={e => setPlDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted-foreground block mb-1">Date To</label>
+              <input type="date" className="pos-input h-9 text-sm" value={plDateTo} onChange={e => setPlDateTo(e.target.value)} />
+            </div>
+            <button
+              onClick={() => { setPlDateFrom(""); setPlDateTo(""); setPlFilterApplied(false); }}
+              className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all"
+            >
+              ✕ Clear
+            </button>
+            <p className="text-xs text-muted-foreground ml-auto italic">Shared date filter applies across GL, Trial Balance, P&L, and Cash Flow.</p>
+          </div>
+
           {Object.entries(generalLedger).filter(([, d]) => d.entries.length > 0 || d.beginBal !== 0).map(([acc, data]) => {
             let currBal = data.beginBal;
             return (
               <div key={acc} className="pos-card overflow-hidden shadow-sm">
                 <div className="bg-primary/10 px-5 py-3 font-bold text-primary flex justify-between items-center">
                   <span>{acc}</span>
-                  <span className="text-xs font-medium uppercase tracking-wider opacity-70">General Ledger</span>
+                  <span className="text-xs font-medium uppercase tracking-wider opacity-70">
+                    {accounts.find(a => a.account_name === acc)?.account_type || ""} · General Ledger
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 border-b border-border">
                       <tr>
                         <th className="text-left px-4 py-2 font-medium">Date</th>
-                        <th className="text-left px-4 py-2 font-medium">Memo</th>
+                        <th className="text-left px-4 py-2 font-medium">Description</th>
+                        <th className="text-left px-4 py-2 font-medium">Source</th>
                         <th className="text-right px-4 py-2 font-medium text-green-600">Debit</th>
                         <th className="text-right px-4 py-2 font-medium text-red-600">Credit</th>
                         <th className="text-right px-4 py-2 font-medium text-primary">Balance</th>
@@ -1412,17 +1906,20 @@ export default function FinanceAdminModule() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       <tr className="bg-muted/20 italic text-muted-foreground">
-                        <td className="px-4 py-2 text-xs" colSpan={2}>Beginning Balance</td>
+                        <td className="px-4 py-2 text-xs" colSpan={3}>Beginning Balance Forwarded</td>
                         <td className="px-4 py-2" />
                         <td className="px-4 py-2" />
                         <td className="px-4 py-2 text-right tabular-nums text-primary font-semibold">{formatPeso(currBal)}</td>
                       </tr>
-                      {data.entries.map(e => {
+                      {data.entries.map((e: any) => {
                         currBal += e.debit - e.credit;
                         return (
                           <tr key={e.id} className="hover:bg-muted/30">
-                            <td className="px-4 py-2 text-xs whitespace-nowrap">{formatDate(e.entry_date)}</td>
-                            <td className="px-4 py-2 text-xs text-muted-foreground">{e.memo || "—"}</td>
+                            <td className="px-4 py-2 text-xs whitespace-nowrap">{formatDate(e.date)}</td>
+                            <td className="px-4 py-2 text-xs text-muted-foreground max-w-xs truncate" title={e.description}>{e.description || "—"}</td>
+                            <td className="px-4 py-2 text-xs">
+                              <span className="px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-[10px] font-bold whitespace-nowrap">{e.source}</span>
+                            </td>
                             <td className="px-4 py-2 text-right tabular-nums text-green-600">{e.debit > 0 ? formatPeso(e.debit) : ""}</td>
                             <td className="px-4 py-2 text-right tabular-nums text-red-600">{e.credit > 0 ? formatPeso(e.credit) : ""}</td>
                             <td className="px-4 py-2 text-right tabular-nums font-bold text-primary">{formatPeso(currBal)}</td>
@@ -1430,14 +1927,22 @@ export default function FinanceAdminModule() {
                         );
                       })}
                     </tbody>
+                    <tfoot className="bg-muted/30 border-t-2 border-border font-black">
+                      <tr>
+                        <td colSpan={3} className="px-4 py-2 text-xs uppercase tracking-wider text-right">Ending Balance</td>
+                        <td className="px-4 py-2 text-right tabular-nums text-green-600">{formatPeso(data.entries.reduce((s: number, e: any) => s + e.debit, 0))}</td>
+                        <td className="px-4 py-2 text-right tabular-nums text-red-600">{formatPeso(data.entries.reduce((s: number, e: any) => s + e.credit, 0))}</td>
+                        <td className="px-4 py-2 text-right tabular-nums text-primary text-base">{formatPeso(currBal)}</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
             );
           })}
-          {Object.values(generalLedger).every(d => d.entries.length === 0 && d.beginBal === 0) && (
+          {Object.values(generalLedger).every((d: any) => d.entries.length === 0 && d.beginBal === 0) && (
             <div className="text-center py-16 text-muted-foreground">
-              No ledger data yet. Add accounts and journal entries to see the general ledger.
+              No ledger data yet. Add accounts and journal entries, or transactions will appear automatically.
             </div>
           )}
         </div>
@@ -1446,9 +1951,29 @@ export default function FinanceAdminModule() {
       {/* ── TRIAL BALANCE ── */}
       {activeTab === "tb" && (
         <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-200">
+          {/* TB Date Filter */}
+          <div className="flex flex-wrap items-end gap-3 bg-card p-4 rounded-xl border border-border shadow-sm">
+            <div>
+              <label className="text-xs font-bold text-muted-foreground block mb-1">Date From</label>
+              <input type="date" className="pos-input h-9 text-sm" value={plDateFrom} onChange={e => setPlDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted-foreground block mb-1">Date To</label>
+              <input type="date" className="pos-input h-9 text-sm" value={plDateTo} onChange={e => setPlDateTo(e.target.value)} />
+            </div>
+            <button
+              onClick={() => { setPlDateFrom(""); setPlDateTo(""); setPlFilterApplied(false); }}
+              className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all"
+            >
+              ✕ Clear
+            </button>
+          </div>
+
           <div className="text-center pt-2">
             <h2 className="text-2xl font-black uppercase tracking-wider">Trial Balance</h2>
-            <p className="text-xs text-muted-foreground mt-1">Derived from Journal Entries + Beginning Balances</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {plDateFrom || "All dates"}{plDateTo ? ` — ${plDateTo}` : ""} · Derived from All Transaction Sources + Beginning Balances
+            </p>
           </div>
           <div className="pos-card overflow-hidden shadow-md">
             <table className="w-full text-sm">
@@ -1463,7 +1988,7 @@ export default function FinanceAdminModule() {
                 {trialBalance.lines.length === 0 && (
                   <tr>
                     <td colSpan={3} className="text-center py-12 text-muted-foreground">
-                      No trial balance data. Add accounts and journal entries first.
+                      No trial balance data. Add accounts or record transactions first.
                     </td>
                   </tr>
                 )}
@@ -1489,7 +2014,7 @@ export default function FinanceAdminModule() {
             </table>
             {trialBalance.totalD > 0 && trialBalance.totalD === trialBalance.totalC && (
               <div className="bg-green-500/10 text-green-700 dark:text-green-400 px-6 py-4 font-bold text-center flex items-center justify-center gap-2 border-t border-green-500/20">
-                <ShieldCheck size={18} /> Trial Balance is balanced.
+                <ShieldCheck size={18} /> Trial Balance is balanced. Debits = Credits = {formatPeso(trialBalance.totalD)}
               </div>
             )}
             {trialBalance.totalD > 0 && trialBalance.totalD !== trialBalance.totalC && (
@@ -1497,6 +2022,134 @@ export default function FinanceAdminModule() {
                 ⚠ Out of balance by {formatPeso(Math.abs(trialBalance.totalD - trialBalance.totalC))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── CASH FLOW STATEMENT ── */}
+      {activeTab === "cf" && (
+        <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-200">
+          {/* CF Date Filter */}
+          <div className="flex flex-wrap items-end gap-3 bg-card p-4 rounded-xl border border-border shadow-sm">
+            <div>
+              <label className="text-xs font-bold text-muted-foreground block mb-1">Date From</label>
+              <input type="date" className="pos-input h-9 text-sm" value={plDateFrom} onChange={e => setPlDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted-foreground block mb-1">Date To</label>
+              <input type="date" className="pos-input h-9 text-sm" value={plDateTo} onChange={e => setPlDateTo(e.target.value)} />
+            </div>
+            <button
+              onClick={() => setPlFilterApplied(true)}
+              className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-95 transition-all"
+            >
+              <RefreshCw size={14} /> Apply Filter
+            </button>
+            {plFilterApplied && (
+              <button
+                onClick={() => { setPlDateFrom(""); setPlDateTo(""); setPlFilterApplied(false); }}
+                className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 active:scale-95 transition-all"
+              >
+                ✕ Clear Filter
+              </button>
+            )}
+            <div className="ml-auto flex gap-2">
+              <button onClick={printCF} className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">
+                <Printer size={14} /> Print Preview
+              </button>
+              <button onClick={exportCF} className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent active:scale-95 transition-all">
+                <Download size={14} /> Export Excel
+              </button>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <h2 className="text-2xl font-black uppercase tracking-wider">Cash Flow Statement</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              {plDateFrom || "All dates"}{plDateTo ? ` — ${plDateTo}` : ""}
+            </p>
+          </div>
+
+          {/* Cash Inflows */}
+          <div className="pos-card overflow-hidden shadow-md">
+            <div className="bg-green-500/10 px-6 py-3 border-b border-green-500/20">
+              <h3 className="font-black text-green-700 dark:text-green-400 text-lg">CASH INFLOWS</h3>
+              <p className="text-xs text-green-600/70">Revenue from all income sources</p>
+            </div>
+            <div className="p-5 space-y-1">
+              {cfData.inflows.filter((i: any) => i.amount > 0).map((item: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center text-sm py-2 px-2 hover:bg-muted/30 rounded-lg transition-colors">
+                  <span className="text-foreground/80">{item.name}</span>
+                  <span className="tabular-nums font-semibold text-green-600">{formatPeso(item.amount)}</span>
+                </div>
+              ))}
+              {cfData.inflows.every((i: any) => i.amount === 0) && (
+                <p className="text-sm text-muted-foreground italic text-center py-4">No cash inflow transactions in this period.</p>
+              )}
+              <div className="flex justify-between items-center pt-3 border-t border-border font-black text-base text-green-600 px-2">
+                <span>Total Cash Inflows</span>
+                <span>{formatPeso(cfData.totalInflow)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cash Outflows */}
+          <div className="pos-card overflow-hidden shadow-md">
+            <div className="bg-red-500/10 px-6 py-3 border-b border-red-500/20">
+              <h3 className="font-black text-red-700 dark:text-red-400 text-lg">CASH OUTFLOWS</h3>
+              <p className="text-xs text-red-600/70">Petty cash expenses disbursed</p>
+            </div>
+            <div className="p-5 space-y-1">
+              {cfData.outflows.filter((e: any) => e.amount > 0).map((item: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center text-sm py-2 px-2 hover:bg-muted/30 rounded-lg transition-colors">
+                  <span className="text-foreground/80">{item.name}</span>
+                  <span className="tabular-nums font-semibold text-red-600">{formatPeso(item.amount)}</span>
+                </div>
+              ))}
+              {cfData.outflows.every((e: any) => e.amount === 0) && (
+                <p className="text-sm text-muted-foreground italic text-center py-4">No cash outflow transactions in this period.</p>
+              )}
+              <div className="flex justify-between items-center pt-3 border-t border-border font-black text-base text-red-600 px-2">
+                <span>Total Cash Outflows</span>
+                <span>{formatPeso(cfData.totalOutflow)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Net Cash Flow */}
+          <div className={`pos-card p-6 flex justify-between items-center border-2 shadow-xl ${
+            cfData.netCashFlow >= 0 ? "bg-green-500/5 border-green-500/30" : "bg-red-500/5 border-red-500/30"
+          }`}>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Net Cash Position</p>
+              <h3 className="text-2xl font-black">{cfData.netCashFlow >= 0 ? "Positive Cash Flow" : "Negative Cash Flow"}</h3>
+              <p className="text-xs text-muted-foreground mt-1">Total Inflows − Total Outflows</p>
+            </div>
+            <span className={`text-3xl font-black tabular-nums ${
+              cfData.netCashFlow >= 0 ? "text-green-600" : "text-red-600"
+            }`}>
+              {formatPeso(cfData.netCashFlow)}
+            </span>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="pos-card p-4 text-center border border-green-500/20 bg-green-500/5">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Inflows</p>
+              <p className="text-xl font-black text-green-600 tabular-nums">{formatPeso(cfData.totalInflow)}</p>
+            </div>
+            <div className="pos-card p-4 text-center border border-red-500/20 bg-red-500/5">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Outflows</p>
+              <p className="text-xl font-black text-red-600 tabular-nums">{formatPeso(cfData.totalOutflow)}</p>
+            </div>
+            <div className={`pos-card p-4 text-center border ${
+              cfData.netCashFlow >= 0 ? "border-primary/20 bg-primary/5" : "border-destructive/20 bg-destructive/5"
+            }`}>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Net Cash Flow</p>
+              <p className={`text-xl font-black tabular-nums ${
+                cfData.netCashFlow >= 0 ? "text-primary" : "text-destructive"
+              }`}>{formatPeso(cfData.netCashFlow)}</p>
+            </div>
           </div>
         </div>
       )}
