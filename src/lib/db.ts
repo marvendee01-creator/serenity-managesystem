@@ -817,3 +817,28 @@ export async function deleteJournalEntry(id: number): Promise<void> {
   const { error } = await supabase.from("journal_entries" as any).delete().eq("id", id);
   if (error) throw error;
 }
+
+export async function renameCOAAndEntries(oldName: string, newName: string): Promise<void> {
+  const { error } = await supabase
+    .from("journal_entries" as any)
+    .update({ account_title: newName })
+    .eq("account_title", oldName);
+  if (error) throw error;
+}
+
+export async function mergeCOAAccounts(oldId: number, oldName: string, targetName: string): Promise<void> {
+  // 1. Update all journal entries pointing to the old account title to the target account title
+  const { error: jeError } = await supabase
+    .from("journal_entries" as any)
+    .update({ account_title: targetName })
+    .eq("account_title", oldName);
+  if (jeError) throw jeError;
+
+  // 2. Delete the old account from chart_of_accounts
+  const { error: coaError } = await supabase
+    .from("chart_of_accounts" as any)
+    .delete()
+    .eq("id", oldId);
+  if (coaError) throw coaError;
+}
+

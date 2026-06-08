@@ -11,6 +11,7 @@ import {
   getJournalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry,
   getSystemConfig, setSystemConfig,
   getTransactions, getFoodSales, getCashierReports, getBookingCashierReports,
+  renameCOAAndEntries, mergeCOAAccounts,
 } from "@/lib/db";
 
 const formatPeso = (amount: number) =>
@@ -1163,13 +1164,37 @@ export default function FinanceAdminModule() {
   };
 
   const saveCOA = async () => {
-    if (!coaForm.account_name?.trim()) return toast.error("Account name is required.");
+    const newName = coaForm.account_name?.trim();
+    if (!newName) return toast.error("Account name is required.");
     try {
       if (editingCOA?.id) {
-        await updateChartOfAccount(editingCOA.id, coaForm);
-        toast.success("Account updated.");
+        const oldName = editingCOA.account_name;
+        const isRename = oldName !== newName;
+        
+        if (isRename) {
+          const targetAccount = accounts.find(
+            a => a.id !== editingCOA.id && a.account_name.toLowerCase() === newName.toLowerCase()
+          );
+          
+          if (targetAccount) {
+            const confirmMerge = window.confirm(
+              `Naanay kapareho nga account nga "${targetAccount.account_name}". Gusto ba nimo e merge tanan transactions sa "${oldName}" ngadto niini?`
+            );
+            if (!confirmMerge) return;
+            
+            await mergeCOAAccounts(editingCOA.id, oldName, targetAccount.account_name);
+            toast.success(`Accounts merged successfully into "${targetAccount.account_name}".`);
+          } else {
+            await updateChartOfAccount(editingCOA.id, coaForm);
+            await renameCOAAndEntries(oldName, newName);
+            toast.success("Account updated.");
+          }
+        } else {
+          await updateChartOfAccount(editingCOA.id, coaForm);
+          toast.success("Account updated.");
+        }
       } else {
-        if (accounts.some(a => a.account_name.toLowerCase() === coaForm.account_name?.toLowerCase())) {
+        if (accounts.some(a => a.account_name.toLowerCase() === newName.toLowerCase())) {
           return toast.error("Duplicate account name.");
         }
         await addChartOfAccount(coaForm as any);
@@ -1178,7 +1203,10 @@ export default function FinanceAdminModule() {
       setEditingCOA(null);
       setCoaForm({ account_type: "Asset", beginning_balance: 0 });
       loadData();
-    } catch { toast.error("Failed to save account."); }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save account.");
+    }
   };
 
   const saveJE = async () => {
