@@ -14,7 +14,7 @@ import bookingMgmtIcon from "@/assets/icons/booking-mgmt.png";
 import bookingCashierIcon from "@/assets/icons/booking-cashier.png";
 import tentIcon from "@/assets/icons/tent.png";
 import SplashScreen from "@/components/SplashScreen";
-import PrismaticBurst from "@/components/PrismaticBurst";
+import { Warp } from "@paper-design/shaders-react";
 import WelcomePopup from "@/components/WelcomePopup";
 import EntranceModule from "@/modules/EntranceModule";
 import RoomModule from "@/modules/RoomModule";
@@ -107,13 +107,19 @@ export default function Index() {
   return (
     <div className="relative min-h-screen flex flex-col bg-background overflow-hidden">
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <PrismaticBurst
-          intensity={2}
-          speed={0.4}
-          animationType="rotate3d"
-          distort={1.2}
-          colors={["#5227FF", "#FF9FFC", "#B19EEF"]}
-          mixBlendMode="lighten"
+        <Warp
+          style={{ height: "100%", width: "100%" }}
+          proportion={0.45}
+          softness={1}
+          distortion={0.25}
+          swirl={0.8}
+          swirlIterations={10}
+          shape="checks"
+          shapeScale={0.1}
+          scale={1}
+          rotation={0}
+          speed={1}
+          colors={["hsl(200, 100%, 20%)", "hsl(160, 100%, 75%)", "hsl(180, 90%, 30%)", "hsl(170, 100%, 80%)"]}
         />
       </div>
       {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}

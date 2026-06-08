@@ -1669,9 +1669,13 @@ export default function ReportsModule() {
 
   const exportCSV = () => {
     const headers = ["Txn No", "Check-in Date & Time", "Date/Time", "Module", "Customer", "Adults", "Kids (8+)", "Kids (5-7)", "Kids (4 Below)", "Amount", "Extra Bed", "Maint. Fee", "Grand Total", "Payment"];
-    const rows = data.map((t) => [
-      t.transaction_no, t.check_in ? formatDateTime(t.check_in) : "", formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.amount_paid, t.extra_bed_charges ?? 0, t.maintenance_fee ?? 0, (t.amount_paid + (t.extra_bed_charges ?? 0) + (t.maintenance_fee ?? 0)), t.payment_method,
-    ]);
+    const rows = data.map((t) => {
+      const showActualTime = t.module === "Entrance" || t.module === "Room" || t.module === "Games Rental" || t.module === "Table Rent" || t.module === "Tent";
+      const checkInStr = t.check_in ? formatDateTime(t.check_in) : (showActualTime ? formatDateTime(t.date_time) : "");
+      return [
+        t.transaction_no, checkInStr, formatDateTime(t.date_time), t.module, t.customer_name || "", t.adults, t.kids_8_above ?? 0, t.kids_5_7 ?? 0, t.kids_4_below ?? 0, t.amount_paid, t.extra_bed_charges ?? 0, t.maintenance_fee ?? 0, (t.amount_paid + (t.extra_bed_charges ?? 0) + (t.maintenance_fee ?? 0)), t.payment_method,
+      ];
+    });
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -1830,7 +1834,12 @@ export default function ReportsModule() {
                   return (
                     <tr key={t.id} className="border-t border-border hover:bg-muted/50">
                       <td className="px-3 py-2 tabular-nums text-xs">{t.transaction_no.slice(-8)}</td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">{t.check_in ? formatDateTime(t.check_in) : "—"}</td>
+                      <td className="px-3 py-2 text-xs whitespace-nowrap">
+                        {(() => {
+                          const showActualTime = t.module === "Entrance" || t.module === "Room" || t.module === "Games Rental" || t.module === "Table Rent" || t.module === "Tent";
+                          return t.check_in ? formatDateTime(t.check_in) : (showActualTime ? formatDateTime(t.date_time) : "—");
+                        })()}
+                      </td>
                       <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDateTime(t.date_time)}</td>
                       <td className="px-3 py-2">{t.module}{t.game_type ? ` - ${t.game_type}` : ""}</td>
                       <td className="px-3 py-2">{t.customer_name || "—"}</td>
