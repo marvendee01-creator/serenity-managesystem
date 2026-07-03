@@ -261,9 +261,9 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
     </table>`;
 
   const exportExcel = () => {
-    const headers = ["Date", "Particulars", "Receipt No", "Amount"];
-    const data = rows.map(r => [r.date, r.particulars, r.receipt_no, r.amount.toFixed(2)]);
-    data.push(["TOTAL", "", "", total.toFixed(2)]);
+    const headers = ["Date", "Name", "Particulars", "Receipt No", "Amount"];
+    const data = rows.map(r => [r.date, r.name || "", r.particulars, r.receipt_no, r.amount.toFixed(2)]);
+    data.push(["TOTAL", "", "", "", total.toFixed(2)]);
     const csv = [headers, ...data].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
