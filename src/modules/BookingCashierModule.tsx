@@ -39,7 +39,7 @@ export type BookingCashierReport = BookingCashierReportDB & {
   reportDate: string;
   beginningCash: number;
   entranceSales: number;
-  pettyItems: { date: string; particulars: string; category?: string; receipt_no: string; amount: number }[];
+  pettyItems: { date: string; name?: string; particulars: string; category?: string; receipt_no: string; amount: number }[];
   actualCash: number;
 };
 
