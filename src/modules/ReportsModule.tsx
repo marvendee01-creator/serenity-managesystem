@@ -221,7 +221,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           for (const item of (r.petty_items || [])) {
             const itemDate = (item.date || r.date).slice(0, 10);
             if (itemDate >= from && itemDate <= to) {
-              allItems.push({ ...item, date: itemDate, reportId: r.id });
+              allItems.push({ ...item, name: item.name || "", date: itemDate, reportId: r.id });
             }
           }
         }
