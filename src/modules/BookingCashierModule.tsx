@@ -245,7 +245,7 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
         report_date: reportDate,
         beginning_cash: bc,
         entrance_sales: sales,
-        petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+        petty_items: pettyItems.map(p => ({ date: p.date, name: p.name, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
         denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
         actual_cash: totalActualCash,
       });
