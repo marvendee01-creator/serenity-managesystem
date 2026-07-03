@@ -308,6 +308,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           <thead>
             <tr className="bg-muted font-bold text-muted-foreground uppercase text-[10px]">
               <th className="text-left px-3 py-2">Date</th>
+              <th className="text-left px-3 py-2">Name</th>
               <th className="text-left px-3 py-2">Particulars</th>
               <th className="text-left px-3 py-2">Receipt No</th>
               <th className="text-right px-3 py-2">Amount</th>
@@ -315,11 +316,12 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           </thead>
           <tbody className="divide-y divide-border">
             {rows.length === 0 && (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground italic">No petty cash items found for this month</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground italic">No petty cash items found for this month</td></tr>
             )}
             {rows.map((r, idx) => (
               <tr key={idx} className="hover:bg-muted/50 transition-colors">
                 <td className="px-3 py-2 text-[11px] whitespace-nowrap">{r.date}</td>
+                <td className="px-3 py-2 text-[11px]">{r.name || "—"}</td>
                 <td className="px-3 py-2 font-medium">{r.particulars}</td>
                 <td className="px-3 py-2 text-muted-foreground">{r.receipt_no}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-bold text-destructive">{formatPeso(r.amount)}</td>
@@ -329,7 +331,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           {rows.length > 0 && (
             <tfoot className="bg-muted/30 font-bold border-t-2 border-border">
               <tr>
-                <td colSpan={3} className="px-3 py-3 text-right text-xs">TOTAL EXPENSES</td>
+                <td colSpan={4} className="px-3 py-3 text-right text-xs">TOTAL EXPENSES</td>
                 <td className="px-3 py-3 text-right text-base text-destructive">{formatPeso(total)}</td>
               </tr>
             </tfoot>
