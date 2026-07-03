@@ -225,7 +225,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
       toast.success("Cashier report saved!");
       if (!editReport) {
         setBeginningCash(""); setSales("");
-        setPettyItems([{ date: "", particulars: "", category: "", receipt_no: "", amount: "" }]);
+        setPettyItems([{ date: "", name: "", particulars: "", category: "", receipt_no: "", amount: "" }]);
         setDenoms(DEFAULT_DENOMS.map(d => ({ ...d })));
         firstRef.current?.focus();
       }
