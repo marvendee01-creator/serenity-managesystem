@@ -123,8 +123,8 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
 
   const [pettyItems, setPettyItems] = useState<PettyItem[]>(
     editReport?.pettyItems?.length
-      ? editReport.pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category || "", receipt_no: p.receipt_no, amount: p.amount.toString(), is_budoy: p.particulars === "Budoy Share (20%)" }))
-      : [{ date: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]
+      ? editReport.pettyItems.map((p: any) => ({ date: p.date, name: p.name || "", particulars: p.particulars, category: p.category || "", receipt_no: p.receipt_no, amount: p.amount.toString(), is_budoy: p.particulars === "Budoy Share (20%)" }))
+      : [{ date: "", name: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]
   );
 
   // Auto-fill Budoy Share amounts from Table Rent transactions for the report date
