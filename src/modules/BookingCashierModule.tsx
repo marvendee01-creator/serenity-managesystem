@@ -6,6 +6,7 @@ import COAAutocomplete from "@/components/COAAutocomplete";
 
 interface PettyItem {
   date: string;
+  name: string;
   particulars: string;
   category: string;
   receipt_no: string;
