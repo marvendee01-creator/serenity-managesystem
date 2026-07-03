@@ -178,7 +178,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
   const expected = totalCashAvailable - totalPettyCash;
   const overShort = totalActualCash - expected;
 
-  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", category: "", receipt_no: "", amount: "" }]);
+  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", name: "", particulars: "", category: "", receipt_no: "", amount: "" }]);
   const removePettyRow = (i: number) => setPettyItems(prev => prev.filter((_, idx) => idx !== i));
   const updatePetty = (i: number, field: keyof PettyItem, val: string) =>
     setPettyItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
