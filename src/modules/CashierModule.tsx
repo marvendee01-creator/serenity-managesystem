@@ -45,7 +45,7 @@ export function buildCashierReportHTML(report: {
   expected_ending_cash: number;
   actual_cash: number;
   cash_over_short: number;
-  petty_items?: { date: string; particulars: string; category?: string; receipt_no: string; amount: number }[];
+  petty_items?: { date: string; name?: string; particulars: string; category?: string; receipt_no: string; amount: number }[];
   denoms?: { label: string; value: number; quantity: number }[];
 }) {
   const d = new Date(report.date);
