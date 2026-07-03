@@ -214,11 +214,11 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
   const expected = totalCashAvailable - totalPettyCash;
   const overShort = totalActualCash - expected;
 
-  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]);
+  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", name: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]);
   const addBudoyRow = () => {
     // Only allow one budoy row
     if (pettyItems.some(p => p.is_budoy)) { toast.error("Budoy Share row already exists"); return; }
-    setPettyItems(prev => [...prev, { date: reportDate, particulars: "Budoy Share (20%)", category: "Expense", receipt_no: "—", amount: budoyTotal.toFixed(2), is_budoy: true }]);
+    setPettyItems(prev => [...prev, { date: reportDate, name: "Budoy", particulars: "Budoy Share (20%)", category: "Expense", receipt_no: "—", amount: budoyTotal.toFixed(2), is_budoy: true }]);
   };
   const removePettyRow = (i: number) => setPettyItems(prev => prev.filter((_, idx) => idx !== i));
   const updatePetty = (i: number, field: keyof PettyItem, val: string) =>
