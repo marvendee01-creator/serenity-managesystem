@@ -353,11 +353,12 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
           </div>
           {/* Full-width landscape table for petty cash */}
           <div className="overflow-x-auto rounded-lg border border-border" style={{ minWidth: 0 }}>
-            <table className="w-full text-sm border-collapse" style={{ minWidth: "900px" }}>
+            <table className="w-full text-sm border-collapse" style={{ minWidth: "1000px" }}>
               <thead className="bg-muted">
                 <tr>
                   <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap" style={{ width: "110px" }}>Date</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "480px" }}>Particulars (Chart of Accounts)</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "140px" }}>Name</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "420px" }}>Particulars (Chart of Accounts)</th>
                   <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "120px" }}>Receipt #</th>
                   <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "110px" }}>Amount</th>
                   <th className="text-center px-2 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "44px" }}></th>
@@ -369,7 +370,10 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
                     <td className="px-2 py-1.5" style={{ width: "110px" }}>
                       <input type="date" className={`${inputClass} text-xs h-9 w-full`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} />
                     </td>
-                    <td className="px-2 py-1.5" style={{ minWidth: "480px" }}>
+                    <td className="px-2 py-1.5" style={{ width: "140px" }}>
+                      <input type="text" className={`${inputClass} text-xs h-9 w-full`} value={item.name} onChange={e => updatePetty(i, "name", e.target.value)} placeholder="Name" />
+                    </td>
+                    <td className="px-2 py-1.5" style={{ minWidth: "420px" }}>
                       <COAAutocomplete
                         value={item.particulars}
                         onChange={(val, account) => {
