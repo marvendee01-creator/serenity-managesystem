@@ -86,12 +86,13 @@ export function buildCashierReportHTML(report: {
     <table>
       <tr>
         <th style="width:90px">Date</th>
-        <th style="min-width:280px">Particulars</th>
+        <th style="width:120px">Name</th>
+        <th style="min-width:260px">Particulars</th>
         <th style="width:120px">Receipt No.</th>
         <th class="right" style="width:100px">Amount</th>
       </tr>
-      ${pettyItems.map(p => `<tr><td>${p.date}</td><td class="particulars">${p.particulars}</td><td>${p.receipt_no || '—'}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
-      <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
+      ${pettyItems.map(p => `<tr><td>${p.date}</td><td>${(p as any).name || ''}</td><td class="particulars">${p.particulars}</td><td>${p.receipt_no || '—'}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="4" class="right">Total</td><td class="right">₱${report.petty_cash.toLocaleString()}</td></tr>
     </table>
     <h3>C. CASH DENOMINATION</h3>
     <table>
