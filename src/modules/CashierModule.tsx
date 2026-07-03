@@ -121,8 +121,8 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
 
   const [pettyItems, setPettyItems] = useState<PettyItem[]>(
     editReport?.petty_items?.length
-      ? editReport.petty_items.map(p => ({ date: p.date, particulars: p.particulars, category: p.category || "", receipt_no: p.receipt_no, amount: p.amount.toString() }))
-      : [{ date: "", particulars: "", category: "", receipt_no: "", amount: "" }]
+      ? editReport.petty_items.map((p: any) => ({ date: p.date, name: p.name || "", particulars: p.particulars, category: p.category || "", receipt_no: p.receipt_no, amount: p.amount.toString() }))
+      : [{ date: "", name: "", particulars: "", category: "", receipt_no: "", amount: "" }]
   );
 
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
