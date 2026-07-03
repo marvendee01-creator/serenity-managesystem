@@ -206,7 +206,7 @@ function StoreSalesSummary() {
 }
 
 function ExpensesSummary({ source, title }: { source: "store" | "entrance"; title: string }) {
-  const [rows, setRows] = useState<{ date: string; particulars: string; receipt_no: string; amount: number; reportId: number }[]>([]);
+  const [rows, setRows] = useState<{ date: string; name: string; particulars: string; receipt_no: string; amount: number; reportId: number }[]>([]);
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [refresh, setRefresh] = useState(0);
@@ -221,7 +221,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           for (const item of (r.petty_items || [])) {
             const itemDate = (item.date || r.date).slice(0, 10);
             if (itemDate >= from && itemDate <= to) {
-              allItems.push({ ...item, date: itemDate, reportId: r.id });
+              allItems.push({ ...item, name: item.name || "", date: itemDate, reportId: r.id });
             }
           }
         }
@@ -250,20 +250,20 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
     <h2>${title} Details — ${rangeLabel}</h2>
     <table>
       <thead>
-        <tr><th>Date</th><th>Particulars</th><th>Receipt No</th><th class="right">Amount</th></tr>
+        <tr><th>Date</th><th>Name</th><th>Particulars</th><th>Receipt No</th><th class="right">Amount</th></tr>
       </thead>
       <tbody>
-        ${rows.map(r => `<tr><td>${r.date}</td><td>${r.particulars}</td><td>${r.receipt_no}</td><td class="right">₱${r.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>`).join("")}
+        ${rows.map(r => `<tr><td>${r.date}</td><td>${r.name || ''}</td><td>${r.particulars}</td><td>${r.receipt_no}</td><td class="right">₱${r.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>`).join("")}
       </tbody>
       <tfoot>
-        <tr class="bold"><td>TOTAL</td><td></td><td></td><td class="right">₱${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>
+        <tr class="bold"><td>TOTAL</td><td></td><td></td><td></td><td class="right">₱${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>
       </tfoot>
     </table>`;
 
   const exportExcel = () => {
-    const headers = ["Date", "Particulars", "Receipt No", "Amount"];
-    const data = rows.map(r => [r.date, r.particulars, r.receipt_no, r.amount.toFixed(2)]);
-    data.push(["TOTAL", "", "", total.toFixed(2)]);
+    const headers = ["Date", "Name", "Particulars", "Receipt No", "Amount"];
+    const data = rows.map(r => [r.date, r.name || "", r.particulars, r.receipt_no, r.amount.toFixed(2)]);
+    data.push(["TOTAL", "", "", "", total.toFixed(2)]);
     const csv = [headers, ...data].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -308,6 +308,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           <thead>
             <tr className="bg-muted font-bold text-muted-foreground uppercase text-[10px]">
               <th className="text-left px-3 py-2">Date</th>
+              <th className="text-left px-3 py-2">Name</th>
               <th className="text-left px-3 py-2">Particulars</th>
               <th className="text-left px-3 py-2">Receipt No</th>
               <th className="text-right px-3 py-2">Amount</th>
@@ -315,11 +316,12 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           </thead>
           <tbody className="divide-y divide-border">
             {rows.length === 0 && (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground italic">No petty cash items found for this month</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground italic">No petty cash items found for this month</td></tr>
             )}
             {rows.map((r, idx) => (
               <tr key={idx} className="hover:bg-muted/50 transition-colors">
                 <td className="px-3 py-2 text-[11px] whitespace-nowrap">{r.date}</td>
+                <td className="px-3 py-2 text-[11px]">{r.name || "—"}</td>
                 <td className="px-3 py-2 font-medium">{r.particulars}</td>
                 <td className="px-3 py-2 text-muted-foreground">{r.receipt_no}</td>
                 <td className="px-3 py-2 text-right tabular-nums font-bold text-destructive">{formatPeso(r.amount)}</td>
@@ -329,7 +331,7 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
           {rows.length > 0 && (
             <tfoot className="bg-muted/30 font-bold border-t-2 border-border">
               <tr>
-                <td colSpan={3} className="px-3 py-3 text-right text-xs">TOTAL EXPENSES</td>
+                <td colSpan={4} className="px-3 py-3 text-right text-xs">TOTAL EXPENSES</td>
                 <td className="px-3 py-3 text-right text-base text-destructive">{formatPeso(total)}</td>
               </tr>
             </tfoot>

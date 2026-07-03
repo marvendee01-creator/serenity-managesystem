@@ -6,6 +6,7 @@ import COAAutocomplete from "@/components/COAAutocomplete";
 
 interface PettyItem {
   date: string;
+  name: string;
   particulars: string;
   category: string;
   receipt_no: string;
@@ -38,7 +39,7 @@ export type BookingCashierReport = BookingCashierReportDB & {
   reportDate: string;
   beginningCash: number;
   entranceSales: number;
-  pettyItems: { date: string; particulars: string; category?: string; receipt_no: string; amount: number }[];
+  pettyItems: { date: string; name?: string; particulars: string; category?: string; receipt_no: string; amount: number }[];
   actualCash: number;
 };
 
@@ -92,12 +93,13 @@ export function buildBookingCashierHTML(report: BookingCashierReport) {
     <table>
       <tr>
         <th style="width:90px">Date</th>
-        <th style="min-width:280px">Particulars</th>
+        <th style="width:120px">Name</th>
+        <th style="min-width:260px">Particulars</th>
         <th style="width:120px">Receipt No.</th>
         <th class="right" style="width:100px">Amount</th>
       </tr>
-      ${report.pettyItems.map(p => `<tr><td>${p.date}</td><td class="particulars">${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
-      <tr class="bold"><td colspan="3" class="right">Total</td><td class="right">₱${totalPetty.toLocaleString()}</td></tr>
+      ${report.pettyItems.map(p => `<tr><td>${p.date}</td><td>${(p as any).name || ''}</td><td class="particulars">${p.particulars}</td><td>${p.receipt_no}</td><td class="right">₱${p.amount.toLocaleString()}</td></tr>`).join('')}
+      <tr class="bold"><td colspan="4" class="right">Total</td><td class="right">₱${totalPetty.toLocaleString()}</td></tr>
     </table>
     <h3>C. CASH DENOMINATION</h3>
     <table>
@@ -122,8 +124,8 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
 
   const [pettyItems, setPettyItems] = useState<PettyItem[]>(
     editReport?.pettyItems?.length
-      ? editReport.pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category || "", receipt_no: p.receipt_no, amount: p.amount.toString(), is_budoy: p.particulars === "Budoy Share (20%)" }))
-      : [{ date: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]
+      ? editReport.pettyItems.map((p: any) => ({ date: p.date, name: p.name || "", particulars: p.particulars, category: p.category || "", receipt_no: p.receipt_no, amount: p.amount.toString(), is_budoy: p.particulars === "Budoy Share (20%)" }))
+      : [{ date: "", name: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]
   );
 
   // Auto-fill Budoy Share amounts from Table Rent transactions for the report date
@@ -213,11 +215,11 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
   const expected = totalCashAvailable - totalPettyCash;
   const overShort = totalActualCash - expected;
 
-  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]);
+  const addPettyRow = () => setPettyItems(prev => [...prev, { date: "", name: "", particulars: "", category: "", receipt_no: "", amount: "", is_budoy: false }]);
   const addBudoyRow = () => {
     // Only allow one budoy row
     if (pettyItems.some(p => p.is_budoy)) { toast.error("Budoy Share row already exists"); return; }
-    setPettyItems(prev => [...prev, { date: reportDate, particulars: "Budoy Share (20%)", category: "Expense", receipt_no: "—", amount: budoyTotal.toFixed(2), is_budoy: true }]);
+    setPettyItems(prev => [...prev, { date: reportDate, name: "Budoy", particulars: "Budoy Share (20%)", category: "Expense", receipt_no: "—", amount: budoyTotal.toFixed(2), is_budoy: true }]);
   };
   const removePettyRow = (i: number) => setPettyItems(prev => prev.filter((_, idx) => idx !== i));
   const updatePetty = (i: number, field: keyof PettyItem, val: string) =>
@@ -243,7 +245,7 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
         report_date: reportDate,
         beginning_cash: bc,
         entrance_sales: sales,
-        petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+        petty_items: pettyItems.map(p => ({ date: p.date, name: p.name, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
         denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
         actual_cash: totalActualCash,
       });
@@ -269,8 +271,8 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
       beginningCash: bc,
       entrance_sales: sales,
       entranceSales: sales,
-      petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
-      pettyItems: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+      petty_items: pettyItems.map(p => ({ date: p.date, name: p.name, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+      pettyItems: pettyItems.map(p => ({ date: p.date, name: p.name, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
       denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
       actual_cash: totalActualCash,
       actualCash: totalActualCash,
@@ -295,9 +297,9 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
       ["Cash Over/Short", overShort.toLocaleString()],
       [],
       ["B. PETTY CASH EXPENSE DETAILS"],
-      ["Date", "Particulars", "Receipt No.", "Amount"],
-      ...pettyItems.map(p => [p.date, p.particulars, p.receipt_no, (parseFloat(p.amount) || 0).toLocaleString()]),
-      ["", "", "Total", totalPettyCash.toLocaleString()],
+      ["Date", "Name", "Particulars", "Receipt No.", "Amount"],
+      ...pettyItems.map(p => [p.date, p.name, p.particulars, p.receipt_no, (parseFloat(p.amount) || 0).toLocaleString()]),
+      ["", "", "", "Total", totalPettyCash.toLocaleString()],
       [],
       ["C. CASH DENOMINATION"],
       ["Denomination", "Quantity", "Amount"],
@@ -402,11 +404,12 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
           </div>
           {/* Full-width landscape table for petty cash */}
           <div className="overflow-x-auto rounded-lg border border-border" style={{ minWidth: 0 }}>
-            <table className="w-full text-sm border-collapse" style={{ minWidth: "900px" }}>
+            <table className="w-full text-sm border-collapse" style={{ minWidth: "1000px" }}>
               <thead className="bg-muted">
                 <tr>
                   <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap" style={{ width: "110px" }}>Date</th>
-                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "480px" }}>Particulars (Chart of Accounts)</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "140px" }}>Name</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ minWidth: "420px" }}>Particulars (Chart of Accounts)</th>
                   <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "120px" }}>Receipt #</th>
                   <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "110px" }}>Amount</th>
                   <th className="text-center px-2 py-2 text-[10px] font-semibold text-muted-foreground" style={{ width: "44px" }}></th>
@@ -418,7 +421,10 @@ export default function BookingCashierModule({ editReport, onBack }: Props) {
                     <td className="px-2 py-1.5" style={{ width: "110px" }}>
                       <input type="date" className={`${inputClass} text-xs h-9 w-full`} value={item.date} onChange={e => updatePetty(i, "date", e.target.value)} disabled={item.is_budoy} />
                     </td>
-                    <td className="px-2 py-1.5" style={{ minWidth: "480px" }}>
+                    <td className="px-2 py-1.5" style={{ width: "140px" }}>
+                      <input type="text" className={`${inputClass} text-xs h-9 w-full`} value={item.name} onChange={e => updatePetty(i, "name", e.target.value)} placeholder="Name" disabled={item.is_budoy} />
+                    </td>
+                    <td className="px-2 py-1.5" style={{ minWidth: "420px" }}>
                       <COAAutocomplete
                         value={item.particulars}
                         onChange={(val, account) => {

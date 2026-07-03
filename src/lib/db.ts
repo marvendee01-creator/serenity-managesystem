@@ -91,6 +91,7 @@ export interface Settings {
 
 export interface CashierReportPettyItem {
   date: string;
+  name?: string;
   particulars: string;
   category?: string;
   receipt_no: string;
