@@ -206,7 +206,7 @@ function StoreSalesSummary() {
 }
 
 function ExpensesSummary({ source, title }: { source: "store" | "entrance"; title: string }) {
-  const [rows, setRows] = useState<{ date: string; particulars: string; receipt_no: string; amount: number; reportId: number }[]>([]);
+  const [rows, setRows] = useState<{ date: string; name: string; particulars: string; receipt_no: string; amount: number; reportId: number }[]>([]);
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [refresh, setRefresh] = useState(0);
