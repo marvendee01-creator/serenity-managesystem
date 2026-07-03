@@ -194,7 +194,7 @@ export default function CashierModule({ editReport, onBack }: CashierModuleProps
     expected_ending_cash: expected,
     actual_cash: totalActualCash,
     cash_over_short: overShort,
-    petty_items: pettyItems.map(p => ({ date: p.date, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
+    petty_items: pettyItems.map(p => ({ date: p.date, name: p.name, particulars: p.particulars, category: p.category, receipt_no: p.receipt_no, amount: parseFloat(p.amount) || 0 })),
     denoms: denoms.map(d => ({ label: d.label, value: d.value, quantity: parseFloat(d.quantity) || 0 })),
   });
 
