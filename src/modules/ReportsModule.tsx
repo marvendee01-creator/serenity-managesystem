@@ -250,13 +250,13 @@ function ExpensesSummary({ source, title }: { source: "store" | "entrance"; titl
     <h2>${title} Details — ${rangeLabel}</h2>
     <table>
       <thead>
-        <tr><th>Date</th><th>Particulars</th><th>Receipt No</th><th class="right">Amount</th></tr>
+        <tr><th>Date</th><th>Name</th><th>Particulars</th><th>Receipt No</th><th class="right">Amount</th></tr>
       </thead>
       <tbody>
-        ${rows.map(r => `<tr><td>${r.date}</td><td>${r.particulars}</td><td>${r.receipt_no}</td><td class="right">₱${r.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>`).join("")}
+        ${rows.map(r => `<tr><td>${r.date}</td><td>${r.name || ''}</td><td>${r.particulars}</td><td>${r.receipt_no}</td><td class="right">₱${r.amount.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>`).join("")}
       </tbody>
       <tfoot>
-        <tr class="bold"><td>TOTAL</td><td></td><td></td><td class="right">₱${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>
+        <tr class="bold"><td>TOTAL</td><td></td><td></td><td></td><td class="right">₱${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr>
       </tfoot>
     </table>`;
 
