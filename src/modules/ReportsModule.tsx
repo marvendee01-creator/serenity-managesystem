@@ -877,7 +877,7 @@ function BookingFinancialLedger() {
           : (depositAmount > 0 ? 'Partially Paid' : 'Unpaid');
 
         // Deposit Date = when the booking/deposit was recorded
-        const deposit_date = depositAmount > 0 ? (t.date_time || t.created_at || null) : null;
+        const deposit_date = depositAmount > 0 ? (t.date_time || null) : null;
         // Full Payment info captured from Booking Management "Settle Folio" -> date_settled + amount_paid
         const isFullyPaid = paymentStatus === 'Fully Paid';
         const full_payment_date = isFullyPaid ? (t.date_settled || null) : null;
