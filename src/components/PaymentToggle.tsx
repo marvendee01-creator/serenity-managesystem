@@ -1,12 +1,18 @@
+type PaymentMethod = "Cash" | "GCash" | "Charge to Booking";
+
 interface PaymentToggleProps {
-  value: "Cash" | "GCash";
-  onChange: (v: "Cash" | "GCash") => void;
+  value: PaymentMethod;
+  onChange: (v: PaymentMethod) => void;
+  options?: readonly PaymentMethod[];
 }
 
-export default function PaymentToggle({ value, onChange }: PaymentToggleProps) {
+const DEFAULT_OPTIONS = ["Cash", "GCash"] as const;
+
+export default function PaymentToggle({ value, onChange, options }: PaymentToggleProps) {
+  const opts = options ?? DEFAULT_OPTIONS;
   return (
     <div className="flex gap-2">
-      {(["Cash", "GCash"] as const).map((opt) => (
+      {opts.map((opt) => (
         <button
           key={opt}
           type="button"
