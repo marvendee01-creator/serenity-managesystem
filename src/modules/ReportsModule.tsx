@@ -857,10 +857,12 @@ function FoodSalesReport() {
 }
 
 function BookingFinancialLedger() {
-  const [txns, setTxns] = useState<(Transaction & { balance_amount: number; payment_status: string })[]>([]);
+  const [txns, setTxns] = useState<(Transaction & { balance_amount: number; payment_status: string; deposit_date: string | null; full_payment_date: string | null; full_payment_amount: number; date_paid: string | null })[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [dateFilter, setDateFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -870,14 +872,26 @@ function BookingFinancialLedger() {
         const totalAmount = t.amount_paid || 0;
         const depositAmount = t.deposit_amount || 0;
         const balanceAmount = totalAmount - depositAmount;
-        const paymentStatus = balanceAmount <= 0 
-          ? 'Fully Paid' 
+        const paymentStatus = balanceAmount <= 0
+          ? 'Fully Paid'
           : (depositAmount > 0 ? 'Partially Paid' : 'Unpaid');
-        
+
+        // Deposit Date = when the booking/deposit was recorded
+        const deposit_date = depositAmount > 0 ? (t.date_time || t.created_at || null) : null;
+        // Full Payment info captured from Booking Management "Settle Folio" -> date_settled + amount_paid
+        const isFullyPaid = paymentStatus === 'Fully Paid';
+        const full_payment_date = isFullyPaid ? (t.date_settled || null) : null;
+        const full_payment_amount = isFullyPaid ? totalAmount : 0;
+        const date_paid = t.date_settled || null;
+
         return {
           ...t,
           balance_amount: balanceAmount,
-          payment_status: paymentStatus
+          payment_status: paymentStatus,
+          deposit_date,
+          full_payment_date,
+          full_payment_amount,
+          date_paid,
         };
       });
       setTxns(processed);
@@ -885,10 +899,21 @@ function BookingFinancialLedger() {
     });
   }, []);
 
+  const inRange = (iso: string | null | undefined) => {
+    if (!iso) return false;
+    const d = iso.slice(0, 10);
+    if (monthFilter && d.slice(0, 7) !== monthFilter) return false;
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    return true;
+  };
+  const hasDateFilter = !!(monthFilter || dateFrom || dateTo);
+
   const filtered = txns.filter(t => {
     const matchesSearch = !search || t.customer_name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "All" || t.payment_status === statusFilter;
-    const matchesDate = !dateFilter || (t.check_in && t.check_in.slice(0, 10) === dateFilter);
+    // Strict date filtering: only include txns whose Date Paid falls inside range
+    const matchesDate = !hasDateFilter || inRange(t.date_paid);
     return matchesSearch && matchesStatus && matchesDate;
   });
 
@@ -896,10 +921,12 @@ function BookingFinancialLedger() {
   const totalPartial = filtered.filter(t => t.payment_status === 'Partially Paid').length;
   const totalUnpaid = filtered.filter(t => t.payment_status === 'Unpaid').length;
 
+  const fmt = (v: string | null) => v ? formatDate(v) : "—";
+
   const exportCSV = () => {
-    const headers = ["Customer Name", "Check In Date", "Check Out Date", "No. of Days", "Booking Type", "Payment Status", "Total Amount", "Deposit Amount", "Balance Remaining"];
+    const headers = ["Customer Name", "Check In Date", "Check Out Date", "No. of Days", "Booking Type", "Payment Status", "Date Paid", "Deposit Date", "Deposit Amount", "Full Payment Date", "Full Payment Amount", "Total Amount", "Balance Remaining"];
     const rows = filtered.map(t => {
-      const days = t.check_in && t.check_out 
+      const days = t.check_in && t.check_out
         ? Math.max(1, Math.ceil((new Date(t.check_out).getTime() - new Date(t.check_in).getTime()) / (1000 * 60 * 60 * 24)))
         : 1;
       return [
@@ -909,8 +936,12 @@ function BookingFinancialLedger() {
         days,
         t.booking_type || "—",
         t.payment_status,
-        (t.amount_paid || 0).toFixed(2),
+        fmt(t.date_paid),
+        fmt(t.deposit_date),
         (t.deposit_amount || 0).toFixed(2),
+        fmt(t.full_payment_date),
+        (t.full_payment_amount || 0).toFixed(2),
+        (t.amount_paid || 0).toFixed(2),
         (t.balance_amount || 0).toFixed(2)
       ];
     });
@@ -950,14 +981,18 @@ function BookingFinancialLedger() {
           <th class="center">Days</th>
           <th>Type</th>
           <th>Status</th>
+          <th>Date Paid</th>
+          <th>Deposit Date</th>
+          <th class="right">Deposit Amount</th>
+          <th>Full Payment Date</th>
+          <th class="right">Full Payment Amount</th>
           <th class="right">Total Amount</th>
-          <th class="right">Deposit</th>
           <th class="right">Balance</th>
         </tr>
       </thead>
       <tbody>
         ${filtered.map(t => {
-          const days = t.check_in && t.check_out 
+          const days = t.check_in && t.check_out
             ? Math.max(1, Math.ceil((new Date(t.check_out).getTime() - new Date(t.check_in).getTime()) / (1000 * 60 * 60 * 24)))
             : 1;
           return `
@@ -968,13 +1003,17 @@ function BookingFinancialLedger() {
             <td class="center">${days}</td>
             <td>${t.booking_type || "—"}</td>
             <td><span class="status ${t.payment_status === 'Fully Paid' ? 'status-paid' : t.payment_status === 'Partially Paid' ? 'status-partial' : 'status-unpaid'}">${t.payment_status}</span></td>
-            <td class="right">₱${(t.amount_paid || 0).toLocaleString()}</td>
+            <td>${fmt(t.date_paid)}</td>
+            <td>${fmt(t.deposit_date)}</td>
             <td class="right">₱${(t.deposit_amount || 0).toLocaleString()}</td>
+            <td>${fmt(t.full_payment_date)}</td>
+            <td class="right">₱${(t.full_payment_amount || 0).toLocaleString()}</td>
+            <td class="right">₱${(t.amount_paid || 0).toLocaleString()}</td>
             <td class="right">₱${(t.balance_amount || 0).toLocaleString()}</td>
           </tr>
         `; }).join("")}
         <tr class="total-row">
-          <td colspan="8" class="right">TOTAL OUTSTANDING BALANCE</td>
+          <td colspan="12" class="right">TOTAL OUTSTANDING BALANCE</td>
           <td class="right">₱${totalOutstanding.toLocaleString()}</td>
         </tr>
       </tbody>
@@ -987,24 +1026,26 @@ function BookingFinancialLedger() {
     w.document.close();
   };
 
+  const clearFilters = () => { setMonthFilter(""); setDateFrom(""); setDateTo(""); };
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
         <div className="md:col-span-2">
-          <label className="text-xs font-medium text-muted-foreground block mb-1">Filter By Customer</label>
+          <label className="text-xs font-medium text-muted-foreground block mb-1">Customer Name</label>
           <div className="relative">
-            <input 
-              type="text" 
-              className="pos-input w-full pl-8" 
-              placeholder="Search customer name..." 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
+            <input
+              type="text"
+              className="pos-input w-full pl-8"
+              placeholder="Search customer name..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
             />
             <Eye size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           </div>
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground block mb-1">Filter By Status</label>
+          <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
           <select className="pos-input w-full" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="All">All Status</option>
             <option value="Fully Paid">Fully Paid</option>
@@ -1013,19 +1054,27 @@ function BookingFinancialLedger() {
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground block mb-1">Filter By Check-In Date</label>
-          <input 
-            type="date" 
-            className="pos-input w-full" 
-            value={dateFilter} 
-            onChange={e => setDateFilter(e.target.value)} 
-          />
+          <label className="text-xs font-medium text-muted-foreground block mb-1">Filter by Month</label>
+          <input type="month" className="pos-input w-full" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
         </div>
-        <div className="flex gap-2">
-          <button onClick={exportCSV} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground block mb-1">Date From</label>
+          <input type="date" className="pos-input w-full" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground block mb-1">Date To</label>
+          <input type="date" className="pos-input w-full" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        </div>
+        <div className="md:col-span-6 flex flex-wrap gap-2 justify-end">
+          {(monthFilter || dateFrom || dateTo) && (
+            <button onClick={clearFilters} className="h-10 px-4 rounded-lg bg-muted text-muted-foreground text-sm font-medium hover:bg-muted/70">
+              Clear Date Filters
+            </button>
+          )}
+          <button onClick={exportCSV} className="h-10 px-4 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
             <Download size={16} /> CSV
           </button>
-          <button onClick={handlePrint} className="flex-1 h-10 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
+          <button onClick={handlePrint} className="h-10 px-4 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-primary hover:text-primary-foreground flex items-center justify-center gap-2">
             <Printer size={16} /> Print
           </button>
         </div>
@@ -1051,23 +1100,27 @@ function BookingFinancialLedger() {
           <thead className="bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             <tr>
               <th className="text-left px-3 py-3">Customer Name</th>
-              <th className="text-left px-3 py-3">Check In Date</th>
-              <th className="text-left px-3 py-3">Check Out Date</th>
-              <th className="text-center px-3 py-3">No. of Days</th>
-              <th className="text-left px-3 py-3">Booking Type</th>
-              <th className="text-center px-3 py-3">Payment Status</th>
-              <th className="text-right px-3 py-3">Total Amount</th>
+              <th className="text-left px-3 py-3">Check In</th>
+              <th className="text-left px-3 py-3">Check Out</th>
+              <th className="text-center px-3 py-3">Days</th>
+              <th className="text-left px-3 py-3">Type</th>
+              <th className="text-center px-3 py-3">Status</th>
+              <th className="text-left px-3 py-3">Date Paid</th>
+              <th className="text-left px-3 py-3">Deposit Date</th>
               <th className="text-right px-3 py-3">Deposit Amount</th>
-              <th className="text-right px-3 py-3">Balance Remaining</th>
+              <th className="text-left px-3 py-3">Full Payment Date</th>
+              <th className="text-right px-3 py-3">Full Payment Amount</th>
+              <th className="text-right px-3 py-3">Total Amount</th>
+              <th className="text-right px-3 py-3">Balance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
-              <tr><td colSpan={9} className="text-center py-12 italic text-muted-foreground">Loading ledger data...</td></tr>
+              <tr><td colSpan={13} className="text-center py-12 italic text-muted-foreground">Loading ledger data...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No bookings found matching filters.</td></tr>
+              <tr><td colSpan={13} className="text-center py-12 text-muted-foreground">No bookings found matching filters.</td></tr>
             ) : filtered.map(t => {
-              const days = t.check_in && t.check_out 
+              const days = t.check_in && t.check_out
                 ? Math.max(1, Math.ceil((new Date(t.check_out).getTime() - new Date(t.check_in).getTime()) / (1000 * 60 * 60 * 24)))
                 : 1;
               return (
@@ -1086,8 +1139,12 @@ function BookingFinancialLedger() {
                       {t.payment_status}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-right tabular-nums font-medium">{formatPeso(t.amount_paid || 0)}</td>
+                  <td className="px-3 py-3 text-xs tabular-nums">{fmt(t.date_paid)}</td>
+                  <td className="px-3 py-3 text-xs tabular-nums">{fmt(t.deposit_date)}</td>
                   <td className="px-3 py-3 text-right tabular-nums font-medium text-success">{formatPeso(t.deposit_amount || 0)}</td>
+                  <td className="px-3 py-3 text-xs tabular-nums">{fmt(t.full_payment_date)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums font-medium">{formatPeso(t.full_payment_amount || 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums font-medium">{formatPeso(t.amount_paid || 0)}</td>
                   <td className="px-3 py-3 text-right tabular-nums font-black text-destructive">{formatPeso(t.balance_amount || 0)}</td>
                 </tr>
               );
