@@ -602,7 +602,7 @@ export default function RoomModule() {
 
         {totalHeadcount > paxLimit && (
           <p className="text-xs text-destructive flex items-center gap-1">
-            <AlertTriangle size={12} /> Max {paxLimit} pax only for {roomType}
+            <AlertTriangle size={12} /> Max {paxLimit} pax only for {selectedRooms.join(", ")}
           </p>
         )}
         <div>
