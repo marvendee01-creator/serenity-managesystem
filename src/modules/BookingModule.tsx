@@ -84,7 +84,7 @@ export default function BookingModule() {
   const [drinksCorkage, setDrinksCorkage] = useState("");
   const [liquorCorkage, setLiquorCorkage] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
-  const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
+  const [payment, setPayment] = useState<"Cash" | "GCash" | "Charge to Booking">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
   const [extraBedCharges, setExtraBedCharges] = useState("");
 
