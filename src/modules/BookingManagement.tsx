@@ -214,6 +214,40 @@ export default function BookingManagement() {
     });
   }, []);
 
+  const handleSettlePayment = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    const amount = parseFloat(settleAmount);
+    if (!amount || amount <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    const currentDeposit = booking.deposit_amount || 0;
+    const totalAmount = booking.amount_paid || 0;
+    const currentBalance = totalAmount - currentDeposit;
+    if (amount > currentBalance + 0.001) {
+      toast.error(`Amount exceeds balance of ₱${currentBalance.toLocaleString()}`);
+      return;
+    }
+    const newDeposit = currentDeposit + amount;
+    const newBalance = totalAmount - newDeposit;
+    const fullyPaid = newBalance <= 0.001;
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      await updateTransaction(booking.id, {
+        deposit_amount: newDeposit,
+        balance: newBalance,
+        payment_status: fullyPaid ? "Fully Paid" : "Partially Paid",
+        date_settled: fullyPaid ? today : booking.date_settled,
+      });
+      toast.success(fullyPaid ? "Booking fully settled" : "Payment recorded");
+      setSettlingId(null);
+      setSettleAmount("");
+      loadBookings();
+    } catch {
+      toast.error("Failed to record payment");
+    }
+  }, [settleAmount, loadBookings]);
+
   const handleCancelBooking = useCallback(async (booking: Transaction) => {
     if (!booking.id) return;
     if (!confirm(`Cancel booking for ${booking.customer_name || "this guest"}? This will exclude it from reports and the reservation board.`)) return;

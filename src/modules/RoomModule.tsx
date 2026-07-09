@@ -206,7 +206,7 @@ export default function RoomModule() {
   // Scheduled check-out fields
   const [checkOutDate, setCheckOutDate] = useState(getTodayDate);
   const [checkOutTime, setCheckOutTime] = useState("17:00"); // default 5PM
-  const [payment, setPayment] = useState<"Cash" | "GCash">("Cash");
+  const [payment, setPayment] = useState<"Cash" | "GCash" | "Charge to Booking">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [discount, setDiscount] = useState("");
   const [extraBedCharges, setExtraBedCharges] = useState("");
@@ -602,7 +602,7 @@ export default function RoomModule() {
 
         {totalHeadcount > paxLimit && (
           <p className="text-xs text-destructive flex items-center gap-1">
-            <AlertTriangle size={12} /> Max {paxLimit} pax only for {roomType}
+            <AlertTriangle size={12} /> Max {paxLimit} pax only for {selectedRooms.join(", ")}
           </p>
         )}
         <div>
