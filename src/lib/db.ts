@@ -323,7 +323,7 @@ export async function getTransactions(filter?: {
     children: row.children,
     total_headcount: row.total_headcount,
     amount_paid: Number(row.amount_paid),
-    payment_method: row.payment_method as "Cash" | "GCash",
+    payment_method: row.payment_method as "Cash" | "GCash" | "Charge to Booking",
     customer_name: row.customer_name ?? undefined,
     number_of_tables: row.number_of_tables ?? undefined,
     check_in: row.check_in ?? undefined,
