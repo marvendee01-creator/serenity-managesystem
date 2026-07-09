@@ -13,7 +13,7 @@ export interface Transaction {
   children: number;
   total_headcount: number;
   amount_paid: number;
-  payment_method: "Cash" | "GCash";
+  payment_method: "Cash" | "GCash" | "Charge to Booking";
   customer_name?: string;
   number_of_tables?: number;
   check_in?: string;
