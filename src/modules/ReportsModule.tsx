@@ -894,8 +894,8 @@ function BookingFinancialLedger() {
             deposit_date: depositAmount > 0 ? (t.date_time?.slice(0, 10) || null) : null,
             deposit_amount: depositAmount,
             settlement_date: isFullyPaid ? (t.date_settled?.slice(0, 10) || null) : null,
-            amount_received: isFullyPaid ? totalAmount : (t.amount_paid || 0) - balance,
-            remaining_balance: balance,
+            amount_received: isFullyPaid ? totalAmount : 0,
+            remaining_balance: isFullyPaid ? 0 : balance,
           };
         });
       processed.sort((a, b) => a.customer_name.localeCompare(b.customer_name));
