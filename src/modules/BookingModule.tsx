@@ -248,6 +248,7 @@ export default function BookingModule() {
       const conflict = hasDateConflict();
       if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
       if (!pending8amProceed && has8amActiveConflict()) { setShow8amWarning(true); return; }
+      if (!pendingSameDateProceed && hasSameDateBooking()) { setShowSameDateWarning(true); return; }
     }
     
     setSaving(true);
