@@ -90,8 +90,23 @@ export default function BookingManagement() {
     } catch { toast.error("Failed to delete"); }
   }, []);
 
+  const toLocalDate = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+  };
+  const toLocalTime = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  };
+
   const openEdit = useCallback((b: Transaction) => {
     setEditingBooking(b);
+    setEditCheckInDate(toLocalDate(b.check_in));
+    setEditCheckInTime(toLocalTime(b.check_in));
+    setEditCheckOutDate(toLocalDate(b.check_out));
+    setEditCheckOutTime(toLocalTime(b.check_out));
     // Parse existing rooms from the stored room_type string
     const rooms = b.room_type
       ? b.room_type.split(",").map((r) => r.trim()).filter((r) => ROOM_OPTIONS.includes(r as typeof ROOM_OPTIONS[number]))
