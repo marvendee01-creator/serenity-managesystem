@@ -45,6 +45,14 @@ export default function BookingManagement() {
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
   const [editSaving, setEditSaving] = useState(false);
 
+  // Separate date/time schedule editing state
+  const [editCheckInDate, setEditCheckInDate] = useState("");
+  const [editCheckInTime, setEditCheckInTime] = useState("");
+  const [editCheckOutDate, setEditCheckOutDate] = useState("");
+  const [editCheckOutTime, setEditCheckOutTime] = useState("");
+  const [schedConflict, setSchedConflict] = useState<{ message: string; onProceed: () => void } | null>(null);
+  const [schedSaving, setSchedSaving] = useState(false);
+
   // Room edit state
   const [editSelectedRooms, setEditSelectedRooms] = useState<string[]>([]);
   const [editNoOfDays, setEditNoOfDays] = useState("1");
@@ -82,8 +90,23 @@ export default function BookingManagement() {
     } catch { toast.error("Failed to delete"); }
   }, []);
 
+  const toLocalDate = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+  };
+  const toLocalTime = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  };
+
   const openEdit = useCallback((b: Transaction) => {
     setEditingBooking(b);
+    setEditCheckInDate(toLocalDate(b.check_in));
+    setEditCheckInTime(toLocalTime(b.check_in));
+    setEditCheckOutDate(toLocalDate(b.check_out));
+    setEditCheckOutTime(toLocalTime(b.check_out));
     // Parse existing rooms from the stored room_type string
     const rooms = b.room_type
       ? b.room_type.split(",").map((r) => r.trim()).filter((r) => ROOM_OPTIONS.includes(r as typeof ROOM_OPTIONS[number]))
@@ -205,6 +228,49 @@ export default function BookingManagement() {
     } catch { toast.error("Failed to update"); }
     setEditSaving(false);
   }, [editingBooking, editForm, editSelectedRooms, editNoOfDays, kuboRate, barkadaRate]);
+
+  // ── Schedule (date/time) independent editing ──
+  const combineISO = (date: string, time: string, fallbackISO?: string) => {
+    if (!date) return undefined;
+    const t = time || toLocalTime(fallbackISO) || "00:00";
+    const d = new Date(`${date}T${t}:00`);
+    return isNaN(d.getTime()) ? undefined : d.toISOString();
+  };
+
+  const checkInDateConflict = (dateStr: string) =>
+    bookings.some(b => b.id !== editingBooking?.id && b.check_in && toLocalDate(b.check_in) === dateStr);
+
+  const saveSchedule = async (field: "check_in" | "check_out", iso: string) => {
+    if (!editingBooking?.id) return;
+    setSchedSaving(true);
+    try {
+      await updateTransaction(editingBooking.id, { [field]: iso });
+      setEditForm(f => ({ ...f, [field]: iso }));
+      setEditingBooking(prev => (prev ? { ...prev, [field]: iso } : prev));
+      toast.success("Successfully changed booking!");
+      loadBookings();
+    } catch { toast.error("Failed to update schedule"); }
+    setSchedSaving(false);
+  };
+
+  const handleConfirmCheckIn = (proceed = false) => {
+    if (!editingBooking?.id || !editCheckInDate) { toast.error("Select a check-in date"); return; }
+    if (!proceed && checkInDateConflict(editCheckInDate)) {
+      setSchedConflict({
+        message: "There is already a guest booking on this date. Do you want to proceed? Please enter the time in.",
+        onProceed: () => handleConfirmCheckIn(true),
+      });
+      return;
+    }
+    const iso = combineISO(editCheckInDate, editCheckInTime, editingBooking.check_in);
+    if (iso) saveSchedule("check_in", iso);
+  };
+
+  const handleConfirmCheckOut = () => {
+    if (!editingBooking?.id || !editCheckOutDate) { toast.error("Select a check-out date"); return; }
+    const iso = combineISO(editCheckOutDate, editCheckOutTime, editingBooking.check_out);
+    if (iso) saveSchedule("check_out", iso);
+  };
 
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
@@ -751,41 +817,49 @@ export default function BookingManagement() {
           <DialogHeader><DialogTitle className="flex items-center gap-2"><BedDouble size={18} className="text-primary" /> Edit Booking</DialogTitle></DialogHeader>
           <div className="space-y-4">
 
-            {/* ── Dates ── */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-medium block mb-1">Check-in</label>
-                <input type="datetime-local" className="pos-input w-full text-sm"
-                  value={editForm.check_in ? editForm.check_in.slice(0, 16) : ""}
-                  onChange={e => {
-                    const val = e.target.value ? new Date(e.target.value).toISOString() : undefined;
-                    setEditForm(f => ({ ...f, check_in: val }));
-                    // auto-derive no_of_days
-                    if (e.target.value && editForm.check_out) {
-                      const inMs = new Date(e.target.value).getTime();
-                      const outMs = new Date(editForm.check_out).getTime();
-                      if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
-                        setEditNoOfDays(String(Math.max(1, Math.ceil((outMs - inMs) / 86400000))));
-                      }
-                    }
-                  }} />
+            {/* ── Schedule Editing (separate date + time, saved via Confirm buttons) ── */}
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-primary block">Check-in</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>
+                    <input type="date" className="pos-input w-full text-sm"
+                      value={editCheckInDate}
+                      onChange={e => setEditCheckInDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-muted-foreground block mb-1">Time</label>
+                    <input type="time" className="pos-input w-full text-sm"
+                      value={editCheckInTime}
+                      onChange={e => setEditCheckInTime(e.target.value)} />
+                  </div>
+                </div>
+                <button disabled={schedSaving} onClick={() => handleConfirmCheckIn()}
+                  className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-[0.97] transition-all disabled:opacity-50">
+                  Confirm Check-in
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-medium block mb-1">Check-out</label>
-                <input type="datetime-local" className="pos-input w-full text-sm"
-                  value={editForm.check_out ? editForm.check_out.slice(0, 16) : ""}
-                  onChange={e => {
-                    const val = e.target.value ? new Date(e.target.value).toISOString() : undefined;
-                    setEditForm(f => ({ ...f, check_out: val }));
-                    // auto-derive no_of_days
-                    if (e.target.value && editForm.check_in) {
-                      const inMs = new Date(editForm.check_in).getTime();
-                      const outMs = new Date(e.target.value).getTime();
-                      if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
-                        setEditNoOfDays(String(Math.max(1, Math.ceil((outMs - inMs) / 86400000))));
-                      }
-                    }
-                  }} />
+              <div className="p-3 rounded-xl border border-border bg-muted/30 space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground block">Check-out</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>
+                    <input type="date" className="pos-input w-full text-sm"
+                      value={editCheckOutDate}
+                      onChange={e => setEditCheckOutDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-muted-foreground block mb-1">Time</label>
+                    <input type="time" className="pos-input w-full text-sm"
+                      value={editCheckOutTime}
+                      onChange={e => setEditCheckOutTime(e.target.value)} />
+                  </div>
+                </div>
+                <button disabled={schedSaving} onClick={handleConfirmCheckOut}
+                  className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-[0.97] transition-all disabled:opacity-50">
+                  Confirm Check-out
+                </button>
               </div>
             </div>
 
@@ -954,6 +1028,23 @@ export default function BookingManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Schedule Conflict Warning Dialog */}
+      {schedConflict && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={() => setSchedConflict(null)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-8 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={40} className="text-warning" />
+            </div>
+            <h3 className="text-2xl font-bold text-foreground mb-3">⚠️ Booking Conflict</h3>
+            <p className="text-base text-muted-foreground mb-6">{schedConflict.message}</p>
+            <div className="flex gap-3">
+              <button onClick={() => setSchedConflict(null)} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold text-base hover:bg-accent transition-all">Cancel</button>
+              <button onClick={() => { const action = schedConflict.onProceed; setSchedConflict(null); action(); }} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 active:scale-95 transition-all">Proceed</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Thank You Message Dialog */}
       <Dialog open={showThankYou} onOpenChange={setShowThankYou}>

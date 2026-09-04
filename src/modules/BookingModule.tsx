@@ -107,6 +107,8 @@ export default function BookingModule() {
   const [dateConflictMessage, setDateConflictMessage] = useState("");
   const [show8amWarning, setShow8amWarning] = useState(false);
   const [pending8amProceed, setPending8amProceed] = useState(false);
+  const [showSameDateWarning, setShowSameDateWarning] = useState(false);
+  const [pendingSameDateProceed, setPendingSameDateProceed] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string; booking_type?: string; room_type?: string }[]>([]);
   
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -198,6 +200,19 @@ export default function BookingModule() {
     });
   }, [checkIn, existingBookings]);
 
+  // Same-date warning: any existing booking (non-cancelled) on the same check-in date, regardless of time
+  const hasSameDateBooking = useCallback(() => {
+    if (!checkIn) return false;
+    const dateStr = checkIn.slice(0, 10);
+    return existingBookings.some((b) => {
+      if ((b as { status?: string }).status === "Cancelled") return false;
+      if (!b.check_in) return false;
+      const d = new Date(b.check_in);
+      const bd = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+      return bd === dateStr || b.check_in.slice(0, 10) === dateStr;
+    });
+  }, [checkIn, existingBookings]);
+
   const hasDateConflict = useCallback(() => {
     if (!checkIn || !checkOut) return { conflict: false, message: "" };
     const newIn = new Date(checkIn).getTime();
@@ -233,6 +248,7 @@ export default function BookingModule() {
       const conflict = hasDateConflict();
       if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
       if (!pending8amProceed && has8amActiveConflict()) { setShow8amWarning(true); return; }
+      if (!pendingSameDateProceed && hasSameDateBooking()) { setShowSameDateWarning(true); return; }
     }
     
     setSaving(true);
@@ -300,10 +316,11 @@ export default function BookingModule() {
       setFunctionHallRate(funcHallSettingRate.toString());
       getTransactions({ module: "Booking" }).then(setExistingBookings);
       setPending8amProceed(false);
+      setPendingSameDateProceed(false);
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days]);
+  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, hasSameDateBooking, pendingSameDateProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -315,6 +332,21 @@ export default function BookingModule() {
     <>
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <BookingConflictDialog message={dateConflictMessage} onCancel={() => setShowDateConflict(false)} onConfirm={() => { setShowDateConflict(false); handleSave(true); }} />}
+      {showSameDateWarning && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowSameDateWarning(false)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-8 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={40} className="text-warning" />
+            </div>
+            <h3 className="text-2xl font-bold text-foreground mb-3">⚠️ Existing Booking on This Date</h3>
+            <p className="text-base text-muted-foreground mb-6">There is already a guest booking on this date. Do you want to proceed? Please enter the time in.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowSameDateWarning(false)} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold text-base hover:bg-accent transition-all">Cancel</button>
+              <button onClick={() => { setShowSameDateWarning(false); setPendingSameDateProceed(true); handleSave(true); }} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 active:scale-95 transition-all">Proceed</button>
+            </div>
+          </div>
+        </div>
+      )}
       {show8amWarning && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShow8amWarning(false)}>
           <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center" onClick={e => e.stopPropagation()}>
