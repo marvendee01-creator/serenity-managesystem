@@ -332,6 +332,21 @@ export default function BookingModule() {
     <>
       {showBalanceWarning && <BalanceWarningDialog balance={savedBalance} onClose={() => setShowBalanceWarning(false)} />}
       {showDateConflict && <BookingConflictDialog message={dateConflictMessage} onCancel={() => setShowDateConflict(false)} onConfirm={() => { setShowDateConflict(false); handleSave(true); }} />}
+      {showSameDateWarning && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowSameDateWarning(false)}>
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-8 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-20 h-20 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={40} className="text-warning" />
+            </div>
+            <h3 className="text-2xl font-bold text-foreground mb-3">⚠️ Existing Booking on This Date</h3>
+            <p className="text-base text-muted-foreground mb-6">There is already a guest booking on this date. Do you want to proceed? Please enter the time in.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowSameDateWarning(false)} className="flex-1 h-12 rounded-lg bg-secondary text-secondary-foreground font-semibold text-base hover:bg-accent transition-all">Cancel</button>
+              <button onClick={() => { setShowSameDateWarning(false); setPendingSameDateProceed(true); handleSave(true); }} className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 active:scale-95 transition-all">Proceed</button>
+            </div>
+          </div>
+        </div>
+      )}
       {show8amWarning && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShow8amWarning(false)}>
           <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center" onClick={e => e.stopPropagation()}>
