@@ -45,6 +45,14 @@ export default function BookingManagement() {
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
   const [editSaving, setEditSaving] = useState(false);
 
+  // Separate date/time schedule editing state
+  const [editCheckInDate, setEditCheckInDate] = useState("");
+  const [editCheckInTime, setEditCheckInTime] = useState("");
+  const [editCheckOutDate, setEditCheckOutDate] = useState("");
+  const [editCheckOutTime, setEditCheckOutTime] = useState("");
+  const [schedConflict, setSchedConflict] = useState<{ message: string; onProceed: () => void } | null>(null);
+  const [schedSaving, setSchedSaving] = useState(false);
+
   // Room edit state
   const [editSelectedRooms, setEditSelectedRooms] = useState<string[]>([]);
   const [editNoOfDays, setEditNoOfDays] = useState("1");
