@@ -229,6 +229,49 @@ export default function BookingManagement() {
     setEditSaving(false);
   }, [editingBooking, editForm, editSelectedRooms, editNoOfDays, kuboRate, barkadaRate]);
 
+  // ── Schedule (date/time) independent editing ──
+  const combineISO = (date: string, time: string, fallbackISO?: string) => {
+    if (!date) return undefined;
+    const t = time || toLocalTime(fallbackISO) || "00:00";
+    const d = new Date(`${date}T${t}:00`);
+    return isNaN(d.getTime()) ? undefined : d.toISOString();
+  };
+
+  const checkInDateConflict = (dateStr: string) =>
+    bookings.some(b => b.id !== editingBooking?.id && b.check_in && toLocalDate(b.check_in) === dateStr);
+
+  const saveSchedule = async (field: "check_in" | "check_out", iso: string) => {
+    if (!editingBooking?.id) return;
+    setSchedSaving(true);
+    try {
+      await updateTransaction(editingBooking.id, { [field]: iso });
+      setEditForm(f => ({ ...f, [field]: iso }));
+      setEditingBooking(prev => (prev ? { ...prev, [field]: iso } : prev));
+      toast.success("Successfully changed booking!");
+      loadBookings();
+    } catch { toast.error("Failed to update schedule"); }
+    setSchedSaving(false);
+  };
+
+  const handleConfirmCheckIn = (proceed = false) => {
+    if (!editingBooking?.id || !editCheckInDate) { toast.error("Select a check-in date"); return; }
+    if (!proceed && checkInDateConflict(editCheckInDate)) {
+      setSchedConflict({
+        message: "There is already a guest booking on this date. Do you want to proceed? Please enter the time in.",
+        onProceed: () => handleConfirmCheckIn(true),
+      });
+      return;
+    }
+    const iso = combineISO(editCheckInDate, editCheckInTime, editingBooking.check_in);
+    if (iso) saveSchedule("check_in", iso);
+  };
+
+  const handleConfirmCheckOut = () => {
+    if (!editingBooking?.id || !editCheckOutDate) { toast.error("Select a check-out date"); return; }
+    const iso = combineISO(editCheckOutDate, editCheckOutTime, editingBooking.check_out);
+    if (iso) saveSchedule("check_out", iso);
+  };
+
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
       const active = txns.filter(t => t.status !== "Cancelled");
