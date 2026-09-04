@@ -316,6 +316,7 @@ export default function BookingModule() {
       setFunctionHallRate(funcHallSettingRate.toString());
       getTransactions({ module: "Booking" }).then(setExistingBookings);
       setPending8amProceed(false);
+      setPendingSameDateProceed(false);
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
