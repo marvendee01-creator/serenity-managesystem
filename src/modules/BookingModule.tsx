@@ -107,6 +107,8 @@ export default function BookingModule() {
   const [dateConflictMessage, setDateConflictMessage] = useState("");
   const [show8amWarning, setShow8amWarning] = useState(false);
   const [pending8amProceed, setPending8amProceed] = useState(false);
+  const [showSameDateWarning, setShowSameDateWarning] = useState(false);
+  const [pendingSameDateProceed, setPendingSameDateProceed] = useState(false);
   const [existingBookings, setExistingBookings] = useState<{ check_in?: string; check_out?: string; booking_type?: string; room_type?: string }[]>([]);
   
   const [receiptData, setReceiptData] = useState<any>(null);
