@@ -200,6 +200,19 @@ export default function BookingModule() {
     });
   }, [checkIn, existingBookings]);
 
+  // Same-date warning: any existing booking (non-cancelled) on the same check-in date, regardless of time
+  const hasSameDateBooking = useCallback(() => {
+    if (!checkIn) return false;
+    const dateStr = checkIn.slice(0, 10);
+    return existingBookings.some((b) => {
+      if ((b as { status?: string }).status === "Cancelled") return false;
+      if (!b.check_in) return false;
+      const d = new Date(b.check_in);
+      const bd = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+      return bd === dateStr || b.check_in.slice(0, 10) === dateStr;
+    });
+  }, [checkIn, existingBookings]);
+
   const hasDateConflict = useCallback(() => {
     if (!checkIn || !checkOut) return { conflict: false, message: "" };
     const newIn = new Date(checkIn).getTime();
