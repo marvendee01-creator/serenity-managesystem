@@ -320,7 +320,7 @@ export default function BookingModule() {
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days]);
+  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, hasSameDateBooking, pendingSameDateProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
