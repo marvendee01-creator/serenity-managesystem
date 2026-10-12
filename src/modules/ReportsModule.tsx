@@ -30,30 +30,54 @@ function formatDate(iso: string) {
 
 type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "booking-ledger" | "maint-monitoring" | "daily-summary";
 
+export const ENTRANCE_SUMMARY_MODULES = ["Entrance", "Table Rent", "Tent"];
+export function isEntranceSummaryEligible(t: { module: string; booking_type?: string | null; status?: string | null }) {
+  if (t.status === "Cancelled") return false;
+  if (ENTRANCE_SUMMARY_MODULES.includes(t.module)) return true;
+  return t.module === "Booking" && t.booking_type !== "Exclusive";
+}
+function txnGrandTotal(t: Transaction) {
+  return (Number(t.amount_paid) || 0) + (Number(t.extra_bed_charges) || 0) + (Number(t.maintenance_fee) || 0);
+}
+function localYMD(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+}
+export function buildEntranceDaily(txns: Transaction[], month: string) {
+  const seen = new Set<string>();
+  const map = new Map<string, number>();
+  for (const t of txns) {
+    const key = String(t.id ?? t.transaction_no);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!isEntranceSummaryEligible(t)) continue;
+    const day = localYMD(t.date_time);
+    if (day.slice(0, 7) !== month) continue;
+    map.set(day, (map.get(day) || 0) + txnGrandTotal(t));
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, total]) => ({ date, total }));
+}
+
 function EntranceSalesSummary() {
-  const [reports, setReports] = useState<BookingCashierReport[]>([]);
-  const [monthFilter, setMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
+  const [rows, setRows] = useState<{ date: string; total: number }[]>([]);
+  const [monthFilter, setMonthFilter] = useState(() => localYMD(new Date().toISOString()).slice(0, 7));
 
   useEffect(() => {
-    loadBookingCashierReports().then(all => {
-      const filtered = all.filter(r => {
-        const d = new Date(r.report_date);
-        const ym = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
-        return ym === monthFilter;
-      });
-      filtered.sort((a, b) => new Date(a.report_date).getTime() - new Date(b.report_date).getTime());
-      setReports(filtered);
-    });
+    const [y, m] = monthFilter.split("-").map(Number);
+    const last = new Date(y, m, 0).getDate();
+    getTransactions({ dateFrom: `${monthFilter}-01`, dateTo: `${monthFilter}-${String(last).padStart(2, "0")}` })
+      .then(txns => setRows(buildEntranceDaily(txns, monthFilter)));
   }, [monthFilter]);
 
-  const total = reports.reduce((s, r) => s + (Number(r.entrance_sales) || 0), 0);
+  const total = rows.reduce((s, r) => s + r.total, 0);
   const monthLabel = new Date(monthFilter + "-01T00:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+  const fmt = (ymd: string) => `${ymd.slice(5, 7)}/${ymd.slice(8, 10)}/${ymd.slice(0, 4)}`;
 
   const exportCSV = () => {
-    const headers = ["Date", "Module", "Daily Total Entrance Sales"];
-    const rows = reports.map(r => [formatDate(r.report_date), "Entrance / Booking", (Number(r.entrance_sales) || 0).toFixed(2)]);
-    rows.push(["", "TOTAL", total.toFixed(2)]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    const headers = ["Date", "Grand Total"];
+    const data = rows.map(r => [fmt(r.date), r.total.toFixed(2)]);
+    data.push(["TOTAL", total.toFixed(2)]);
+    const csv = [headers, ...data].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -67,7 +91,7 @@ function EntranceSalesSummary() {
     <div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
         <div>
-          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Filter by Month</label>
           <input type="month" className="pos-input text-sm" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} />
         </div>
         <div className="md:col-start-3 self-end">
@@ -76,37 +100,32 @@ function EntranceSalesSummary() {
           </button>
         </div>
       </div>
-
+      <p className="text-xs text-muted-foreground mb-2">Includes Entrance, Table Rent, Tent and Non-Exclusive Booking transactions (Exclusive excluded).</p>
       <div className="pos-card text-center mb-4">
         <p className="text-xs text-muted-foreground">Total Entrance Sales for {monthLabel}</p>
         <p className="text-2xl font-bold tabular-nums text-primary">{formatPeso(total)}</p>
       </div>
-
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted">
               <th className="text-left px-3 py-2 font-medium">Date</th>
-              <th className="text-left px-3 py-2 font-medium">Module</th>
-              <th className="text-right px-3 py-2 font-medium">Daily Total Entrance Sales</th>
+              <th className="text-right px-3 py-2 font-medium">Grand Total</th>
             </tr>
           </thead>
           <tbody>
-            {reports.length === 0 && (
-              <tr><td colSpan={3} className="text-center py-8 text-muted-foreground">No entrance sales for this month</td></tr>
+            {rows.length === 0 && (
+              <tr><td colSpan={2} className="text-center py-8 text-muted-foreground">No entrance sales for this month</td></tr>
             )}
-            {reports.map(r => (
-              <tr key={r.id} className="border-t border-border hover:bg-muted/50">
-                <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(r.report_date)}</td>
-                <td className="px-3 py-2">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">Entrance / Booking</span>
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(Number(r.entrance_sales) || 0)}</td>
+            {rows.map(r => (
+              <tr key={r.date} className="border-t border-border hover:bg-muted/50">
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{fmt(r.date)}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-medium">{formatPeso(r.total)}</td>
               </tr>
             ))}
-            {reports.length > 0 && (
+            {rows.length > 0 && (
               <tr className="border-t-2 border-border bg-accent/30 font-bold">
-                <td className="px-3 py-2" colSpan={2}>TOTAL</td>
+                <td className="px-3 py-2">TOTAL</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatPeso(total)}</td>
               </tr>
             )}
@@ -1782,10 +1801,20 @@ export default function ReportsModule() {
       })()}
       {tab === "transactions" && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
             <select className="pos-input text-sm" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
               {MODULES.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-0.5">Filter by Month</label>
+              <input type="month" className="pos-input text-sm" value={txnDateFrom && txnDateTo && txnDateFrom.slice(0,7) === txnDateTo.slice(0,7) && txnDateFrom.endsWith("-01") ? txnDateFrom.slice(0,7) : ""} onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                const [y, m] = v.split("-").map(Number);
+                setTxnDateFrom(`${v}-01`);
+                setTxnDateTo(`${v}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`);
+              }} />
+            </div>
             <div>
               <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
               <input type="date" className="pos-input text-sm" value={txnDateFrom} onChange={(e) => setTxnDateFrom(e.target.value)} />
