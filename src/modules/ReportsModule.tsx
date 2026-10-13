@@ -35,7 +35,7 @@ export const ENTRANCE_SUMMARY_MODULES = ["Entrance", "Table Rent", "Tent"];
 export function isEntranceSummaryEligible(t: { module: string; booking_type?: string | null; status?: string | null }) {
   if (t.status === "Cancelled") return false;
   if (ENTRANCE_SUMMARY_MODULES.includes(t.module)) return true;
-  return t.module === "Booking" && t.booking_type !== "Exclusive";
+  return t.module === "Booking";
 }
 function txnGrandTotal(t: Transaction) {
   return (Number(t.amount_paid) || 0) + (Number(t.extra_bed_charges) || 0) + (Number(t.maintenance_fee) || 0);
@@ -124,7 +124,7 @@ function EntranceSalesSummary() {
           </button>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground mb-2">Includes Entrance, Table Rent, Tent and Non-Exclusive Booking transactions (Exclusive excluded).</p>
+      <p className="text-xs text-muted-foreground mb-2">Includes Entrance, Table Rent, Tent and all Booking payments (Exclusive and Non-Exclusive), posted on the date paid.</p>
       <div className="pos-card text-center mb-4">
         <p className="text-xs text-muted-foreground">Total Entrance Sales for {monthLabel}</p>
         <p className="text-2xl font-bold tabular-nums text-primary">{formatPeso(total)}</p>
