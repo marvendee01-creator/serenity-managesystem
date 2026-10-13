@@ -39,6 +39,11 @@ function getStatusBadge(status?: string) {
 export default function BookingManagement() {
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [filter, setFilter] = useState<PaymentFilter>("ALL");
+  const [fCustomer, setFCustomer] = useState("");
+  const [fBasis, setFBasis] = useState<"txn" | "checkin" | "checkout">("txn");
+  const [fMonth, setFMonth] = useState("");
+  const [fFrom, setFFrom] = useState("");
+  const [fTo, setFTo] = useState("");
   const [settlingId, setSettlingId] = useState<number | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
   const [editingBooking, setEditingBooking] = useState<Transaction | null>(null);
@@ -331,9 +336,32 @@ export default function BookingManagement() {
 
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
-  const filtered = filter === "ALL"
-    ? bookings
-    : bookings.filter(b => b.payment_status === filter);
+  const ymdLocal = (v?: string) => {
+    if (!v) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return "";
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const filtered = bookings.filter(b => {
+    if (filter !== "ALL" && b.payment_status !== filter) return false;
+    if (fCustomer.trim() && !(b.customer_name || "").toLowerCase().includes(fCustomer.trim().toLowerCase())) return false;
+    if (fFrom || fTo) {
+      const d = ymdLocal(fBasis === "txn" ? b.date_time : fBasis === "checkin" ? b.check_in : b.check_out);
+      if (!d) return false;
+      if (fFrom && d < fFrom) return false;
+      if (fTo && d > fTo) return false;
+    }
+    return true;
+  });
+  const pickMonth = (m: string) => {
+    setFMonth(m);
+    if (!m) return;
+    const [y, mo] = m.split("-").map(Number);
+    setFFrom(`${m}-01`);
+    setFTo(`${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, "0")}`);
+  };
+  const clearFilters = () => { setFilter("ALL"); setFCustomer(""); setFBasis("txn"); setFMonth(""); setFFrom(""); setFTo(""); };
 
   const handleOpenFolio = useCallback(async (booking: Transaction) => {
     if (!booking.id || !booking.customer_name) {
@@ -485,6 +513,34 @@ export default function BookingManagement() {
             {f === "ALL" ? `All (${bookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
           </button>
         ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4 items-end">
+        <div className="md:col-span-2">
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Customer Name</label>
+          <input className="pos-input w-full text-sm" value={fCustomer} onChange={e => setFCustomer(e.target.value)} placeholder="Search name" />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date Filter Based On</label>
+          <select className="pos-input w-full text-sm" value={fBasis} onChange={e => setFBasis(e.target.value as any)}>
+            <option value="txn">Transaction Date</option>
+            <option value="checkin">Check-in Date</option>
+            <option value="checkout">Check-out Date</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
+          <input type="month" className="pos-input w-full text-sm" value={fMonth} onChange={e => pickMonth(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date From</label>
+          <input type="date" className="pos-input w-full text-sm" value={fFrom} onChange={e => { setFFrom(e.target.value); setFMonth(""); }} />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Date To</label>
+          <input type="date" className="pos-input w-full text-sm" value={fTo} onChange={e => { setFTo(e.target.value); setFMonth(""); }} />
+        </div>
+        <button onClick={clearFilters} className="col-span-2 md:col-span-6 h-9 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium hover:bg-accent">Clear Filters</button>
       </div>
 
       <div className="space-y-3">
