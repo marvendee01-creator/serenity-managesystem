@@ -47,6 +47,33 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: number
+          kind: string
+          payment_date: string
+          transaction_id: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: number
+          kind: string
+          payment_date: string
+          transaction_id: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: number
+          kind?: string
+          payment_date?: string
+          transaction_id?: number
+        }
+        Relationships: []
+      }
       cashier_reports: {
         Row: {
           actual_cash: number

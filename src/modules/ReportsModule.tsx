@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect, useCallback } from "react";
 import { FileText, Download, Printer, Banknote, Eye, CalendarDays, ClipboardList, Pencil, Trash2, BarChart3, TrendingUp, Trophy } from "lucide-react";
 import { getTransactions, getCashierReports, getBookingCashierReports, updateTransaction, deleteCashierReport, deleteBookingCashierReport, getFoodSales, getJournalEntries, type Transaction, type CashierReport, type FoodSale } from "@/lib/db";
@@ -43,14 +44,26 @@ function localYMD(iso: string) {
   const d = new Date(iso);
   return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
 }
-export function buildEntranceDaily(txns: Transaction[], month: string) {
+export type BookingPaymentRow = { id: number; transaction_id: number; payment_date: string; amount: number };
+export function buildEntranceDaily(txns: Transaction[], month: string, payments: BookingPaymentRow[] = [], bookingById: Map<number, Transaction> = new Map()) {
   const seen = new Set<string>();
   const map = new Map<string, number>();
+  const withPayments = new Set(payments.map(p => p.transaction_id));
+  const seenPay = new Set<number>();
+  for (const p of payments) {
+    if (seenPay.has(p.id)) continue;
+    seenPay.add(p.id);
+    const b = bookingById.get(p.transaction_id);
+    if (!b || !isEntranceSummaryEligible(b)) continue;
+    if (p.payment_date.slice(0, 7) !== month) continue;
+    map.set(p.payment_date, (map.get(p.payment_date) || 0) + (Number(p.amount) || 0));
+  }
   for (const t of txns) {
     const key = String(t.id ?? t.transaction_no);
     if (seen.has(key)) continue;
     seen.add(key);
     if (!isEntranceSummaryEligible(t)) continue;
+    if (t.module === "Booking" && t.id != null && withPayments.has(t.id)) continue;
     const day = localYMD(t.date_time);
     if (day.slice(0, 7) !== month) continue;
     map.set(day, (map.get(day) || 0) + txnGrandTotal(t));
@@ -65,8 +78,19 @@ function EntranceSalesSummary() {
   useEffect(() => {
     const [y, m] = monthFilter.split("-").map(Number);
     const last = new Date(y, m, 0).getDate();
-    getTransactions({ dateFrom: `${monthFilter}-01`, dateTo: `${monthFilter}-${String(last).padStart(2, "0")}` })
-      .then(txns => setRows(buildEntranceDaily(txns, monthFilter)));
+    const from = `${monthFilter}-01`, to = `${monthFilter}-${String(last).padStart(2, "0")}`;
+    (async () => {
+      const txns = await getTransactions({ dateFrom: from, dateTo: to });
+      const { data: pays } = await supabase.from("booking_payments").select("id, transaction_id, payment_date, amount").gte("payment_date", from).lte("payment_date", to);
+      const payments = (pays || []) as BookingPaymentRow[];
+      // ensure we know which bookings ever had logged payments (so legacy fallback doesn't double count)
+      const { data: allPayIds } = await supabase.from("booking_payments").select("transaction_id").in("transaction_id", txns.filter(t => t.module === "Booking" && t.id != null).map(t => t.id!));
+      const ids = [...new Set(payments.map(p => p.transaction_id))];
+      const { data: bks } = ids.length ? await supabase.from("transactions").select("id, module, booking_type, status").in("id", ids) : { data: [] as any[] };
+      const byId = new Map<number, Transaction>((bks || []).map((b: any) => [b.id, b as Transaction]));
+      const marker = (allPayIds || []).map((r: any) => ({ id: -1, transaction_id: r.transaction_id, payment_date: "0000-00-00", amount: 0 }));
+      setRows(buildEntranceDaily(txns, monthFilter, [...payments, ...marker], byId));
+    })();
   }, [monthFilter]);
 
   const total = rows.reduce((s, r) => s + r.total, 0);
