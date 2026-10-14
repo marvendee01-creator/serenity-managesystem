@@ -428,6 +428,7 @@ export type Database = {
           kids_4_below: number | null
           kids_5_7: number | null
           kids_8_above: number | null
+          last_payment_date: string | null
           liquor_corkage_fee: number | null
           maintenance_fee: number | null
           module: string
@@ -477,6 +478,7 @@ export type Database = {
           kids_4_below?: number | null
           kids_5_7?: number | null
           kids_8_above?: number | null
+          last_payment_date?: string | null
           liquor_corkage_fee?: number | null
           maintenance_fee?: number | null
           module: string
@@ -526,6 +528,7 @@ export type Database = {
           kids_4_below?: number | null
           kids_5_7?: number | null
           kids_8_above?: number | null
+          last_payment_date?: string | null
           liquor_corkage_fee?: number | null
           maintenance_fee?: number | null
           module?: string
