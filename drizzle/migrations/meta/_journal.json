@@ -8,6 +8,13 @@
       "when": 1791889579494,
       "tag": "0000_booking_payments_log",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791936310307,
+      "tag": "0001_booking_payment_date",
+      "breakpoints": true
     }
   ]
 }
