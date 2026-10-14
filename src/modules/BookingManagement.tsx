@@ -284,7 +284,47 @@ export default function BookingManagement() {
     getTransactions({ module: "Booking" }).then(txns => {
       setCancelledBookings(txns.filter(t => t.status === "Cancelled").sort((a, b) => (b.cancellation_date || "").localeCompare(a.cancellation_date || "")));
       const active = txns.filter(t => t.status !== "Cancelled");
-...
+      const sorted = active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
+      setBookings(sorted);
+    });
+  }, []);
+
+  const handleSettlePayment = useCallback(async (booking: Transaction) => {
+    if (!booking.id) return;
+    const amount = parseFloat(settleAmount);
+    if (!amount || amount <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    const currentDeposit = booking.deposit_amount || 0;
+    const totalAmount = booking.amount_paid || 0;
+    const currentBalance = totalAmount - currentDeposit;
+    if (amount > currentBalance + 0.001) {
+      toast.error(`Amount exceeds balance of ₱${currentBalance.toLocaleString()}`);
+      return;
+    }
+    const newDeposit = currentDeposit + amount;
+    const newBalance = totalAmount - newDeposit;
+    const fullyPaid = newBalance <= 0.001;
+    const today = settleDate || new Date().toISOString().slice(0, 10);
+    try {
+      await updateTransaction(booking.id, { last_payment_date: null });
+      await updateTransaction(booking.id, {
+        last_payment_date: today,
+        deposit_amount: newDeposit,
+        balance: newBalance,
+        payment_status: fullyPaid ? "Fully Paid" : "Partially Paid",
+        date_settled: fullyPaid ? today : booking.date_settled,
+      });
+      toast.success(fullyPaid ? "Booking fully settled" : "Payment recorded");
+      setSettlingId(null);
+      setSettleAmount("");
+      loadBookings();
+    } catch {
+      toast.error("Failed to record payment");
+    }
+  }, [settleAmount, settleDate, loadBookings]);
+
   const handleCancelBooking = useCallback((booking: Transaction) => {
     if (!booking.id) return;
     setCancelDate("");
