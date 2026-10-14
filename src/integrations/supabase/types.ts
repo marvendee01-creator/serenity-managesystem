@@ -401,6 +401,7 @@ export type Database = {
           amount_paid: number
           balance: number | null
           booking_type: string | null
+          cancellation_date: string | null
           check_in: string | null
           check_out: string | null
           checkout_time: string | null
@@ -451,6 +452,7 @@ export type Database = {
           amount_paid?: number
           balance?: number | null
           booking_type?: string | null
+          cancellation_date?: string | null
           check_in?: string | null
           check_out?: string | null
           checkout_time?: string | null
@@ -501,6 +503,7 @@ export type Database = {
           amount_paid?: number
           balance?: number | null
           booking_type?: string | null
+          cancellation_date?: string | null
           check_in?: string | null
           check_out?: string | null
           checkout_time?: string | null
