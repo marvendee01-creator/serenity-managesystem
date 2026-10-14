@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 const ROOM_OPTIONS = ["Kubo Room", "Barkada Room"] as const;
 
-type PaymentFilter = "ALL" | "Unpaid" | "Partially Paid" | "Fully Paid";
+type PaymentFilter = "ALL" | "Unpaid" | "Partially Paid" | "Fully Paid" | "Cancelled";
 
 function getCardStyle(status?: string) {
   switch (status) {
@@ -38,6 +38,9 @@ function getStatusBadge(status?: string) {
 
 export default function BookingManagement() {
   const [bookings, setBookings] = useState<Transaction[]>([]);
+  const [cancelledBookings, setCancelledBookings] = useState<Transaction[]>([]);
+  const [cancelTarget, setCancelTarget] = useState<Transaction | null>(null);
+  const [cancelDate, setCancelDate] = useState("");
   const [filter, setFilter] = useState<PaymentFilter>("ALL");
   const [fCustomer, setFCustomer] = useState("");
   const [fBasis, setFBasis] = useState<"txn" | "checkin" | "checkout" | "settled">("txn");
@@ -279,62 +282,32 @@ export default function BookingManagement() {
 
   const loadBookings = useCallback(() => {
     getTransactions({ module: "Booking" }).then(txns => {
+      setCancelledBookings(txns.filter(t => t.status === "Cancelled").sort((a, b) => (b.cancellation_date || "").localeCompare(a.cancellation_date || "")));
       const active = txns.filter(t => t.status !== "Cancelled");
-      const sorted = active.sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
-      setBookings(sorted);
-    });
+...
+  const handleCancelBooking = useCallback((booking: Transaction) => {
+    if (!booking.id) return;
+    setCancelDate("");
+    setCancelTarget(booking);
   }, []);
 
-  const handleSettlePayment = useCallback(async (booking: Transaction) => {
-    if (!booking.id) return;
-    const amount = parseFloat(settleAmount);
-    if (!amount || amount <= 0) {
-      toast.error("Enter a valid amount");
-      return;
-    }
-    const currentDeposit = booking.deposit_amount || 0;
-    const totalAmount = booking.amount_paid || 0;
-    const currentBalance = totalAmount - currentDeposit;
-    if (amount > currentBalance + 0.001) {
-      toast.error(`Amount exceeds balance of ₱${currentBalance.toLocaleString()}`);
-      return;
-    }
-    const newDeposit = currentDeposit + amount;
-    const newBalance = totalAmount - newDeposit;
-    const fullyPaid = newBalance <= 0.001;
-    const today = settleDate || new Date().toISOString().slice(0, 10);
-    try {
-      await updateTransaction(booking.id, { last_payment_date: null });
-      await updateTransaction(booking.id, {
-        last_payment_date: today,
-        deposit_amount: newDeposit,
-        balance: newBalance,
-        payment_status: fullyPaid ? "Fully Paid" : "Partially Paid",
-        date_settled: fullyPaid ? today : booking.date_settled,
-      });
-      toast.success(fullyPaid ? "Booking fully settled" : "Payment recorded");
-      setSettlingId(null);
-      setSettleAmount("");
-      loadBookings();
-    } catch {
-      toast.error("Failed to record payment");
-    }
-  }, [settleAmount, settleDate, loadBookings]);
-
-  const handleCancelBooking = useCallback(async (booking: Transaction) => {
-    if (!booking.id) return;
-    if (!confirm(`Cancel booking for ${booking.customer_name || "this guest"}? This will exclude it from reports and the reservation board.`)) return;
+  const confirmCancelBooking = useCallback(async () => {
+    const booking = cancelTarget;
+    if (!booking?.id) return;
+    if (!cancelDate) { toast.error("Date of Cancellation is required"); return; }
     try {
       await updateTransaction(booking.id, {
         status: "Cancelled",
-        comments: `Booking cancelled on ${new Date().toISOString().slice(0, 10)}.`,
+        cancellation_date: cancelDate,
+        comments: `${booking.comments ? booking.comments + " | " : ""}Booking cancelled on ${cancelDate}.`,
       });
       toast.success(`Booking for ${booking.customer_name || "guest"} cancelled`);
+      setCancelTarget(null);
       loadBookings();
     } catch {
       toast.error("Failed to cancel booking");
     }
-  }, [loadBookings]);
+  }, [cancelTarget, cancelDate, loadBookings]);
 
   useEffect(() => { loadBookings(); }, [loadBookings]);
 
@@ -345,11 +318,12 @@ export default function BookingManagement() {
     if (isNaN(d.getTime())) return "";
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
-  const filtered = bookings.filter(b => {
-    if (filter !== "ALL" && b.payment_status !== filter) return false;
+  const isCancelledView = filter === "Cancelled";
+  const filtered = (isCancelledView ? cancelledBookings : bookings).filter(b => {
+    if (!isCancelledView && filter !== "ALL" && b.payment_status !== filter) return false;
     if (fCustomer.trim() && !(b.customer_name || "").toLowerCase().includes(fCustomer.trim().toLowerCase())) return false;
     if (fFrom || fTo) {
-      const d = ymdLocal(fBasis === "txn" ? b.date_time : fBasis === "checkin" ? b.check_in : fBasis === "settled" ? (b.payment_status === "Fully Paid" ? b.date_settled : "") : b.check_out);
+      const d = isCancelledView ? ymdLocal(b.cancellation_date || "") : ymdLocal(fBasis === "txn" ? b.date_time : fBasis === "checkin" ? b.check_in : fBasis === "settled" ? (b.payment_status === "Fully Paid" ? b.date_settled : "") : b.check_out);
       if (!d) return false;
       if (fFrom && d < fFrom) return false;
       if (fTo && d > fTo) return false;
@@ -510,13 +484,13 @@ export default function BookingManagement() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 border-b border-border pb-1">
-        {(["ALL", "Unpaid", "Partially Paid", "Fully Paid"] as const).map(f => (
+        {(["ALL", "Unpaid", "Partially Paid", "Fully Paid", "Cancelled"] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={`flex-1 h-10 rounded-t-lg text-xs font-medium transition-all ${filter === f ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
           >
-            {f === "ALL" ? `All (${bookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
+            {f === "ALL" ? `All (${bookings.length})` : f === "Cancelled" ? `Cancelled (${cancelledBookings.length})` : `${f} (${bookings.filter(b => b.payment_status === f).length})`}
           </button>
         ))}
       </div>
@@ -528,12 +502,16 @@ export default function BookingManagement() {
         </div>
         <div>
           <label className="text-[10px] text-muted-foreground block mb-0.5">Date Filter Based On</label>
+          {filter === "Cancelled" ? (
+            <div className="pos-input w-full text-sm flex items-center">Cancellation Date</div>
+          ) : (
           <select className="pos-input w-full text-sm" value={fBasis} onChange={e => setFBasis(e.target.value as any)}>
             <option value="txn">Transaction Date</option>
             <option value="checkin">Check-in Date</option>
             <option value="checkout">Check-out Date</option>
             <option value="settled">Settlement Date (Fully Paid)</option>
           </select>
+          )}
         </div>
         <div>
           <label className="text-[10px] text-muted-foreground block mb-0.5">Month</label>
@@ -549,6 +527,23 @@ export default function BookingManagement() {
         </div>
         <button onClick={clearFilters} className="col-span-2 md:col-span-6 h-9 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium hover:bg-accent">Clear Filters</button>
       </div>
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 bg-background/80 flex items-center justify-center p-4" onClick={() => setCancelTarget(null)}>
+          <div className="pos-card w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold">Cancel Booking</h3>
+            <p className="text-sm text-muted-foreground">Cancel booking for {cancelTarget.customer_name || "this guest"}?</p>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Date of Cancellation *</label>
+              <input type="date" autoFocus className="pos-input w-full" value={cancelDate} onChange={e => setCancelDate(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setCancelTarget(null)} className="flex-1 h-11 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-accent">Back</button>
+              <button onClick={confirmCancelBooking} disabled={!cancelDate} className="flex-1 h-11 rounded-lg bg-destructive text-destructive-foreground font-semibold disabled:opacity-50">Confirm Cancellation</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {filtered.length === 0 && (
