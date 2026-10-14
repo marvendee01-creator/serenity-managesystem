@@ -40,7 +40,7 @@ export default function BookingManagement() {
   const [bookings, setBookings] = useState<Transaction[]>([]);
   const [filter, setFilter] = useState<PaymentFilter>("ALL");
   const [fCustomer, setFCustomer] = useState("");
-  const [fBasis, setFBasis] = useState<"txn" | "checkin" | "checkout">("txn");
+  const [fBasis, setFBasis] = useState<"txn" | "checkin" | "checkout" | "settled">("txn");
   const [fMonth, setFMonth] = useState("");
   const [fFrom, setFFrom] = useState("");
   const [fTo, setFTo] = useState("");
@@ -302,9 +302,11 @@ export default function BookingManagement() {
     const newDeposit = currentDeposit + amount;
     const newBalance = totalAmount - newDeposit;
     const fullyPaid = newBalance <= 0.001;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = settleDate || new Date().toISOString().slice(0, 10);
     try {
+      await updateTransaction(booking.id, { last_payment_date: null });
       await updateTransaction(booking.id, {
+        last_payment_date: today,
         deposit_amount: newDeposit,
         balance: newBalance,
         payment_status: fullyPaid ? "Fully Paid" : "Partially Paid",
@@ -317,7 +319,7 @@ export default function BookingManagement() {
     } catch {
       toast.error("Failed to record payment");
     }
-  }, [settleAmount, loadBookings]);
+  }, [settleAmount, settleDate, loadBookings]);
 
   const handleCancelBooking = useCallback(async (booking: Transaction) => {
     if (!booking.id) return;
@@ -347,7 +349,7 @@ export default function BookingManagement() {
     if (filter !== "ALL" && b.payment_status !== filter) return false;
     if (fCustomer.trim() && !(b.customer_name || "").toLowerCase().includes(fCustomer.trim().toLowerCase())) return false;
     if (fFrom || fTo) {
-      const d = ymdLocal(fBasis === "txn" ? b.date_time : fBasis === "checkin" ? b.check_in : b.check_out);
+      const d = ymdLocal(fBasis === "txn" ? b.date_time : fBasis === "checkin" ? b.check_in : fBasis === "settled" ? (b.payment_status === "Fully Paid" ? b.date_settled : "") : b.check_out);
       if (!d) return false;
       if (fFrom && d < fFrom) return false;
       if (fTo && d > fTo) return false;
@@ -420,7 +422,9 @@ export default function BookingManagement() {
     
     try {
       // 1. Settle main booking
+      await updateTransaction(folioBooking.id, { last_payment_date: null });
       await updateTransaction(folioBooking.id, {
+        last_payment_date: today,
         deposit_amount: folioBooking.amount_paid,
         balance: 0,
         payment_status: "Fully Paid",
@@ -463,7 +467,9 @@ export default function BookingManagement() {
     const totalAmount = booking.amount_paid || 0;
     const today = settleDate || new Date().toISOString().slice(0, 10);
     try {
+      await updateTransaction(booking.id, { last_payment_date: null });
       await updateTransaction(booking.id, {
+        last_payment_date: today,
         deposit_amount: totalAmount,
         balance: 0,
         payment_status: "Fully Paid",
@@ -526,6 +532,7 @@ export default function BookingManagement() {
             <option value="txn">Transaction Date</option>
             <option value="checkin">Check-in Date</option>
             <option value="checkout">Check-out Date</option>
+            <option value="settled">Settlement Date (Fully Paid)</option>
           </select>
         </div>
         <div>
@@ -672,6 +679,8 @@ export default function BookingManagement() {
                     min="0"
                     autoFocus
                   />
+                  <label className="text-xs font-medium block">Payment / Settlement Date</label>
+                  <input type="date" className="pos-input w-full" value={settleDate} onChange={e => setSettleDate(e.target.value)} />
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleSettlePayment(b)}

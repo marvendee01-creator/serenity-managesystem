@@ -33,6 +33,7 @@ export interface Transaction {
   kids_5_7?: number;
   kids_4_below?: number;
   date_settled?: string;
+  last_payment_date?: string | null;
   start_time?: string;
   end_time?: string;
   default_hours?: number;
