@@ -252,6 +252,7 @@ export default function BookingModule() {
       if (!pendingSameDateProceed && hasSameDateBooking()) { setShowSameDateWarning(true); return; }
     }
     
+    if (deposit > 0 && !depositDate) { toast.error("Deposit Date is required"); return; }
     setSaving(true);
     const txNo = `SR-${Date.now()}`;
     const now = new Date().toISOString();

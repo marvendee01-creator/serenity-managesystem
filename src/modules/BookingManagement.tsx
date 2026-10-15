@@ -142,6 +142,7 @@ export default function BookingManagement() {
       number_of_tables: b.number_of_tables ?? 0,
       maintenance_fee: b.maintenance_fee ?? 0,
       deposit_amount: b.deposit_amount ?? 0,
+      deposit_date: b.deposit_date ?? (b.deposit_amount ? ymdOf(b.date_time) : null),
       corkage_fee: b.corkage_fee ?? 0,
       extra_bed_charges: b.extra_bed_charges ?? 0,
       drinks_corkage_fee: b.drinks_corkage_fee ?? 0,
@@ -200,6 +201,7 @@ export default function BookingManagement() {
       const newTotal = Math.max(0, baseNoCharges + roomFee + maintenanceFee + drinksCorkage + liquorCorkage + extraBed + funcHallTotal);
 
       const deposit = editForm.deposit_amount ?? 0;
+      if (deposit > 0 && !editForm.deposit_date) { toast.error("Deposit Date is required"); setEditSaving(false); return; }
       const newBalance = Math.max(0, newTotal - deposit);
       const newPaymentStatus =
         deposit === 0 ? "Unpaid" : deposit < newTotal ? "Partially Paid" : "Fully Paid";
@@ -220,6 +222,7 @@ export default function BookingManagement() {
         drinks_corkage_fee: drinksCorkage,
         liquor_corkage_fee: liquorCorkage,
         deposit_amount: deposit,
+        deposit_date: deposit > 0 ? (editForm.deposit_date || null) : null,
         corkage_fee: editForm.corkage_fee ?? 0,
         extra_bed_charges: extraBed,
         room_type: editSelectedRooms.length > 0 ? editSelectedRooms.join(", ") : undefined,
@@ -608,7 +611,8 @@ export default function BookingManagement() {
                     </p>
                   )}
                   {b.room_type && <p className="text-xs opacity-70">{b.room_type}</p>}
-                  {b.date_settled && <p className="text-xs opacity-70">Fully paid: {formatDate(b.date_settled + "T00:00:00")}</p>}
+                  {(b.deposit_amount || 0) > 0 && b.deposit_date && <p className="text-xs opacity-70">Deposit date: {formatDate(b.deposit_date + "T00:00:00")}</p>}
+                  {b.payment_status === "Fully Paid" && b.date_settled && <p className="text-xs font-semibold text-success">Fully Paid Date: {formatDate(String(b.date_settled).slice(0, 10) + "T00:00:00")}</p>}
                 </div>
                 <div className="flex flex-col items-end">
                   <span className={`px-2 py-1 rounded-full text-[10px] font-bold mb-2 ${badge.className}`}>
@@ -649,6 +653,13 @@ export default function BookingManagement() {
                     className="flex-1 min-w-[120px] h-10 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-accent active:scale-[0.97] transition-all flex items-center justify-center gap-2"
                   >
                     <Receipt size={16} /> Settle Folio
+                  </button>
+                  <button
+                    onClick={() => { setSettlingId(b.id!); setSettleAmount(currentBalance.toFixed(2)); setSettleDate(ymdOf(new Date().toISOString())); }}
+                    className="h-10 px-3 rounded-lg text-sm font-medium bg-success text-success-foreground hover:bg-success/80 active:scale-[0.97] transition-all flex items-center gap-1"
+                    title="Record remaining balance and mark as Fully Paid"
+                  >
+                    <CheckCircle size={14} /> Mark Fully Paid
                   </button>
                   <button
                     onClick={() => openEdit(b)}
@@ -714,7 +725,7 @@ export default function BookingManagement() {
                     min="0"
                     autoFocus
                   />
-                  <label className="text-xs font-medium block">Payment / Settlement Date</label>
+                  <label className="text-xs font-medium block">Payment / Fully Paid Date</label>
                   <input type="date" className="pos-input w-full" value={settleDate} onChange={e => setSettleDate(e.target.value)} />
                   <div className="flex gap-2">
                     <button
@@ -1117,8 +1128,12 @@ export default function BookingManagement() {
             {/* ── Deposit ── */}
             <div>
               <label className="text-xs font-medium block mb-1 font-bold text-primary">Deposit Amount</label>
-              <input type="number" step="0.01" min="0" className="pos-input w-full border-primary/50" value={editForm.deposit_amount ?? 0}
-                onChange={e => setEditForm(f => ({ ...f, deposit_amount: parseFloat(e.target.value) || 0 }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" step="0.01" min="0" className="pos-input w-full border-primary/50" value={editForm.deposit_amount ?? 0}
+                  onChange={e => setEditForm(f => ({ ...f, deposit_amount: parseFloat(e.target.value) || 0 }))} />
+                <input type="date" className="pos-input w-full border-primary/50" aria-label="Deposit Date" title="Deposit Date" value={editForm.deposit_date || ""}
+                  onChange={e => setEditForm(f => ({ ...f, deposit_date: e.target.value || null }))} />
+              </div>
             </div>
 
             <div className="flex gap-2 pt-1">
