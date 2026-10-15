@@ -63,8 +63,18 @@ export function buildEntranceDaily(txns: Transaction[], month: string, payments:
     if (seen.has(key)) continue;
     seen.add(key);
     if (!isEntranceSummaryEligible(t)) continue;
-    if (t.module === "Booking" && t.id != null && withPayments.has(t.id)) continue;
     const day = localYMD(t.date_time);
+    if (t.module === "Booking") {
+      // Maint. Fee from Transactions, posted on its actual transaction date
+      const maint = Number(t.maintenance_fee) || 0;
+      if (maint && day.slice(0, 7) === month) map.set(day, (map.get(day) || 0) + maint);
+      // Deposits come from logged payments; legacy bookings without logs use the saved Deposit Amount/Date (never Grand Total)
+      if (t.id != null && withPayments.has(t.id)) continue;
+      const dep = Number(t.deposit_amount) || 0;
+      const dDay = t.deposit_date || day;
+      if (dep && dDay.slice(0, 7) === month) map.set(dDay, (map.get(dDay) || 0) + dep);
+      continue;
+    }
     if (day.slice(0, 7) !== month) continue;
     map.set(day, (map.get(day) || 0) + txnGrandTotal(t));
   }
