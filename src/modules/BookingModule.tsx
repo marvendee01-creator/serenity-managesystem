@@ -86,6 +86,7 @@ export default function BookingModule() {
   const [discountAmount, setDiscountAmount] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash" | "Charge to Booking">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
+  const [depositDate, setDepositDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; });
   const [extraBedCharges, setExtraBedCharges] = useState("");
 
   const [exclusiveFee, setExclusiveFee] = useState(5000);
@@ -274,6 +275,8 @@ export default function BookingModule() {
         kids_8_above: k8, kids_5_7: k5, kids_4_below: k4,
         total_headcount: headcount,
         amount_paid: total, deposit_amount: deposit,
+        deposit_date: deposit > 0 ? depositDate : null,
+        date_settled: deposit > 0 && paymentStatus === "Fully Paid" ? depositDate : undefined,
         balance: balance > 0 ? balance : 0, payment_status: paymentStatus,
         payment_method: payment,
         extra_bed_charges: extraBed,
@@ -538,7 +541,11 @@ export default function BookingModule() {
 
         <div>
           <label className="text-sm font-medium block mb-1">Deposit Amount</label>
-          <input type="number" step="0.01" className="pos-input w-full" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min="0" />
+          <div className="grid grid-cols-2 gap-2">
+            <input type="number" step="0.01" className="pos-input w-full" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min="0" />
+            <input type="date" className="pos-input w-full" value={depositDate} onChange={(e) => setDepositDate(e.target.value)} title="Deposit Date" aria-label="Deposit Date" />
+          </div>
+          {deposit > 0 && <p className="text-xs text-muted-foreground mt-1">Deposit Date: date the deposit was actually received</p>}
         </div>
 
         <div className={`pos-card ${paymentStatus === "Fully Paid" ? "border-success/30 bg-success/5" : paymentStatus === "Partially Paid" ? "border-warning/30 bg-warning/5" : "border-destructive/30 bg-destructive/5"}`}>

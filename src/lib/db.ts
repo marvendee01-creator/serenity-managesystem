@@ -22,6 +22,7 @@ export interface Transaction {
   corkage_fee?: number;
   function_hall_fee?: number;
   deposit_amount?: number;
+  deposit_date?: string | null;
   balance?: number;
   payment_status?: string;
   comments?: string;
@@ -243,6 +244,7 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       corkage_fee: t.corkage_fee ?? 0,
       function_hall_fee: t.function_hall_fee ?? 0,
       deposit_amount: t.deposit_amount ?? 0,
+      deposit_date: t.deposit_date ?? null,
       balance: t.balance ?? 0,
       payment_status: t.payment_status ?? null,
       comments: t.comments ?? null,
@@ -334,6 +336,7 @@ export async function getTransactions(filter?: {
     corkage_fee: row.corkage_fee != null ? Number(row.corkage_fee) : undefined,
     function_hall_fee: row.function_hall_fee != null ? Number(row.function_hall_fee) : undefined,
     deposit_amount: row.deposit_amount != null ? Number(row.deposit_amount) : undefined,
+    deposit_date: row.deposit_date ?? null,
     balance: row.balance != null ? Number(row.balance) : undefined,
     payment_status: row.payment_status ?? undefined,
     comments: row.comments ?? undefined,
