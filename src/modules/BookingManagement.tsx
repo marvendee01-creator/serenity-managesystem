@@ -6,6 +6,8 @@ import { Receipt, CreditCard, Wallet, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
+const ymdOf = (v?: string) => { if (!v) return ""; const d = new Date(v); if (isNaN(d.getTime())) return v.slice(0, 10); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
 const ROOM_OPTIONS = ["Kubo Room", "Barkada Room"] as const;
 
 type PaymentFilter = "ALL" | "Unpaid" | "Partially Paid" | "Fully Paid" | "Cancelled";
