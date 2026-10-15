@@ -934,7 +934,7 @@ function BookingFinancialLedger() {
             id: t.id!,
             customer_name: t.customer_name || "—",
             payment_status,
-            deposit_date: depositAmount > 0 ? (t.date_time?.slice(0, 10) || null) : null,
+            deposit_date: depositAmount > 0 ? (t.deposit_date || t.date_time?.slice(0, 10) || null) : null,
             deposit_amount: depositAmount,
             settlement_date: isFullyPaid ? (t.date_settled?.slice(0, 10) || null) : null,
             amount_received: isFullyPaid ? totalAmount : 0,

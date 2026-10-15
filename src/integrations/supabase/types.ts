@@ -414,6 +414,7 @@ export type Database = {
           date_time: string
           default_hours: number | null
           deposit_amount: number | null
+          deposit_date: string | null
           drinks_corkage_fee: number | null
           end_time: string | null
           entry_time: string | null
@@ -465,6 +466,7 @@ export type Database = {
           date_time?: string
           default_hours?: number | null
           deposit_amount?: number | null
+          deposit_date?: string | null
           drinks_corkage_fee?: number | null
           end_time?: string | null
           entry_time?: string | null
@@ -516,6 +518,7 @@ export type Database = {
           date_time?: string
           default_hours?: number | null
           deposit_amount?: number | null
+          deposit_date?: string | null
           drinks_corkage_fee?: number | null
           end_time?: string | null
           entry_time?: string | null
