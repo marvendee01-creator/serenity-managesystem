@@ -29,6 +29,13 @@
       "when": 1792024433562,
       "tag": "0003_booking_deposit_date",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792322193690,
+      "tag": "0004_create_serenity_members",
+      "breakpoints": true
     }
   ]
 }

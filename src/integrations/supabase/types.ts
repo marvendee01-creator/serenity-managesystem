@@ -289,6 +289,42 @@ export type Database = {
         }
         Relationships: []
       }
+      serenity_members: {
+        Row: {
+          card_name: string
+          created_at: string
+          customer_name: string
+          expiry_date: string
+          id: number
+          issue_date: string
+          member_id: string
+          qr_token: string
+          status: string
+        }
+        Insert: {
+          card_name?: string
+          created_at?: string
+          customer_name: string
+          expiry_date?: string
+          id?: never
+          issue_date?: string
+          member_id: string
+          qr_token?: string
+          status?: string
+        }
+        Update: {
+          card_name?: string
+          created_at?: string
+          customer_name?: string
+          expiry_date?: string
+          id?: never
+          issue_date?: string
+          member_id?: string
+          qr_token?: string
+          status?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           adult_rate_day: number

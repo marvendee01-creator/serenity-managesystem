@@ -31,6 +31,7 @@ import BookingCashierModule from "@/modules/BookingCashierModule";
 import TentModule from "@/modules/TentModule";
 import FoodPOSModule from "@/modules/FoodPOSModule";
 import FinanceAdminModule from "@/modules/FinanceAdminModule";
+import SerenityCircleModule from "@/modules/SerenityCircleModule";
 
 const MODULES = [
   { id: "entrance", label: "Entrance", icon: entranceIcon },
@@ -46,6 +47,7 @@ const MODULES = [
   { id: "cashier-booking", label: "Cashier Booking", icon: bookingCashierIcon },
   { id: "food-pos", label: "Food POS", icon: cashierIcon },
   { id: "finance-admin", label: "Finance & Admin", icon: reportsIcon },
+  { id: "serenity-circle", label: "Serenity Circle", icon: bookingIcon },
   { id: "settings", label: "Settings", icon: settingsIcon },
   { id: "maintenance", label: "Maintenance", icon: maintenanceIcon },
 ] as const;
@@ -66,6 +68,7 @@ const MODULE_COMPONENTS: Record<ModuleId, React.FC> = {
   "cashier-booking": BookingCashierModule,
   "food-pos": FoodPOSModule,
   "finance-admin": FinanceAdminModule,
+  "serenity-circle": SerenityCircleModule,
   settings: SettingsModule,
   maintenance: MaintenanceModule,
 };

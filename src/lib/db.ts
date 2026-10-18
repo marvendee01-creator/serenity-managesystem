@@ -832,6 +832,62 @@ export async function renameCOAAndEntries(oldName: string, newName: string): Pro
   if (error) throw error;
 }
 
+// ============ Serenity Circle Membership ============
+
+export type MembershipStatus = "Active" | "Expired" | "Suspended" | "Cancelled";
+export type MembershipCardName = "Serenity Privé" | "Serenity Prestige" | "Serenity Privilege";
+
+export interface SerenityMember {
+  id?: number;
+  member_id: string;
+  customer_name: string;
+  card_name: MembershipCardName;
+  issue_date: string;
+  expiry_date: string;
+  qr_token: string;
+  status: MembershipStatus;
+  created_at?: string;
+}
+
+export async function getSerenityMembers(): Promise<SerenityMember[]> {
+  const { data, error } = await supabase
+    .from("serenity_members")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as SerenityMember[];
+}
+
+export async function addSerenityMember(m: Omit<SerenityMember, "id" | "qr_token" | "created_at">): Promise<SerenityMember> {
+  const { data, error } = await supabase
+    .from("serenity_members")
+    .insert({
+      member_id: m.member_id,
+      customer_name: m.customer_name,
+      card_name: m.card_name,
+      issue_date: m.issue_date,
+      expiry_date: m.expiry_date,
+      status: m.status,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as SerenityMember;
+}
+
+export async function updateSerenityMember(id: number, updates: Partial<SerenityMember>): Promise<void> {
+  const { id: _id, created_at: _c, ...rest } = updates;
+  const { error } = await supabase.from("serenity_members").update(rest).eq("id", id);
+  if (error) throw error;
+}
+
+export async function regenerateMemberQrToken(id: number): Promise<string> {
+  const newToken = crypto.randomUUID();
+  const { error } = await supabase.from("serenity_members").update({ qr_token: newToken }).eq("id", id);
+  if (error) throw error;
+  return newToken;
+}
+
 export async function mergeCOAAccounts(oldId: number, oldName: string, targetName: string): Promise<void> {
   // 1. Update all journal entries pointing to the old account title to the target account title
   const { error: jeError } = await supabase
