@@ -9,6 +9,11 @@ import { toast } from "sonner";
 import { formatPeso } from "@/lib/format";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import MemberVerification from "@/components/MemberVerification";
+import LoyaltyPreview from "@/components/LoyaltyPreview";
+import { memberEligible, entranceEligibleAmount, personalDiscount, roundMoney } from "@/lib/loyalty";
+import { saveLoyaltyEntrance } from "@/lib/loyalty-db";
+import type { SerenityMember, Transaction } from "@/lib/db";
 
 const TOUR_TYPES = ["Day Tour", "Overnight"] as const;
 
@@ -26,6 +31,8 @@ export default function EntranceModule() {
   const [payment, setPayment] = useState<"Cash" | "GCash" | "Charge to Booking">("Cash");
   const [amountReceived, setAmountReceived] = useState("");
   const [discount, setDiscount] = useState("");
+  const [member, setMember] = useState<SerenityMember | null>(null);
+  const [excludedAdults, setExcludedAdults] = useState("0");
   const [useManualDatetime, setUseManualDatetime] = useState(false);
   const [customDate, setCustomDate] = useState("");
   const [customTime, setCustomTime] = useState("");
@@ -108,14 +115,21 @@ export default function EntranceModule() {
   const maint = parseFloat(maintenanceFee) || 0;
   const drinksCork = parseFloat(drinksCorkage) || 0;
   const liquorCork = parseFloat(liquorCorkage) || 0;
-  const totalAmount = Math.max(0, baseAmount + tentAddon + functionHallTotal + maint + drinksCork + liquorCork - discountVal);
+  const excluded = parseInt(excludedAdults) || 0;
+  const eligibleEntrance = entranceEligibleAmount(a, excluded, isDayTour ? dayAdultRate : overnightAdultRate,
+    k8 * (isDayTour ? dayKids8Rate : overnightKids8Rate) + k5 * (isDayTour ? dayKids5Rate : overnightKids5Rate), payment !== "Charge to Booking");
+  const loyaltyDiscount = personalDiscount(eligibleEntrance, memberEligible(member, new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" })), discountVal);
+  const totalAmount = roundMoney(Math.max(0, baseAmount + tentAddon + functionHallTotal + maint + drinksCork + liquorCork - discountVal - loyaltyDiscount));
 
   const isCharge = payment === "Charge to Booking";
   const receivedVal = isCharge ? 0 : received;
   const change = isCharge ? 0 : receivedVal - totalAmount;
 
   const handleSave = useCallback(async () => {
+    if (saving) return;
     if (headcount === 0) { toast.error("Please enter guest details"); return; }
+    if (member && (excluded < 0 || excluded > a)) { toast.error("Excluded adults must be between zero and the adult headcount"); return; }
+    if (member && discountVal > 0) { toast.error("Remove the other discount before applying a personal discount"); return; }
     if (isCharge && !customerName.trim()) { toast.error("Customer Name is required to Charge to Booking"); return; }
     if (!isCharge && receivedVal < totalAmount && receivedVal > 0) { toast.error("Insufficient amount received"); return; }
     setSaving(true);
@@ -124,7 +138,7 @@ export default function EntranceModule() {
       ? new Date(`${customDate}T${customTime || "00:00"}`).toISOString()
       : new Date().toISOString();
     try {
-      await addTransaction({
+      const transaction: Omit<Transaction, "id"> = {
         transaction_no: txNo,
         date_time: now,
         module: "Entrance",
@@ -148,7 +162,9 @@ export default function EntranceModule() {
         deposit_amount: isCharge ? 0 : totalAmount,
         balance: isCharge ? totalAmount : 0,
         payment_status: isCharge ? "Unpaid" : "Fully Paid",
-      });
+      };
+      if (member && loyaltyDiscount > 0) await saveLoyaltyEntrance(transaction, member, excluded, discountVal);
+      else await addTransaction(transaction);
       toast.success(isCharge ? "Charged to booking successfully!" : "Entrance recorded!");
 
       const rData = {
@@ -161,6 +177,7 @@ export default function EntranceModule() {
         details: [
           { label: "Tour Type", value: tourType },
           { label: "Headcount", value: `${a} Adults, ${k8+k5+k4} Children` },
+          ...(loyaltyDiscount > 0 && member ? [{ label: "Membership ID", value: member.member_id }, { label: "Personal discount (5%)", value: formatPeso(loyaltyDiscount) }] : []),
         ],
       };
 
@@ -173,14 +190,15 @@ export default function EntranceModule() {
 
       setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
       setAmountReceived(""); setDiscount("");
+      setMember(null); setExcludedAdults("0");
       setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage("");
       setWithTent(false); setWithFunctionHall(false); setFuncHallDays("1");
       setPayment("Cash"); setTourType(getAutoTourType());
       setUseManualDatetime(false); setCustomDate(""); setCustomTime("");
       firstRef.current?.focus();
-    } catch (err) { console.error("Entrance save error:", err); toast.error("Failed to save"); }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to save"); }
     setSaving(false);
-  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, withFunctionHall, fhDays, funcHallRate, functionHallTotal, maint, drinksCork, liquorCork, useManualDatetime, customDate, customTime, isCharge, receivedVal, change]);
+  }, [customerName, a, k8, k5, k4, headcount, totalAmount, payment, tourType, withFunctionHall, fhDays, funcHallRate, functionHallTotal, maint, drinksCork, liquorCork, useManualDatetime, customDate, customTime, isCharge, receivedVal, change, member, excluded, loyaltyDiscount, discountVal, saving]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -310,6 +328,15 @@ export default function EntranceModule() {
           </div>
         </div>
 
+        <MemberVerification key={member ? "verified" : "unverified"} member={member} onChange={setMember} />
+        {member && <div className="space-y-2">
+          <Label htmlFor="excluded-adults">Adults not paying the full adult fee (seniors / complimentary)</Label>
+          <input id="excluded-adults" type="number" min="0" max={a} step="1" className="pos-input w-full" value={excludedAdults} onChange={e => setExcludedAdults(e.target.value)} />
+          <p className="text-xs text-muted-foreground">Full-fee paying adults: {Math.max(0, a - excluded)} / minimum 5</p>
+          {eligibleEntrance === 0 && <p className="text-sm text-warning">Not eligible: requires walk-in payment and at least five full-fee paying adults.</p>}
+          {discountVal > 0 && <p role="alert" className="text-sm text-destructive">Cannot combine the personal discount with another discount.</p>}
+          <LoyaltyPreview eligible={eligibleEntrance} discount={loyaltyDiscount} total={totalAmount} />
+        </div>}
         <div>
           <label className="text-sm font-medium block mb-1">Discount</label>
           <input type="number" step="0.01" className="pos-input w-full" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0.00" min="0" />

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { verifyMember } from "@/lib/loyalty-db";
 import { memberEligible } from "@/lib/loyalty";
-import { localDateStr } from "@/lib/format";
 import type { SerenityMember } from "@/lib/db";
 
 export default function MemberVerification({ member, onChange }: { member: SerenityMember | null; onChange: (m: SerenityMember | null) => void }) {
@@ -22,7 +21,8 @@ export default function MemberVerification({ member, onChange }: { member: Seren
     setBusy(true); setError(""); changeRef.current(null);
     try {
       const found = await verifyMember(value);
-      if (!memberEligible(found, localDateStr())) throw new Error(`Membership is ${found.status !== "Active" ? found.status.toLowerCase() : "outside its validity dates"}`);
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+      if (!memberEligible(found, today)) throw new Error(`Membership is ${found.status !== "Active" ? found.status.toLowerCase() : "outside its validity dates"}`);
       setIdentifier(found.member_id); changeRef.current(found); setScanning(false);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to verify membership"); }
     finally { setBusy(false); }
