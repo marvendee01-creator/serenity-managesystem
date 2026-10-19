@@ -36,6 +36,13 @@
       "when": 1792322193690,
       "tag": "0004_create_serenity_members",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792371215046,
+      "tag": "0005_personal_loyalty_discounts",
+      "breakpoints": true
     }
   ]
 }

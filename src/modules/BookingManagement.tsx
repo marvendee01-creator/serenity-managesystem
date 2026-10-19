@@ -5,6 +5,12 @@ import { formatPeso } from "@/lib/format";
 import { Receipt, CreditCard, Wallet, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import MemberVerification from "@/components/MemberVerification";
+import LoyaltyPreview from "@/components/LoyaltyPreview";
+import { personalDiscount, packageEligibleAmount, roundMoney } from "@/lib/loyalty";
+import { applyBookingLoyalty } from "@/lib/loyalty-db";
+import type { SerenityMember } from "@/lib/db";
 
 const ymdOf = (v?: string) => { if (!v) return ""; const d = new Date(v); if (isNaN(d.getTime())) return v.slice(0, 10); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -54,6 +60,14 @@ export default function BookingManagement() {
   const [editingBooking, setEditingBooking] = useState<Transaction | null>(null);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
   const [editSaving, setEditSaving] = useState(false);
+  const [loyaltyBooking, setLoyaltyBooking] = useState<Transaction | null>(null);
+  const [loyaltyMember, setLoyaltyMember] = useState<SerenityMember | null>(null);
+  const [packageType, setPackageType] = useState("Room accommodation");
+  const [eligibleCharges, setEligibleCharges] = useState("");
+  const [confirmedPackage, setConfirmedPackage] = useState(false);
+  const [loyaltySaving, setLoyaltySaving] = useState(false);
+  const [exclusiveRate, setExclusiveRate] = useState(5000);
+  const [tableRate, setTableRate] = useState(200);
 
   // Separate date/time schedule editing state
   const [editCheckInDate, setEditCheckInDate] = useState("");
@@ -74,6 +88,8 @@ export default function BookingManagement() {
     getSettings().then((s) => {
       setKuboRate(s.kubo_room_rate);
       setBarkadaRate(s.barkada_room_rate);
+      setExclusiveRate(s.exclusive_fee);
+      setTableRate(s.table_rent_rate);
     });
   }, []);
   
@@ -329,6 +345,28 @@ export default function BookingManagement() {
       toast.error("Failed to record payment");
     }
   }, [settleAmount, settleDate, loadBookings]);
+
+  const packageCeiling = (() => {
+    if (!loyaltyBooking) return 0;
+    const b = loyaltyBooking;
+    const stayMs = b.check_in && b.check_out ? new Date(b.check_out).getTime() - new Date(b.check_in).getTime() : 0;
+    const days = Math.max(1, Math.ceil((Number.isFinite(stayMs) ? stayMs : 0) / 86400000));
+    const rooms = (b.room_type?.includes("Kubo Room") ? kuboRate : 0) + (b.room_type?.includes("Barkada Room") ? barkadaRate : 0);
+    const charge = packageType === "Room accommodation" ? rooms * days : packageType === "Function hall" ? (b.function_hall_fee || 0) + (b.function_hall_total || 0) : b.booking_type === "Exclusive" ? exclusiveRate : 0;
+    return Math.max(0, Math.min(charge, b.amount_paid - (b.maintenance_fee || 0) - (b.drinks_corkage_fee || 0) - (b.liquor_corkage_fee || 0) - (b.extension_fee || 0) - (b.number_of_tables || 0) * tableRate));
+  })();
+  const eligiblePackage = packageEligibleAmount(packageType, parseFloat(eligibleCharges) || 0, packageCeiling);
+  const bookingDiscount = personalDiscount(eligiblePackage, !!loyaltyMember && confirmedPackage, loyaltyBooking?.discount_amount || 0);
+  const finalBookingTotal = roundMoney((loyaltyBooking?.amount_paid || 0) - bookingDiscount);
+  const saveBookingDiscount = async () => {
+    if (!loyaltyBooking?.id || !loyaltyMember || !bookingDiscount || loyaltySaving) return;
+    setLoyaltySaving(true);
+    try {
+      await applyBookingLoyalty(loyaltyBooking.id, loyaltyMember, packageType, eligiblePackage, loyaltyBooking.amount_paid);
+      setLoyaltyBooking(null); loadBookings(); toast.success("Personal discount saved. Prior payments are unchanged.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Unable to apply discount"); }
+    finally { setLoyaltySaving(false); }
+  };
 
   const handleCancelBooking = useCallback((booking: Transaction) => {
     if (!booking.id) return;
@@ -647,6 +685,8 @@ export default function BookingManagement() {
                   Room Additional Charges (Extension): ₱{b.extension_fee.toLocaleString()}
                 </div>
               )}
+              {(b.discount_amount || 0) > 0 && <p className="text-xs text-success mb-2">Saved discount: {formatPeso(b.discount_amount || 0)}</p>}
+              {b.status !== "Cancelled" && <Button type="button" variant="outline" size="sm" className="mb-2" disabled={(b.discount_amount || 0) > 0} onClick={() => { setLoyaltyBooking(b); setLoyaltyMember(null); setPackageType("Room accommodation"); setEligibleCharges(""); setConfirmedPackage(false); }}>Serenity Circle discount</Button>}
 
               {(b.payment_status === "Unpaid" || b.payment_status === "Partially Paid") && !isSettling && (
                 <div className="flex flex-wrap gap-2">
@@ -751,6 +791,26 @@ export default function BookingManagement() {
           );
         })}
       </div>
+
+      <Dialog open={!!loyaltyBooking} onOpenChange={open => { if (!open && !loyaltySaving) setLoyaltyBooking(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Serenity Circle package discount</DialogTitle></DialogHeader>
+          <p className="text-sm">{loyaltyBooking?.customer_name} · {loyaltyBooking?.transaction_no}</p>
+          <MemberVerification member={loyaltyMember} onChange={setLoyaltyMember} />
+          <label className="text-sm font-medium" htmlFor="loyalty-package">Package</label>
+          <select id="loyalty-package" className="pos-input w-full" value={packageType} onChange={e => { setPackageType(e.target.value); setEligibleCharges(""); setConfirmedPackage(false); }}>
+            <option>Room accommodation</option><option>Function hall</option><option>Exclusive resort</option>
+          </select>
+          <label className="text-sm font-medium" htmlFor="eligible-package-charges">Confirmed eligible package charges</label>
+          <input id="eligible-package-charges" type="number" step="0.01" min="0" max={packageCeiling} value={eligibleCharges} onChange={e => setEligibleCharges(e.target.value)} className="pos-input w-full" />
+          <p className="text-xs text-muted-foreground">Recorded package ceiling: {formatPeso(packageCeiling)}</p>
+          {packageCeiling === 0 && <p className="text-sm text-warning">No eligible charges for this package.</p>}
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmedPackage} onChange={e => setConfirmedPackage(e.target.checked)} />Confirmed package charges only; no other promotion, discount, or free-credit redemption on this booking.</label>
+          <LoyaltyPreview eligible={eligiblePackage} discount={bookingDiscount} total={finalBookingTotal} />
+          {(loyaltyBooking?.deposit_amount || 0) > finalBookingTotal && <p role="alert" className="text-sm text-destructive">Previously received payments exceed the discounted total. Discount cannot be applied.</p>}
+          <Button disabled={!bookingDiscount || loyaltySaving || (loyaltyBooking?.deposit_amount || 0) > finalBookingTotal} onClick={saveBookingDiscount}>{loyaltySaving ? "Saving…" : "Apply personal discount"}</Button>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!folioBooking} onOpenChange={(o) => { if (!o) setFolioBooking(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
