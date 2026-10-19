@@ -289,6 +289,56 @@ export type Database = {
         }
         Relationships: []
       }
+      serenity_discount_audits: {
+        Row: {
+          created_at: string
+          discount_amount: number
+          discount_rate: number
+          discount_type: string
+          eligible_amount: number
+          final_total: number
+          id: number
+          membership_id: string
+          original_total: number
+          transaction_date: string
+          transaction_id: number
+        }
+        Insert: {
+          created_at?: string
+          discount_amount: number
+          discount_rate?: number
+          discount_type: string
+          eligible_amount: number
+          final_total: number
+          id?: number
+          membership_id: string
+          original_total: number
+          transaction_date: string
+          transaction_id: number
+        }
+        Update: {
+          created_at?: string
+          discount_amount?: number
+          discount_rate?: number
+          discount_type?: string
+          eligible_amount?: number
+          final_total?: number
+          id?: number
+          membership_id?: string
+          original_total?: number
+          transaction_date?: string
+          transaction_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serenity_discount_audits_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       serenity_members: {
         Row: {
           card_name: string
@@ -451,6 +501,7 @@ export type Database = {
           default_hours: number | null
           deposit_amount: number | null
           deposit_date: string | null
+          discount_amount: number
           drinks_corkage_fee: number | null
           end_time: string | null
           entry_time: string | null
@@ -503,6 +554,7 @@ export type Database = {
           default_hours?: number | null
           deposit_amount?: number | null
           deposit_date?: string | null
+          discount_amount?: number
           drinks_corkage_fee?: number | null
           end_time?: string | null
           entry_time?: string | null
@@ -555,6 +607,7 @@ export type Database = {
           default_hours?: number | null
           deposit_amount?: number | null
           deposit_date?: string | null
+          discount_amount?: number
           drinks_corkage_fee?: number | null
           end_time?: string | null
           entry_time?: string | null
@@ -594,7 +647,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      apply_booking_loyalty: {
+        Args: {
+          p_eligible: number
+          p_expected_total: number
+          p_id: number
+          p_package_type: string
+          p_token: string
+        }
+        Returns: undefined
+      }
+      record_loyalty_entrance: {
+        Args: {
+          p_excluded_adults: number
+          p_other_discount: number
+          p_token: string
+          p_transaction: Json
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
