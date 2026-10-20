@@ -289,6 +289,112 @@ export type Database = {
         }
         Relationships: []
       }
+      serenity_credit_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          id: number
+          issue_id: string
+          kind: string
+          member_id: number
+          reason: string
+          request_id: string
+          staff_user: string | null
+          transaction_id: number | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: never
+          issue_id: string
+          kind: string
+          member_id: number
+          reason: string
+          request_id?: string
+          staff_user?: string | null
+          transaction_id?: number | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: never
+          issue_id?: string
+          kind?: string
+          member_id?: number
+          reason?: string
+          request_id?: string
+          staff_user?: string | null
+          transaction_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serenity_credit_ledger_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "serenity_reward_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serenity_credit_ledger_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "serenity_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serenity_credit_ledger_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      serenity_credit_redemptions: {
+        Row: {
+          amount: number
+          created_at: string
+          member_id: number
+          package_type: string
+          refunded: boolean
+          staff_user: string
+          transaction_id: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          member_id: number
+          package_type: string
+          refunded?: boolean
+          staff_user: string
+          transaction_id: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          member_id?: number
+          package_type?: string
+          refunded?: boolean
+          staff_user?: string
+          transaction_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serenity_credit_redemptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "serenity_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serenity_credit_redemptions_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       serenity_discount_audits: {
         Row: {
           created_at: string
@@ -372,6 +478,152 @@ export type Database = {
           member_id?: string
           qr_token?: string
           status?: string
+        }
+        Relationships: []
+      }
+      serenity_referrals: {
+        Row: {
+          completed_date: string | null
+          created_at: string
+          member_id: number
+          net_eligible: number
+          package_type: string
+          reason: string
+          transaction_id: number
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          completed_date?: string | null
+          created_at?: string
+          member_id: number
+          net_eligible?: number
+          package_type: string
+          reason: string
+          transaction_id: number
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          completed_date?: string | null
+          created_at?: string
+          member_id?: number
+          net_eligible?: number
+          package_type?: string
+          reason?: string
+          transaction_id?: number
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serenity_referrals_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "serenity_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serenity_referrals_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      serenity_reward_bookings: {
+        Row: {
+          issue_id: string
+          net_eligible: number
+          transaction_id: number
+        }
+        Insert: {
+          issue_id: string
+          net_eligible: number
+          transaction_id: number
+        }
+        Update: {
+          issue_id?: string
+          net_eligible?: number
+          transaction_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serenity_reward_bookings_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "serenity_reward_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serenity_reward_bookings_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "serenity_referrals"
+            referencedColumns: ["transaction_id"]
+          },
+        ]
+      }
+      serenity_reward_issues: {
+        Row: {
+          amount: number
+          expires_on: string
+          id: string
+          issued_at: string
+          member_id: number
+          net_eligible: number
+          reason: string
+          remaining: number
+          staff_user: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          expires_on: string
+          id?: string
+          issued_at?: string
+          member_id: number
+          net_eligible: number
+          reason: string
+          remaining: number
+          staff_user: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          expires_on?: string
+          id?: string
+          issued_at?: string
+          member_id?: number
+          net_eligible?: number
+          reason?: string
+          remaining?: number
+          staff_user?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serenity_reward_issues_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "serenity_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      serenity_reward_staff: {
+        Row: {
+          role: string
+          user_id: string
+        }
+        Insert: {
+          role: string
+          user_id: string
+        }
+        Update: {
+          role?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -495,6 +747,7 @@ export type Database = {
           comments: string | null
           corkage_fee: number | null
           created_at: string
+          credit_redeemed: number
           customer_name: string | null
           date_settled: string | null
           date_time: string
@@ -548,6 +801,7 @@ export type Database = {
           comments?: string | null
           corkage_fee?: number | null
           created_at?: string
+          credit_redeemed?: number
           customer_name?: string | null
           date_settled?: string | null
           date_time?: string
@@ -601,6 +855,7 @@ export type Database = {
           comments?: string | null
           corkage_fee?: number | null
           created_at?: string
+          credit_redeemed?: number
           customer_name?: string | null
           date_settled?: string | null
           date_time?: string
@@ -665,6 +920,48 @@ export type Database = {
           p_transaction: Json
         }
         Returns: number
+      }
+      serenity_adjust_credit: {
+        Args: {
+          p_amount: number
+          p_booking: number
+          p_issue: string
+          p_kind: string
+          p_reason: string
+          p_request: string
+        }
+        Returns: undefined
+      }
+      serenity_expire_credits: {
+        Args: { p_member: number }
+        Returns: undefined
+      }
+      serenity_is_staff: { Args: { p_admin?: boolean }; Returns: boolean }
+      serenity_issue_rewards: { Args: { p_member: number }; Returns: number }
+      serenity_package_ceiling: {
+        Args: { p_id: number; p_package: string }
+        Returns: number
+      }
+      serenity_redeem: {
+        Args: {
+          p_amount: number
+          p_booking: number
+          p_package: string
+          p_request: string
+          p_token: string
+        }
+        Returns: undefined
+      }
+      serenity_save_referral: {
+        Args: {
+          p_booking: number
+          p_completed: string
+          p_net: number
+          p_package: string
+          p_reason: string
+          p_token: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

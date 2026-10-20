@@ -1,4 +1,6 @@
-# Phase 2 Serenity Circle
-- [ ] Add shared member ID / QR verification and discount previews.
-- [ ] Apply and audit qualifying Entrance and booking package discounts atomically, preventing duplicates and stacking.
-- [ ] Run rule tests and verify saved discounts and reports through the app.
+# Serenity Circle
+- [x] Phase 2 member verification, previews and atomic personal discounts.
+- [ ] Phase 3 referral attribution, completed-booking verification and unique groups-of-10 rewards.
+- [ ] Protected credit ledger, expiry, reversals/adjustments and future-package redemption.
+- [ ] Booking and member screens plus rule tests and live verification.
+- [ ] Enable authorized staff access (no staff auth accounts currently exist).

@@ -43,6 +43,13 @@
       "when": 1792371215046,
       "tag": "0005_personal_loyalty_discounts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792454855270,
+      "tag": "0006_serenity_referral_credits",
+      "breakpoints": true
     }
   ]
 }
