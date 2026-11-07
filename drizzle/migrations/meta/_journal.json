@@ -50,6 +50,13 @@
       "when": 1792454855270,
       "tag": "0006_serenity_referral_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794015241912,
+      "tag": "0007_serenity_staff_roles_admin",
+      "breakpoints": true
     }
   ]
 }

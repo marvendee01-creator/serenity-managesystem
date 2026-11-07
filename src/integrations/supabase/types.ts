@@ -932,12 +932,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      serenity_admin_exists: { Args: never; Returns: boolean }
+      serenity_claim_first_admin: { Args: never; Returns: boolean }
       serenity_expire_credits: {
         Args: { p_member: number }
         Returns: undefined
       }
       serenity_is_staff: { Args: { p_admin?: boolean }; Returns: boolean }
       serenity_issue_rewards: { Args: { p_member: number }; Returns: number }
+      serenity_list_staff: {
+        Args: never
+        Returns: {
+          email: string
+          role: string
+          user_id: string
+        }[]
+      }
       serenity_package_ceiling: {
         Args: { p_id: number; p_package: string }
         Returns: number
@@ -961,6 +971,10 @@ export type Database = {
           p_reason: string
           p_token: string
         }
+        Returns: undefined
+      }
+      serenity_set_staff_role: {
+        Args: { p_role: string; p_user: string }
         Returns: undefined
       }
     }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
+import StaffAccessPanel from "@/components/StaffAccessPanel";
 import { Users, UserPlus, IdCard, Printer, ArrowLeft, RefreshCw, Ban, PauseCircle, PlayCircle } from "lucide-react";
 import {
   getSerenityMembers,
@@ -16,7 +17,7 @@ import {
 const CARD_NAMES: MembershipCardName[] = ["Serenity Privé", "Serenity Prestige", "Serenity Privilege"];
 const STATUSES: MembershipStatus[] = ["Active", "Expired", "Suspended", "Cancelled"];
 
-type View = "list" | "register" | "details" | "card";
+type View = "list" | "register" | "details" | "card" | "staff";
 
 function fmtDate(d: string) {
   if (!d) return "";
@@ -76,7 +77,11 @@ export default function SerenityCircleModule() {
           <IdCard size={22} />
         </div>
         <h2 className="text-xl font-bold text-foreground" style={{ lineHeight: "1.2" }}>Serenity Circle</h2>
+        {view === "list" && (
+          <button onClick={() => setView("staff")} className="ml-auto rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted">Staff Access</button>
+        )}
       </div>
+      {view === "staff" && <StaffAccessPanel />}
 
       {view !== "list" && (
         <button
