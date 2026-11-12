@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ClipboardList, CheckCircle, AlertTriangle, XCircle, Ban, Pencil, Trash2, BedDouble } from "lucide-react";
 import { getTransactions, updateTransaction, deleteTransaction, getFoodSales, updateFoodSale, getSettings, type Transaction, type FoodSale } from "@/lib/db";
-import { formatPeso } from "@/lib/format";
+import { formatPeso, calculateCalendarDays } from "@/lib/format";
 import { Receipt, CreditCard, Wallet, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -144,7 +144,8 @@ export default function BookingManagement() {
       const inMs = new Date(b.check_in).getTime();
       const outMs = new Date(b.check_out).getTime();
       if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
-        derivedDays = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
+        const cDays = calculateCalendarDays(b.check_in, b.check_out);
+        if (cDays > 0) derivedDays = cDays;
       }
     }
     setEditNoOfDays(String(derivedDays));
@@ -196,7 +197,8 @@ export default function BookingManagement() {
         const inMs = new Date(editingBooking.check_in).getTime();
         const outMs = new Date(editingBooking.check_out).getTime();
         if (!isNaN(inMs) && !isNaN(outMs) && outMs > inMs) {
-          oldDays = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
+          const cDays = calculateCalendarDays(editingBooking.check_in, editingBooking.check_out);
+          if (cDays > 0) oldDays = cDays;
         }
       }
       const oldRoomFee = oldRoomTypes.reduce(
@@ -999,7 +1001,13 @@ export default function BookingManagement() {
                     <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>
                     <input type="date" className="pos-input w-full text-sm"
                       value={editCheckInDate}
-                      onChange={e => setEditCheckInDate(e.target.value)} />
+                      onChange={e => {
+                        setEditCheckInDate(e.target.value);
+                        if (e.target.value && editCheckOutDate) {
+                          const cDays = calculateCalendarDays(e.target.value, editCheckOutDate);
+                          if (cDays > 0) setEditNoOfDays(String(cDays));
+                        }
+                      }} />
                   </div>
                   <div>
                     <label className="text-[10px] font-medium text-muted-foreground block mb-1">Time</label>
@@ -1020,7 +1028,13 @@ export default function BookingManagement() {
                     <label className="text-[10px] font-medium text-muted-foreground block mb-1">Date</label>
                     <input type="date" className="pos-input w-full text-sm"
                       value={editCheckOutDate}
-                      onChange={e => setEditCheckOutDate(e.target.value)} />
+                      onChange={e => {
+                        setEditCheckOutDate(e.target.value);
+                        if (editCheckInDate && e.target.value) {
+                          const cDays = calculateCalendarDays(editCheckInDate, e.target.value);
+                          if (cDays > 0) setEditNoOfDays(String(cDays));
+                        }
+                      }} />
                   </div>
                   <div>
                     <label className="text-[10px] font-medium text-muted-foreground block mb-1">Time</label>
@@ -1035,6 +1049,19 @@ export default function BookingManagement() {
                 </button>
               </div>
             </div>
+
+            {/* ── Duration ── */}
+            {(() => {
+              const cDays = calculateCalendarDays(editForm.check_in, editForm.check_out);
+              if (cDays > 0) {
+                return (
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary text-xs font-semibold flex items-center justify-between">
+                    <span>Booking Duration: <strong>{cDays} {cDays === 1 ? "Day / Night" : "Days / Nights"}</strong></span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* ── Room Selection ── */}
             <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-2">

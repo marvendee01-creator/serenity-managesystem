@@ -6,7 +6,7 @@ import PaymentToggle from "@/components/PaymentToggle";
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, getTransactions, getSettings } from "@/lib/db";
 import { toast } from "sonner";
-import { formatPeso } from "@/lib/format";
+import { formatPeso, calculateCalendarDays } from "@/lib/format";
 
 const TYPES = ["Exclusive", "Non-Exclusive"] as const;
 const ROOM_OPTIONS = ["Kubo Room", "Barkada Room"] as const;
@@ -116,13 +116,7 @@ export default function BookingModule() {
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
-  useEffect(() => {
-    if (checkIn && noOfDays) {
-      const d = new Date(checkIn);
-      d.setDate(d.getDate() + Math.max(1, parseInt(noOfDays) || 1));
-      setCheckOut(d.toISOString().slice(0, 10));
-    }
-  }, [checkIn, noOfDays]);
+
   useEffect(() => {
     getSettings().then((s) => {
       setExclusiveFee(s.exclusive_fee);
@@ -139,23 +133,43 @@ export default function BookingModule() {
     getTransactions({ module: "Booking" }).then(setExistingBookings);
   }, []);
 
-  // Auto-derive function hall days from check-in/out span (rounded up, min 1)
+  const isExclusive = bookingType === "Exclusive";
+  const isOvernight = isExclusive || stayType === "Overnight";
+
+  // Calculate calendar days difference and validate dates
+  const calendarDays = calculateCalendarDays(checkIn, checkOut);
+
+  let dateValidationError = "";
+  if (!checkIn || !checkOut) {
+    dateValidationError = "Please select check-in and check-out dates.";
+  } else if (calendarDays < 0) {
+    dateValidationError = "Check-out date cannot be earlier than check-in date.";
+  } else if (calendarDays === 0 && isOvernight) {
+    dateValidationError = "Check-out date cannot be earlier than or equal to check-in date for overnight bookings.";
+  }
+
+  const billableDays = dateValidationError ? 0 : (calendarDays === 0 ? 1 : calendarDays);
+
+  // Auto-sync rooms days when booking duration changes
+  useEffect(() => {
+    if (billableDays > 0) {
+      setNoOfDays(billableDays.toString());
+    }
+  }, [billableDays]);
+
+  // Auto-derive function hall days from billable days
   useEffect(() => {
     if (!withFunctionHall) return;
-    if (!checkIn || !checkOut) return;
-    const inMs = new Date(checkIn).getTime();
-    const outMs = new Date(checkOut).getTime();
-    if (isNaN(inMs) || isNaN(outMs) || outMs <= inMs) return;
-    const days = Math.max(1, Math.ceil((outMs - inMs) / (1000 * 60 * 60 * 24)));
-    setFunctionHallDays(days.toString());
-  }, [withFunctionHall, checkIn, checkOut]);
+    if (billableDays > 0) {
+      setFunctionHallDays(billableDays.toString());
+    }
+  }, [withFunctionHall, billableDays]);
 
   const a = parseInt(adults) || 0;
   const k8 = parseInt(kids8Above) || 0;
   const k5 = parseInt(kids5to7) || 0;
   const k4 = parseInt(kids4Below) || 0;
   const headcount = a + k8 + k5 + k4;
-  const isExclusive = bookingType === "Exclusive";
   const numTables = parseInt(addOnTables) || 0;
   const corkage = parseFloat(maintenanceFee) || 0;
   const drinksCork = parseFloat(drinksCorkage) || 0;
@@ -173,18 +187,25 @@ export default function BookingModule() {
   const kids8Rate = isDayTour ? dayKids8Rate : nightKids8Rate;
   const kids5Rate = isDayTour ? dayKids5Rate : nightKids5Rate;
 
-  const adultFee = a * adultRate;
-  const childrenTotalFee = isExclusive ? 0 : (k8 * kids8Rate + k5 * kids5Rate);
-  const personFee = adultFee + childrenTotalFee;
-  
+  // Daily fees
+  const exclusiveTotal = isExclusive ? (billableDays > 0 ? exclusiveFee * billableDays : 0) : 0;
+  const adultFeePerDay = a * adultRate;
+  const kids8FeePerDay = k8 * kids8Rate;
+  const kids5FeePerDay = k5 * kids5Rate;
+  const personFeePerDay = isExclusive ? 0 : (adultFeePerDay + kids8FeePerDay + kids5FeePerDay);
+  const personTotal = isExclusive ? 0 : (billableDays > 0 ? personFeePerDay * billableDays : 0);
+
+  // Rooms calculation: preserve existing selected rooms x days without double multiplying
   const days = Math.max(1, parseFloat(noOfDays) || 1);
   const baseRoomFee = selectedRooms.reduce((sum, r) => sum + (r === "Kubo Room" ? kuboRate : r === "Barkada Room" ? barkadaRate : 0), 0);
   const roomFee = baseRoomFee * days;
   
   const tableFee = numTables * tableRate;
-  const baseAmount = isExclusive
-    ? (exclusiveFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork + extraBed)
-    : (personFee + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork + extraBed);
+  const baseAmount = dateValidationError || billableDays <= 0
+    ? 0
+    : isExclusive
+      ? (exclusiveTotal + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork + extraBed)
+      : (personTotal + roomFee + tableFee + funcHall + functionHallTotal + corkage + drinksCork + liquorCork + extraBed);
   const total = Math.max(0, baseAmount - discount);
   const balance = total - deposit;
   const paymentStatus = deposit === 0 ? "Unpaid" : deposit < total ? "Partially Paid" : "Fully Paid";
@@ -244,6 +265,7 @@ export default function BookingModule() {
   }, [checkIn, checkOut, existingBookings, isExclusive, selectedRooms]);
 
   const handleSave = useCallback(async (proceedConflict = false) => {
+    if (dateValidationError) { toast.error(dateValidationError); return; }
     if (total === 0) { toast.error("Enter amount"); return; }
     if (!proceedConflict) {
       const conflict = hasDateConflict();
@@ -291,10 +313,10 @@ export default function BookingModule() {
         totalAmount: total,
         paymentMethod: payment, paymentStatus,
         details: [
-          ...(isExclusive ? [{ label: "Exclusive Fee", value: `₱${exclusiveFee.toLocaleString()}` }] : []),
-          ...(!isExclusive && adultFee > 0 ? [{ label: `Adults (${a})`, value: `₱${adultFee.toLocaleString()}` }] : []),
-          ...(!isExclusive && k8 > 0 ? [{ label: `Kids 8+ (${k8})`, value: `₱${(k8 * kids8Rate).toLocaleString()}` }] : []),
-          ...(!isExclusive && k5 > 0 ? [{ label: `Kids 5-7 (${k5})`, value: `₱${(k5 * kids5Rate).toLocaleString()}` }] : []),
+          ...(isExclusive ? [{ label: `Exclusive Fee (${billableDays} day${billableDays > 1 ? "s" : ""} × ₱${exclusiveFee.toLocaleString()})`, value: `₱${exclusiveTotal.toLocaleString()}` }] : []),
+          ...(!isExclusive && adultFeePerDay > 0 ? [{ label: `Adults (${a} × ${billableDays}d)`, value: `₱${(adultFeePerDay * billableDays).toLocaleString()}` }] : []),
+          ...(!isExclusive && kids8FeePerDay > 0 ? [{ label: `Kids 8+ (${k8} × ${billableDays}d)`, value: `₱${(kids8FeePerDay * billableDays).toLocaleString()}` }] : []),
+          ...(!isExclusive && kids5FeePerDay > 0 ? [{ label: `Kids 5-7 (${k5} × ${billableDays}d)`, value: `₱${(kids5FeePerDay * billableDays).toLocaleString()}` }] : []),
           ...(k4 > 0 ? [{ label: `Kids 4↓ FREE (${k4})`, value: "₱0" }] : []),
           ...(roomFee > 0 ? [{ label: `Rooms (${selectedRooms.join(", ")})`, value: `₱${roomFee.toLocaleString()} (${days} day${days > 1 ? "s" : ""})` }] : []),
           ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays} day${fhDays > 1 ? "s" : ""} × ₱${fhRate.toLocaleString()})`, value: `₱${functionHallTotal.toLocaleString()}` }] : []),
@@ -324,7 +346,7 @@ export default function BookingModule() {
       firstRef.current?.focus();
     } catch { toast.error("Failed to save"); }
     setSaving(false);
-  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, hasSameDateBooking, pendingSameDateProceed, isExclusive, exclusiveFee, roomFee, adultFee, kids8Rate, kids5Rate, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days]);
+  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, hasSameDateBooking, pendingSameDateProceed, isExclusive, exclusiveFee, exclusiveTotal, roomFee, adultFeePerDay, kids8FeePerDay, kids5FeePerDay, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days, billableDays, dateValidationError, depositDate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
@@ -380,7 +402,12 @@ export default function BookingModule() {
               <button key={t} className={`toggle-btn flex-1 ${bookingType === t ? "toggle-btn-active" : ""}`} onClick={() => setBookingType(t)}>{t}</button>
             ))}
           </div>
-          {isExclusive && <p className="text-xs text-muted-foreground mt-1">Exclusive Fee: {formatPeso(exclusiveFee)}</p>}
+          {isExclusive && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Exclusive Fee: {formatPeso(exclusiveFee)} / day
+              {billableDays > 1 && ` (${billableDays} days = ${formatPeso(exclusiveTotal)})`}
+            </p>
+          )}
         </div>
 
         {!isExclusive && (
@@ -395,27 +422,57 @@ export default function BookingModule() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium block mb-1">Check-in Date & Time</label>
-            <input type="datetime-local" className="pos-input w-full" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium block mb-1">Check-in Date & Time</label>
+              <input type="datetime-local" className="pos-input w-full" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Check-out Date & Time</label>
+              <input type="datetime-local" className="pos-input w-full" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+            </div>
           </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Check-out Date & Time</label>
-            <input type="datetime-local" className="pos-input w-full" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
-          </div>
+
+          {/* Booking Duration & Date Validation display */}
+          {dateValidationError ? (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle size={15} className="shrink-0" />
+              <span>{dateValidationError}</span>
+            </div>
+          ) : billableDays > 0 ? (
+            <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 text-xs flex justify-between items-center">
+              <span className="flex items-center gap-1.5">
+                <CalendarDays size={14} className="text-primary" />
+                Booking Duration: <strong className="text-primary font-bold text-sm">{billableDays} {billableDays === 1 ? "Day / Night" : "Days / Nights"}</strong>
+              </span>
+              <span className="text-muted-foreground text-[11px]">
+                {isExclusive
+                  ? `${formatPeso(exclusiveFee)}/day × ${billableDays} ${billableDays === 1 ? "day" : "days"}`
+                  : `${stayType} rates × ${billableDays} ${billableDays === 1 ? "day" : "days"}`}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">Adults</label>
             <input type="number" className="pos-input w-full" value={adults} onChange={(e) => setAdults(e.target.value)} placeholder="0" min="0" />
-            {!isExclusive && a > 0 && <p className="text-xs text-muted-foreground mt-1">{a} × {formatPeso(adultRate)} = {formatPeso(adultFee)}</p>}
+            {!isExclusive && a > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {a} × {formatPeso(adultRate)}{billableDays > 1 ? ` × ${billableDays} days` : ""} = {formatPeso(adultFeePerDay * (billableDays || 1))}
+              </p>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Kids (8 & above)</label>
             <input type="number" className="pos-input w-full" value={kids8Above} onChange={(e) => setKids8Above(e.target.value)} placeholder="0" min="0" />
-            {!isExclusive && k8 > 0 && <p className="text-xs text-muted-foreground mt-1">{k8} × {formatPeso(kids8Rate)} = {formatPeso(k8 * kids8Rate)}</p>}
+            {!isExclusive && k8 > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {k8} × {formatPeso(kids8Rate)}{billableDays > 1 ? ` × ${billableDays} days` : ""} = {formatPeso(kids8FeePerDay * (billableDays || 1))}
+              </p>
+            )}
           </div>
         </div>
 
@@ -423,7 +480,11 @@ export default function BookingModule() {
           <div>
             <label className="text-sm font-medium block mb-1">Kids (5-7)</label>
             <input type="number" className="pos-input w-full" value={kids5to7} onChange={(e) => setKids5to7(e.target.value)} placeholder="0" min="0" />
-            {!isExclusive && k5 > 0 && <p className="text-xs text-muted-foreground mt-1">{k5} × {formatPeso(kids5Rate)} = {formatPeso(k5 * kids5Rate)}</p>}
+            {!isExclusive && k5 > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {k5} × {formatPeso(kids5Rate)}{billableDays > 1 ? ` × ${billableDays} days` : ""} = {formatPeso(kids5FeePerDay * (billableDays || 1))}
+              </p>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">Kids (4 & Below - FREE)</label>
@@ -523,10 +584,20 @@ export default function BookingModule() {
           <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
           <p className="text-2xl font-bold text-primary tabular-nums">{formatPeso(total)}</p>
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
-            {isExclusive && <p>Exclusive Fee: {formatPeso(exclusiveFee)}</p>}
-            {!isExclusive && adultFee > 0 && <p>Adults ({a}): {formatPeso(adultFee)}</p>}
-            {!isExclusive && k8 > 0 && <p>Kids 8+ ({k8}): {formatPeso(k8 * kids8Rate)}</p>}
-            {!isExclusive && k5 > 0 && <p>Kids 5-7 ({k5}): {formatPeso(k5 * kids5Rate)}</p>}
+            {isExclusive && (
+              <p>
+                Exclusive Fee ({billableDays} day{billableDays > 1 ? "s" : ""} × {formatPeso(exclusiveFee)}): {formatPeso(exclusiveTotal)}
+              </p>
+            )}
+            {!isExclusive && adultFeePerDay > 0 && (
+              <p>Adults ({a}){billableDays > 1 ? ` × ${billableDays}d` : ""}: {formatPeso(adultFeePerDay * (billableDays || 1))}</p>
+            )}
+            {!isExclusive && kids8FeePerDay > 0 && (
+              <p>Kids 8+ ({k8}){billableDays > 1 ? ` × ${billableDays}d` : ""}: {formatPeso(kids8FeePerDay * (billableDays || 1))}</p>
+            )}
+            {!isExclusive && kids5FeePerDay > 0 && (
+              <p>Kids 5-7 ({k5}){billableDays > 1 ? ` × ${billableDays}d` : ""}: {formatPeso(kids5FeePerDay * (billableDays || 1))}</p>
+            )}
             {k4 > 0 && <p>Kids 4↓ ({k4}): FREE</p>}
             {roomFee > 0 && <p>+ Rooms: {formatPeso(roomFee)}</p>}
             {funcHall > 0 && <p>+ Function Hall Fee: {formatPeso(funcHall)}</p>}
