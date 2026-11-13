@@ -26,7 +26,7 @@ const dateText = (value?: string | null) => value ? new Date(`${value.slice(0, 1
 
 export default function SerenityRewardsPanel({ members }: { members: SerenityMember[] }) {
   const { user, isStaff, isAdmin, loading: authLoading } = useStaffAuth();
-  const [data, setData] = useState<Data>({ referrals: [], issues: [], ledger: [], redemptions: [] });
+  const [data, setData] = useState<Data>({ referrals: [], issues: [], ledger: [], redemptions: [], rewardedBookings: [] });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState("all");
