@@ -13,6 +13,9 @@ import {
   type SerenityCreditRedemption,
   type SerenityRewardIssue,
 } from "@/lib/serenity-rewards";
+import { getSerenityPackageCeiling, redeemSerenityCredits } from "@/lib/serenity-rewards";
+import MemberVerification from "@/components/MemberVerification";
+import type { Transaction } from "@/lib/db";
 import { useStaffAuth } from "@/hooks/use-staff-auth";
 import { toast } from "sonner";
 
@@ -38,6 +41,13 @@ export default function SerenityRewardsPanel({ members }: { members: SerenityMem
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [adjustmentReason, setAdjustmentReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [candidateBookings, setCandidateBookings] = useState<Transaction[]>([]);
+  const [redemptionBookingId, setRedemptionBookingId] = useState("");
+  const [redemptionMember, setRedemptionMember] = useState<SerenityMember | null>(null);
+  const [redemptionPackage, setRedemptionPackage] = useState("Room accommodation");
+  const [redemptionAmount, setRedemptionAmount] = useState("");
+  const [redemptionCeiling, setRedemptionCeiling] = useState(0);
+  const [redemptionSaving, setRedemptionSaving] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!isStaff) return;
@@ -48,6 +58,35 @@ export default function SerenityRewardsPanel({ members }: { members: SerenityMem
   }, [isStaff]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    if (!isStaff) return;
+    void supabase.from("transactions").select("*").eq("module", "Booking").order("date_time", { ascending: false })
+      .then(({ data: rows, error }) => {
+        if (error) { toast.error(error.message); return; }
+        setCandidateBookings((rows ?? []).map(row => ({
+          ...row,
+          payment_method: row.payment_method as Transaction["payment_method"],
+          amount_paid: Number(row.amount_paid),
+          deposit_amount: Number(row.deposit_amount ?? 0),
+          balance: Number(row.balance ?? 0),
+          maintenance_fee: Number(row.maintenance_fee ?? 0),
+          drinks_corkage_fee: Number(row.drinks_corkage_fee ?? 0),
+          liquor_corkage_fee: Number(row.liquor_corkage_fee ?? 0),
+          discount_amount: Number(row.discount_amount ?? 0),
+          adults: Number(row.adults),
+          children: Number(row.children),
+          total_headcount: Number(row.total_headcount),
+        })));
+      });
+  }, [isStaff]);
+
+  useEffect(() => {
+    const booking = candidateBookings.find(row => String(row.id) === redemptionBookingId);
+    if (!booking?.id) { setRedemptionCeiling(0); return; }
+    void getSerenityPackageCeiling(booking.id, redemptionPackage).then(setRedemptionCeiling)
+      .catch(error => { setRedemptionCeiling(0); toast.error(error instanceof Error ? error.message : "Unable to check package limit"); });
+  }, [candidateBookings, redemptionBookingId, redemptionPackage]);
 
   const membersById = useMemo(() => new Map(members.map(member => [member.id, member])), [members]);
   const visibleMembers = useMemo(() => members.filter(member => {
@@ -86,6 +125,21 @@ export default function SerenityRewardsPanel({ members }: { members: SerenityMem
     if (memberFilter !== "all" && String(redemption.member_id) !== memberFilter) return false;
     return (!monthFilter && !fromDate && !toDate) || (dateField === "entry" && withinDateRange(redemption.created_at));
   });
+  const rewardedBookingIds = useMemo(() => new Set(data.rewardedBookings.map(row => row.transaction_id)), [data.rewardedBookings]);
+  const untaggedBookings = candidateBookings.filter(booking => booking.id && booking.status !== "Cancelled" && !rewardedBookingIds.has(booking.id) && !data.referrals.some(referral => referral.transaction_id === booking.id));
+
+  const saveRedemption = async () => {
+    const booking = candidateBookings.find(row => String(row.id) === redemptionBookingId);
+    const amount = Number(redemptionAmount);
+    if (!booking?.id || !redemptionMember || !amount || amount > redemptionCeiling) return;
+    setRedemptionSaving(true);
+    try {
+      await redeemSerenityCredits({ bookingId: booking.id, memberToken: redemptionMember.qr_token, packageType: redemptionPackage, amount });
+      toast.success("Reward credits applied to the booking");
+      setRedemptionBookingId(""); setRedemptionMember(null); setRedemptionAmount(""); await refresh();
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to redeem credits"); }
+    finally { setRedemptionSaving(false); }
+  };
 
   const runMemberAction = async (memberId: number, kind: "issue" | "expire") => {
     try {
@@ -135,6 +189,27 @@ export default function SerenityRewardsPanel({ members }: { members: SerenityMem
       </div>
 
       <section>
+        <h3 className="mb-2 font-semibold">Redeem credits for an eligible future booking</h3>
+        <div className="space-y-3 border-y border-border py-3">
+          <div><label className="mb-1 block text-sm font-medium">Booking</label><select className="pos-input w-full" value={redemptionBookingId} onChange={event => { setRedemptionBookingId(event.target.value); setRedemptionAmount(""); }}><option value="">Select a booking</option>{candidateBookings.filter(booking => booking.id && booking.status !== "Cancelled").map(booking => <option key={booking.id} value={booking.id}>{booking.customer_name || "Guest"} · {booking.transaction_no} · {booking.payment_status || "Unpaid"}</option>)}</select></div>
+          <MemberVerification member={redemptionMember} onChange={setRedemptionMember} />
+          <div className="grid grid-cols-2 gap-2"><div><label className="mb-1 block text-sm font-medium">Eligible package</label><select className="pos-input w-full" value={redemptionPackage} onChange={event => setRedemptionPackage(event.target.value)}><option>Room accommodation</option><option>Function hall</option><option>Exclusive resort</option></select></div><div><label className="mb-1 block text-sm font-medium">Credits to apply</label><input className="pos-input w-full" type="number" min="0" step="0.01" value={redemptionAmount} onChange={event => setRedemptionAmount(event.target.value)} /></div></div>
+          <p className="text-xs text-muted-foreground">Eligible unpaid package charges: {formatPeso(redemptionCeiling)} · Must belong to this member and be booked at least 14 days before check-in.</p>
+          <Button disabled={redemptionSaving || !redemptionMember || !redemptionBookingId || !Number(redemptionAmount) || Number(redemptionAmount) > redemptionCeiling} onClick={() => void saveRedemption()}>{redemptionSaving ? "Applying…" : "Apply credits"}</Button>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Referral attribution & verification</h3><span className="text-xs text-muted-foreground">Unique bookings only; self-referrals are blocked</span></div>
+        <div className="overflow-x-auto border-y border-border"><table className="w-full min-w-[700px] text-sm"><thead><tr className="border-b border-border text-left text-muted-foreground"><th className="py-2">Booking</th><th>Guest</th><th>Referrer</th><th>Completed</th><th>Eligible net payment</th><th>Verification</th></tr></thead><tbody>
+          {untaggedBookings.map(booking => <ReferralBookingRow key={booking.id} booking={booking} members={members} onSaved={async () => { await refresh(); }} />)}
+          {untaggedBookings.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">No untagged bookings available.</td></tr>}
+          {data.referrals.map(referral => { const booking = candidateBookings.find(row => row.id === referral.transaction_id); const member = membersById.get(referral.member_id); return <tr key={referral.transaction_id} className="border-b border-border/60"><td className="py-2">{booking?.transaction_no ?? referral.transaction_id}</td><td>{booking?.customer_name ?? "—"}</td><td>{member?.customer_name ?? `Member ${referral.member_id}`}</td><td>{referral.completed_date ? dateText(referral.completed_date) : "Awaiting completion"}</td><td>{formatPeso(referral.net_eligible)}</td><td>{referral.verified_at ? "Verified" : "Attributed"}</td></tr>; })}
+        </tbody></table></div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">{members.map(member => { const summary = memberSummary(member.id ?? 0); return <div key={member.id} className="flex items-center justify-between gap-2 border-b border-border py-2 text-sm"><span>{member.customer_name} · {summary.referrals} verified booking(s)</span><Button size="sm" variant="outline" onClick={() => void runMemberAction(member.id ?? 0, "issue")}>Issue groups of 10</Button></div>; })}</div>
+      </section>
+
+      <section>
         <div className="mb-2 flex items-center justify-between gap-3"><h3 className="font-semibold">Member credit balances & referrals</h3><Button variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</Button></div>
         <div className="overflow-x-auto border-y border-border"><table className="w-full min-w-[620px] text-sm"><thead><tr className="border-b border-border text-left text-muted-foreground"><th className="py-2">Member</th><th>Completed referrals</th><th>Credits earned</th><th>Available</th><th className="text-right">Staff actions</th></tr></thead><tbody>
           {visibleMembers.map(member => { const summary = memberSummary(member.id ?? 0); return <tr key={member.id} className="border-b border-border/60"><td className="py-2"><span className="font-medium">{member.customer_name}</span><span className="ml-2 text-xs text-muted-foreground">{member.member_id}</span></td><td>{summary.referrals} / 10</td><td>{formatPeso(summary.earned)}</td><td className="font-semibold">{formatPeso(summary.balance)}</td><td className="text-right"><div className="inline-flex gap-1"><Button size="sm" variant="outline" onClick={() => void runMemberAction(member.id ?? 0, "issue")}>Issue earned rewards</Button><Button size="sm" variant="ghost" onClick={() => void runMemberAction(member.id ?? 0, "expire")}>Update expiry</Button></div></td></tr>; })}
@@ -177,4 +252,40 @@ export default function SerenityRewardsPanel({ members }: { members: SerenityMem
       <p className="text-xs text-muted-foreground">Credit changes require administrator approval and are recorded with the signed-in staff account.</p>
     </div>
   );
+}
+
+function ReferralBookingRow({ booking, members, onSaved }: { booking: Transaction; members: SerenityMember[]; onSaved: () => Promise<void> }) {
+  const [member, setMember] = useState<SerenityMember | null>(null);
+  const [packageType, setPackageType] = useState("Room accommodation");
+  const [completedDate, setCompletedDate] = useState("");
+  const [netAmount, setNetAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [ceiling, setCeiling] = useState(0);
+  useEffect(() => {
+    if (!booking.id) return;
+    void getSerenityPackageCeiling(booking.id, packageType).then(setCeiling).catch(() => setCeiling(0));
+  }, [booking.id, packageType]);
+
+  const save = async () => {
+    if (!booking.id || !member || !reason.trim()) return;
+    const net = Number(netAmount) || 0;
+    if (completedDate && (!net || net > ceiling)) { toast.error("Verified eligible payments must be above zero and within the package limit"); return; }
+    setSaving(true);
+    try {
+      await supabase.rpc("serenity_save_referral", {
+        p_booking: booking.id,
+        p_token: member.qr_token,
+        p_package: packageType,
+        p_net: net,
+        p_completed: completedDate || null,
+        p_reason: reason.trim(),
+      }).then(({ error }) => { if (error) throw new Error(error.message); });
+      toast.success(completedDate ? "Referral verified and recorded" : "Referrer attribution saved");
+      await onSaved();
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to save referral"); }
+    finally { setSaving(false); }
+  };
+
+  return <tr className="border-b border-border/60 align-top"><td className="py-2">{booking.transaction_no}</td><td>{booking.customer_name || "—"}</td><td className="min-w-56"><MemberVerification member={member} onChange={setMember} /></td><td className="min-w-36"><input type="date" className="pos-input w-full" value={completedDate} onChange={event => setCompletedDate(event.target.value)} aria-label={`Completion date for ${booking.transaction_no}`} /></td><td className="min-w-40"><select className="pos-input mb-1 w-full" value={packageType} onChange={event => setPackageType(event.target.value)}><option>Room accommodation</option><option>Function hall</option><option>Exclusive resort</option></select><input type="number" min="0" max={ceiling} step="0.01" className="pos-input w-full" placeholder={`Limit ${formatPeso(ceiling)}`} value={netAmount} onChange={event => setNetAmount(event.target.value)} aria-label={`Eligible net payment for ${booking.transaction_no}`} /></td><td className="min-w-52"><textarea className="pos-input mb-1 w-full" placeholder="Required resort verification reason" value={reason} onChange={event => setReason(event.target.value)} /><Button size="sm" disabled={saving || !member || !reason.trim() || (!!completedDate && !Number(netAmount))} onClick={() => void save()}>{saving ? "Saving…" : completedDate ? "Verify completed booking" : "Save referral"}</Button></td></tr>;
 }

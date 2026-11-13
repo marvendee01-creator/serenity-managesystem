@@ -5,21 +5,24 @@ export type SerenityReferral = Database["public"]["Tables"]["serenity_referrals"
 export type SerenityRewardIssue = Database["public"]["Tables"]["serenity_reward_issues"]["Row"];
 export type SerenityCreditLedgerEntry = Database["public"]["Tables"]["serenity_credit_ledger"]["Row"];
 export type SerenityCreditRedemption = Database["public"]["Tables"]["serenity_credit_redemptions"]["Row"];
+export type SerenityRewardBooking = Database["public"]["Tables"]["serenity_reward_bookings"]["Row"];
 
 export async function loadSerenityRewards() {
-  const [referrals, issues, ledger, redemptions] = await Promise.all([
+  const [referrals, issues, ledger, redemptions, rewardedBookings] = await Promise.all([
     supabase.from("serenity_referrals").select("*").order("created_at", { ascending: false }),
     supabase.from("serenity_reward_issues").select("*").order("issued_at", { ascending: false }),
     supabase.from("serenity_credit_ledger").select("*").order("created_at", { ascending: false }),
     supabase.from("serenity_credit_redemptions").select("*").order("created_at", { ascending: false }),
+    supabase.from("serenity_reward_bookings").select("transaction_id,issue_id,net_eligible"),
   ]);
-  const failure = referrals.error ?? issues.error ?? ledger.error ?? redemptions.error;
+  const failure = referrals.error ?? issues.error ?? ledger.error ?? redemptions.error ?? rewardedBookings.error;
   if (failure) throw new Error(failure.message);
   return {
     referrals: (referrals.data ?? []) as SerenityReferral[],
     issues: (issues.data ?? []) as SerenityRewardIssue[],
     ledger: (ledger.data ?? []) as SerenityCreditLedgerEntry[],
     redemptions: (redemptions.data ?? []) as SerenityCreditRedemption[],
+    rewardedBookings: (rewardedBookings.data ?? []) as SerenityRewardBooking[],
   };
 }
 

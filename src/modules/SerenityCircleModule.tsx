@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import StaffAccessPanel from "@/components/StaffAccessPanel";
+import SerenityRewardsPanel from "@/modules/SerenityRewardsPanel";
 import { Users, UserPlus, IdCard, Printer, ArrowLeft, RefreshCw, Ban, PauseCircle, PlayCircle } from "lucide-react";
 import {
   getSerenityMembers,
@@ -17,7 +18,7 @@ import {
 const CARD_NAMES: MembershipCardName[] = ["Serenity Privé", "Serenity Prestige", "Serenity Privilege"];
 const STATUSES: MembershipStatus[] = ["Active", "Expired", "Suspended", "Cancelled"];
 
-type View = "list" | "register" | "details" | "card" | "staff";
+type View = "list" | "register" | "details" | "card" | "staff" | "rewards";
 
 function fmtDate(d: string) {
   if (!d) return "";
@@ -82,6 +83,7 @@ export default function SerenityCircleModule() {
         )}
       </div>
       {view === "staff" && <StaffAccessPanel />}
+      {view === "rewards" && <SerenityRewardsPanel members={members} />}
 
       {view !== "list" && (
         <button
@@ -93,7 +95,10 @@ export default function SerenityCircleModule() {
       )}
 
       {view === "list" && (
-        <MemberList members={members} loading={loading} onRegister={() => setView("register")} onDetails={openDetails} onCard={openCard} />
+        <>
+          <MemberList members={members} loading={loading} onRegister={() => setView("register")} onDetails={openDetails} onCard={openCard} />
+          <div className="mt-4 border-t border-border pt-4"><button onClick={() => setView("rewards")} className="w-full rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">Referrals & Reward Credits</button></div>
+        </>
       )}
       {view === "register" && (
         <RegisterMember
