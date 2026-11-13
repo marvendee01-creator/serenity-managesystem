@@ -31,14 +31,29 @@ function formatDate(iso: string) {
 
 type Tab = "transactions" | "cashier" | "cashier-booking" | "store-sales" | "entrance-sales" | "expenses-store" | "expenses-entrance" | "reservation" | "petty-monitoring" | "analytics" | "food-sales" | "booking-ledger" | "maint-monitoring" | "daily-summary";
 
-export const ENTRANCE_SUMMARY_MODULES = ["Entrance", "Table Rent", "Tent"];
+export const ENTRANCE_SUMMARY_MODULES = ["Entrance"];
 export function isEntranceSummaryEligible(t: { module: string; booking_type?: string | null; status?: string | null }) {
   if (t.status === "Cancelled") return false;
-  if (ENTRANCE_SUMMARY_MODULES.includes(t.module)) return true;
-  return t.module === "Booking";
+  return t.module === "Entrance" || t.module === "Booking";
 }
-function txnGrandTotal(t: Transaction) {
-  return (Number(t.amount_paid) || 0) + (Number(t.extra_bed_charges) || 0) + (Number(t.maintenance_fee) || 0);
+export function getEntranceGrandTotal(t: Transaction | any): number {
+  if (!t) return 0;
+  const maint = Number(t.maintenance_fee) || 0;
+  const extraBed = Number(t.extra_bed_charges) || 0;
+
+  // 1. If grand_total is explicitly provided/computed:
+  if (t.grand_total != null && !isNaN(Number(t.grand_total))) {
+    return Math.max(0, Number(t.grand_total));
+  }
+
+  // 2. If entrance_amount is specified separately from maint:
+  if (t.entrance_amount != null && !isNaN(Number(t.entrance_amount))) {
+    return Math.max(0, Number(t.entrance_amount) + maint + extraBed);
+  }
+
+  // 3. From standard Transaction:
+  const amountPaid = Number(t.amount_paid) || 0;
+  return Math.max(0, amountPaid + maint + extraBed);
 }
 function localYMD(iso: string) {
   const d = new Date(iso);
@@ -48,35 +63,49 @@ export type BookingPaymentRow = { id: number; transaction_id: number; payment_da
 export function buildEntranceDaily(txns: Transaction[], month: string, payments: BookingPaymentRow[] = [], bookingById: Map<number, Transaction> = new Map()) {
   const seen = new Set<string>();
   const map = new Map<string, number>();
-  const withPayments = new Set(payments.map(p => p.transaction_id));
+  const withPayments = new Set<number>();
   const seenPay = new Set<number>();
   for (const p of payments) {
+    if (p.transaction_id != null) {
+      withPayments.add(Number(p.transaction_id));
+    }
+    if (p.id <= 0) continue;
     if (seenPay.has(p.id)) continue;
     seenPay.add(p.id);
-    const b = bookingById.get(p.transaction_id);
-    if (!b || !isEntranceSummaryEligible(b)) continue;
-    if (p.payment_date.slice(0, 7) !== month) continue;
-    map.set(p.payment_date, (map.get(p.payment_date) || 0) + (Number(p.amount) || 0));
+    const b = bookingById.get(Number(p.transaction_id));
+    if (b && (b.status === "Cancelled" || b.module !== "Booking")) continue;
+    const pDate = String(p.payment_date || "").slice(0, 10);
+    if (pDate.slice(0, 7) !== month) continue;
+    const amt = Number(p.amount) || 0;
+    if (amt > 0) {
+      map.set(pDate, (map.get(pDate) || 0) + amt);
+    }
   }
   for (const t of txns) {
+    if (!t || t.status === "Cancelled") continue;
     const key = String(t.id ?? t.transaction_no);
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!isEntranceSummaryEligible(t)) continue;
-    const day = localYMD(t.date_time);
     if (t.module === "Booking") {
-      // Maint. Fee from Transactions, posted on its actual transaction date
-      const maint = Number(t.maintenance_fee) || 0;
-      if (maint && day.slice(0, 7) === month) map.set(day, (map.get(day) || 0) + maint);
-      // Deposits come from logged payments; legacy bookings without logs use the saved Deposit Amount/Date (never Grand Total)
-      if (t.id != null && withPayments.has(t.id)) continue;
+      // If this booking has payment records in booking_payments, skip to prevent duplicate counting
+      if (t.id != null && withPayments.has(Number(t.id))) continue;
       const dep = Number(t.deposit_amount) || 0;
-      const dDay = t.deposit_date || day;
-      if (dep && dDay.slice(0, 7) === month) map.set(dDay, (map.get(dDay) || 0) + dep);
+      if (dep <= 0) continue;
+      const depDate = t.deposit_date ? String(t.deposit_date).slice(0, 10) : localYMD(t.date_time);
+      if (depDate.slice(0, 7) === month) {
+        map.set(depDate, (map.get(depDate) || 0) + dep);
+      }
       continue;
     }
-    if (day.slice(0, 7) !== month) continue;
-    map.set(day, (map.get(day) || 0) + txnGrandTotal(t));
+    if (t.module === "Entrance") {
+      const day = localYMD(t.date_time);
+      if (day.slice(0, 7) !== month) continue;
+      const grandTotal = getEntranceGrandTotal(t);
+      if (grandTotal > 0) {
+        map.set(day, (map.get(day) || 0) + grandTotal);
+      }
+      continue;
+    }
   }
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, total]) => ({ date, total }));
 }
@@ -90,16 +119,32 @@ function EntranceSalesSummary() {
     const last = new Date(y, m, 0).getDate();
     const from = `${monthFilter}-01`, to = `${monthFilter}-${String(last).padStart(2, "0")}`;
     (async () => {
-      const txns = await getTransactions({ dateFrom: from, dateTo: to });
-      const { data: pays } = await supabase.from("booking_payments").select("id, transaction_id, payment_date, amount").gte("payment_date", from).lte("payment_date", to);
-      const payments = (pays || []) as BookingPaymentRow[];
-      // ensure we know which bookings ever had logged payments (so legacy fallback doesn't double count)
-      const { data: allPayIds } = await supabase.from("booking_payments").select("transaction_id").in("transaction_id", txns.filter(t => t.module === "Booking" && t.id != null).map(t => t.id!));
-      const ids = [...new Set(payments.map(p => p.transaction_id))];
-      const { data: bks } = ids.length ? await supabase.from("transactions").select("id, module, booking_type, status").in("id", ids) : { data: [] as any[] };
-      const byId = new Map<number, Transaction>((bks || []).map((b: any) => [b.id, b as Transaction]));
-      const marker = (allPayIds || []).map((r: any) => ({ id: -1, transaction_id: r.transaction_id, payment_date: "0000-00-00", amount: 0 }));
-      setRows(buildEntranceDaily(txns, monthFilter, [...payments, ...marker], byId));
+      const [txns, bookings, paysRes, allPayIdsRes] = await Promise.all([
+        getTransactions({ dateFrom: from, dateTo: to }),
+        getTransactions({ module: "Booking" }),
+        supabase.from("booking_payments").select("id, transaction_id, payment_date, amount").gte("payment_date", from).lte("payment_date", to),
+        supabase.from("booking_payments").select("transaction_id"),
+      ]);
+      const payments = (paysRes.data || []) as BookingPaymentRow[];
+      const allPayIds = allPayIdsRes.data || [];
+      const byId = new Map<number, Transaction>();
+      for (const b of bookings) {
+        if (b.id != null) byId.set(b.id, b);
+      }
+      for (const t of txns) {
+        if (t.id != null && !byId.has(t.id) && t.module === "Booking") byId.set(t.id, t);
+      }
+      const allTxnsMap = new Map<string, Transaction>();
+      for (const t of txns) {
+        if (t.module === "Entrance") {
+          allTxnsMap.set(String(t.id ?? t.transaction_no), t);
+        }
+      }
+      for (const b of bookings) {
+        allTxnsMap.set(String(b.id ?? b.transaction_no), b);
+      }
+      const marker = (allPayIds || []).map((r: any) => ({ id: -1, transaction_id: Number(r.transaction_id), payment_date: "0000-00-00", amount: 0 }));
+      setRows(buildEntranceDaily([...allTxnsMap.values()], monthFilter, [...payments, ...marker], byId));
     })();
   }, [monthFilter]);
 
