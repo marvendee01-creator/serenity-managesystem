@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { ArrowLeft } from "lucide-react";
+import { LogOut } from "lucide-react";
 import logo from "@/assets/logo.png";
 import entranceIcon from "@/assets/icons/entrance.png";
 import roomIcon from "@/assets/icons/room.png";
@@ -32,6 +33,9 @@ import TentModule from "@/modules/TentModule";
 import FoodPOSModule from "@/modules/FoodPOSModule";
 import FinanceAdminModule from "@/modules/FinanceAdminModule";
 import SerenityCircleModule from "@/modules/SerenityCircleModule";
+import StaffAccessPanel from "@/components/StaffAccessPanel";
+import { useStaffAuth } from "@/hooks/use-staff-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 const MODULES = [
   { id: "entrance", label: "Entrance", icon: entranceIcon },
@@ -77,11 +81,37 @@ export default function Index() {
   const [splash, setSplash] = useState(true);
   const [active, setActive] = useState<ModuleId | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+  const { isStaff, loading } = useStaffAuth();
 
   const handleSplashDone = useCallback(() => {
     setSplash(false);
     setShowWelcome(true);
   }, []);
+
+  if (loading) {
+    return <div className="min-h-screen grid place-items-center bg-background text-foreground">Checking staff access…</div>;
+  }
+
+  if (!isStaff) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <header className="bg-sidebar px-4 py-5 flex items-center gap-3 shadow-md">
+          <img src={logo} alt="Logo" className="w-10 h-10 rounded-full" />
+          <div>
+            <h1 className="text-sm font-bold text-sidebar-foreground leading-tight">Serenity Inland Resort</h1>
+            <p className="text-[10px] text-sidebar-foreground/50">Staff access</p>
+          </div>
+        </header>
+        <main className="flex-1 w-full max-w-md mx-auto p-4 md:p-6 flex flex-col justify-center gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">Staff sign in</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Sign in with an authorized Serenity staff account to use the management system.</p>
+          </div>
+          <StaffAccessPanel />
+        </main>
+      </div>
+    );
+  }
 
   if (splash) return <SplashScreen onDone={handleSplashDone} />;
 
@@ -98,7 +128,15 @@ export default function Index() {
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-sm font-bold text-sidebar-foreground leading-tight">{activeLabel}</h1>
+          <h1 className="text-sm font-bold text-sidebar-foreground leading-tight flex-1">{activeLabel}</h1>
+          <button
+            onClick={() => { void supabase.auth.signOut(); }}
+            className="rounded-lg bg-sidebar-foreground/10 px-3 py-2 flex items-center gap-2 text-sidebar-foreground hover:bg-sidebar-foreground/20 transition-colors"
+            aria-label="Sign out"
+          >
+            <LogOut size={16} />
+            <span className="text-xs">Sign out</span>
+          </button>
         </header>
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           <ActiveModule key={active} />
@@ -132,6 +170,14 @@ export default function Index() {
           <h1 className="text-sm font-bold text-sidebar-foreground leading-tight">Serenity Inland Resort</h1>
           <p className="text-[10px] text-sidebar-foreground/50">Management System</p>
         </div>
+        <button
+          onClick={() => { void supabase.auth.signOut(); }}
+          className="ml-auto rounded-lg bg-sidebar-foreground/10 px-3 py-2 flex items-center gap-2 text-sidebar-foreground hover:bg-sidebar-foreground/20 transition-colors"
+          aria-label="Sign out"
+        >
+          <LogOut size={16} />
+          <span className="text-xs">Sign out</span>
+        </button>
       </header>
 
       <div className="relative z-10 flex-1 flex items-center justify-center p-6">
