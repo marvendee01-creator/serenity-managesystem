@@ -284,6 +284,7 @@ export async function addTransaction(t: Omit<Transaction, "id">): Promise<number
       liquor_corkage_fee: t.liquor_corkage_fee ?? 0,
       discount_amount: t.discount_amount ?? 0,
       // extra_bed_charges is not yet in the DB schema
+      // date_settled is already included above (from remote commit 959a946)
     } as any)
     .select("id")
     .single();

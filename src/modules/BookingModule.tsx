@@ -6,7 +6,7 @@ import PaymentToggle from "@/components/PaymentToggle";
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
 import { addTransaction, findTransactionIdByNumber, getTransactions, getSettings } from "@/lib/db";
 import { toast } from "sonner";
-import { formatPeso, calculateCalendarDays } from "@/lib/format";
+import { formatPeso, calculateCalendarDays, parseCalendarDate } from "@/lib/format";
 
 const TYPES = ["Exclusive", "Non-Exclusive"] as const;
 const ROOM_OPTIONS = ["Kubo Room", "Barkada Room"] as const;
@@ -64,11 +64,15 @@ function BookingConflictDialog({ message, onConfirm, onCancel }: { message: stri
 }
 
 export default function BookingModule() {
+  const getInitialCheckIn = () => new Date().toISOString().slice(0, 10);
+  const getInitialCheckOut = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); };
+  const getInitialDepositDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+
   const [customerName, setCustomerName] = useState("");
   const [bookingType, setBookingType] = useState<string>(TYPES[0]);
   const [stayType, setStayType] = useState<"Day Tour" | "Overnight">("Day Tour");
-  const [checkIn, setCheckIn] = useState(() => new Date().toISOString().slice(0, 10));
-  const [checkOut, setCheckOut] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); });
+  const [checkIn, setCheckIn] = useState(getInitialCheckIn);
+  const [checkOut, setCheckOut] = useState(getInitialCheckOut);
   const [adults, setAdults] = useState("");
   const [kids8Above, setKids8Above] = useState("");
   const [kids5to7, setKids5to7] = useState("");
@@ -86,7 +90,7 @@ export default function BookingModule() {
   const [discountAmount, setDiscountAmount] = useState("");
   const [payment, setPayment] = useState<"Cash" | "GCash" | "Charge to Booking">("Cash");
   const [depositAmount, setDepositAmount] = useState("");
-  const [depositDate, setDepositDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; });
+  const [depositDate, setDepositDate] = useState(getInitialDepositDate);
   const [extraBedCharges, setExtraBedCharges] = useState("");
 
   const [exclusiveFee, setExclusiveFee] = useState(5000);
@@ -267,9 +271,9 @@ export default function BookingModule() {
   }, [checkIn, checkOut, existingBookings, isExclusive, selectedRooms]);
 
   const handleSave = useCallback(async (proceedConflict = false) => {
-    if (savingRef.current) return;
+    if (savingRef.current || saving) return;
     if (dateValidationError) { toast.error(dateValidationError); return; }
-    if (total === 0) { toast.error("Enter amount"); return; }
+    if (total <= 0) { toast.error("Enter amount"); return; }
     if (![total, deposit, balance, corkage, drinksCork, liquorCork, funcHall, extraBed, discount].every(Number.isFinite)) {
       toast.error("Check the booking amounts and try again.");
       return;
@@ -281,7 +285,17 @@ export default function BookingModule() {
       if (!pendingSameDateProceed && hasSameDateBooking()) { setShowSameDateWarning(true); return; }
     }
     
-    if (deposit > 0 && (!depositDate || Number.isNaN(Date.parse(`${depositDate}T00:00:00`)))) { toast.error("Enter a valid Deposit Date"); return; }
+    const parsedDeposit = Math.max(0, Math.round((parseFloat(depositAmount) || 0) * 100) / 100);
+    const parsedTotal = Math.max(0, Math.round(total * 100) / 100);
+    const parsedBalance = Math.max(0, Math.round((parsedTotal - parsedDeposit) * 100) / 100);
+
+    if (parsedDeposit > 0) {
+      if (!depositDate || !parseCalendarDate(depositDate)) {
+        toast.error("Valid Deposit Date is required when deposit amount is entered");
+        return;
+      }
+    }
+
     savingRef.current = true;
     setSaving(true);
     const txNo = transactionNoRef.current ?? `SR-${Date.now()}`;
@@ -289,40 +303,59 @@ export default function BookingModule() {
     const now = new Date().toISOString();
     try {
       const existingTransactionId = await findTransactionIdByNumber(txNo);
-      if (!existingTransactionId) await addTransaction({
-        transaction_no: txNo, date_time: now, module: "Booking",
-        customer_name: customerName || undefined, booking_type: bookingType,
-        check_in: checkIn || undefined, check_out: checkOut || undefined,
-        corkage_fee: corkage > 0 ? corkage : undefined,
-        maintenance_fee: corkage > 0 ? corkage : 0,
-        drinks_corkage_fee: drinksCork,
-        liquor_corkage_fee: liquorCork,
-        function_hall_fee: funcHall > 0 ? funcHall : undefined,
-        with_function_hall: withFunctionHall,
-        function_hall_days: withFunctionHall ? fhDays : 0,
-        function_hall_rate: withFunctionHall ? fhRate : 0,
-        function_hall_total: functionHallTotal,
-        room_type: selectedRooms.length > 0 ? selectedRooms.join(", ") : undefined,
-        number_of_tables: numTables > 0 ? numTables : undefined,
-        adults: a, children: k8 + k5 + k4,
-        kids_8_above: k8, kids_5_7: k5, kids_4_below: k4,
-        total_headcount: headcount,
-        amount_paid: total, deposit_amount: deposit,
-        deposit_date: deposit > 0 ? depositDate : null,
-        date_settled: deposit > 0 && paymentStatus === "Fully Paid" ? depositDate : undefined,
-        balance: balance > 0 ? balance : 0, payment_status: paymentStatus,
-        payment_method: payment,
-        extra_bed_charges: extraBed,
-      });
+      if (!existingTransactionId) {
+        await addTransaction({
+          transaction_no: txNo,
+          date_time: now,
+          module: "Booking",
+          customer_name: customerName?.trim() || undefined,
+          booking_type: bookingType,
+          tour_type: isExclusive ? "Overnight" : stayType,
+          check_in: checkIn || undefined,
+          check_out: checkOut || undefined,
+          corkage_fee: corkage > 0 ? corkage : undefined,
+          maintenance_fee: corkage > 0 ? corkage : 0,
+          drinks_corkage_fee: drinksCork,
+          liquor_corkage_fee: liquorCork,
+          function_hall_fee: funcHall > 0 ? funcHall : undefined,
+          with_function_hall: withFunctionHall,
+          function_hall_days: withFunctionHall ? fhDays : 0,
+          function_hall_rate: withFunctionHall ? fhRate : 0,
+          function_hall_total: functionHallTotal,
+          room_type: selectedRooms.length > 0 ? selectedRooms.join(", ") : undefined,
+          number_of_tables: numTables > 0 ? numTables : undefined,
+          adults: a,
+          children: k8 + k5 + k4,
+          kids_8_above: k8,
+          kids_5_7: k5,
+          kids_4_below: k4,
+          total_headcount: headcount,
+          amount_paid: parsedTotal,
+          deposit_amount: parsedDeposit,
+          deposit_date: parsedDeposit > 0 ? depositDate : null,
+          date_settled: parsedDeposit > 0 && paymentStatus === "Fully Paid" ? depositDate : undefined,
+          balance: parsedBalance,
+          payment_status: paymentStatus,
+          payment_method: payment,
+          discount_amount: discount > 0 ? discount : 0,
+          extra_bed_charges: extraBed,
+          status: "Confirmed",
+        });
+      }
       transactionNoRef.current = null;
       toast.success("Booking saved!");
 
       const rData = {
-        transactionNo: txNo, dateTime: now, module: `Booking - ${bookingType}`,
-        customerName: customerName || undefined,
-        adults: a, children: k8 + k5 + k4, headcount,
-        totalAmount: total,
-        paymentMethod: payment, paymentStatus,
+        transactionNo: txNo,
+        dateTime: now,
+        module: `Booking - ${bookingType}`,
+        customerName: customerName?.trim() || undefined,
+        adults: a,
+        children: k8 + k5 + k4,
+        headcount,
+        totalAmount: parsedTotal,
+        paymentMethod: payment,
+        paymentStatus,
         details: [
           ...(isExclusive ? [{ label: `Exclusive Fee (${billableDays} day${billableDays > 1 ? "s" : ""} × ₱${exclusiveFee.toLocaleString()})`, value: `₱${exclusiveTotal.toLocaleString()}` }] : []),
           ...(!isExclusive && adultFeePerDay > 0 ? [{ label: `Adults (${a} × ${billableDays}d)`, value: `₱${(adultFeePerDay * billableDays).toLocaleString()}` }] : []),
@@ -331,39 +364,62 @@ export default function BookingModule() {
           ...(k4 > 0 ? [{ label: `Kids 4↓ FREE (${k4})`, value: "₱0" }] : []),
           ...(roomFee > 0 ? [{ label: `Rooms (${selectedRooms.join(", ")})`, value: `₱${roomFee.toLocaleString()} (${days} day${days > 1 ? "s" : ""})` }] : []),
           ...(functionHallTotal > 0 ? [{ label: `Function Hall (${fhDays} day${fhDays > 1 ? "s" : ""} × ₱${fhRate.toLocaleString()})`, value: `₱${functionHallTotal.toLocaleString()}` }] : []),
+          ...(corkage > 0 ? [{ label: "Maintenance Fee", value: `₱${corkage.toLocaleString()}` }] : []),
+          ...(drinksCork > 0 ? [{ label: "Drinks Corkage", value: `₱${drinksCork.toLocaleString()}` }] : []),
+          ...(liquorCork > 0 ? [{ label: "Liquor Corkage", value: `₱${liquorCork.toLocaleString()}` }] : []),
+          ...(discount > 0 ? [{ label: "Discount", value: `-₱${discount.toLocaleString()}` }] : []),
           ...(extraBed > 0 ? [{ label: "Extra Bed", value: `₱${extraBed.toLocaleString()}` }] : []),
-          { label: "Deposit", value: `₱${deposit.toLocaleString()}` },
-          { label: "Balance", value: `₱${Math.max(0, balance).toLocaleString()}` },
+          { label: "Deposit", value: `₱${parsedDeposit.toLocaleString()}` },
+          { label: "Balance", value: `₱${parsedBalance.toLocaleString()}` },
         ],
       };
 
-      if (paymentStatus !== "Fully Paid" && balance > 0) {
-        setSavedBalance(balance);
+      setReceiptData(rData);
+      if (paymentStatus !== "Fully Paid" && parsedBalance > 0) {
+        setSavedBalance(parsedBalance);
         setShowBalanceWarning(true);
-      } else {
-        setReceiptData(rData);
       }
 
-      setCustomerName(""); setAdults(""); setKids8Above(""); setKids5to7(""); setKids4Below("");
-      setDepositAmount(""); setBookingType(TYPES[0]); setSelectedRooms([]); setAddOnTables("");
+      setCustomerName("");
+      setAdults("");
+      setKids8Above("");
+      setKids5to7("");
+      setKids4Below("");
+      setDepositAmount("");
+      setBookingType(TYPES[0]);
+      setSelectedRooms([]);
+      setAddOnTables("");
       setNoOfDays("1");
-      setCheckIn(""); setCheckOut(""); setMaintenanceFee(""); setDrinksCorkage(""); setLiquorCorkage(""); setFunctionHallFee(""); setDiscountAmount("");
+      setCheckIn(getInitialCheckIn());
+      setCheckOut(getInitialCheckOut());
+      setDepositDate(getInitialDepositDate());
+      setMaintenanceFee("");
+      setDrinksCorkage("");
+      setLiquorCorkage("");
+      setFunctionHallFee("");
+      setDiscountAmount("");
       setExtraBedCharges("");
-      setWithFunctionHall(false); setFunctionHallDays("");
+      setWithFunctionHall(false);
+      setFunctionHallDays("");
       setFunctionHallRate(funcHallSettingRate.toString());
-      const savedBookings = await getTransactions({ module: "Booking" });
-      setExistingBookings(savedBookings);
+      try {
+        const refreshedBookings = await getTransactions({ module: "Booking" });
+        setExistingBookings(refreshedBookings);
+      } catch (refreshErr) {
+        console.warn("Could not refresh bookings list:", refreshErr);
+      }
       setPending8amProceed(false);
       setPendingSameDateProceed(false);
       firstRef.current?.focus();
-    } catch (error) {
-      const details = error instanceof Error ? error.message : typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error);
-      toast.error(`Failed to save booking: ${details}`);
+    } catch (err: any) {
+      console.error("Booking save error:", err);
+      const errMsg = err?.message || err?.error_description || (typeof err === "string" ? err : "Failed to save");
+      toast.error(`Failed to save booking: ${errMsg}`);
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
-  }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, hasSameDateBooking, pendingSameDateProceed, isExclusive, exclusiveFee, exclusiveTotal, roomFee, adultFeePerDay, kids8FeePerDay, kids5FeePerDay, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days, billableDays, dateValidationError, depositDate]);
+  }, [saving, customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, hasSameDateBooking, pendingSameDateProceed, isExclusive, exclusiveFee, exclusiveTotal, roomFee, adultFeePerDay, kids8FeePerDay, kids5FeePerDay, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days, billableDays, dateValidationError, depositDate, depositAmount, extraBed]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSave(); } };
