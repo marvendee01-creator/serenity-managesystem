@@ -4,7 +4,7 @@ import ModuleShell from "@/components/ModuleShell";
 import CustomerSelect from "@/components/CustomerSelect";
 import PaymentToggle from "@/components/PaymentToggle";
 import ReceiptPrintDialog from "@/components/ReceiptPrintDialog";
-import { addTransaction, getTransactions, getSettings } from "@/lib/db";
+import { addTransaction, findTransactionIdByNumber, getTransactions, getSettings } from "@/lib/db";
 import { toast } from "sonner";
 import { formatPeso, calculateCalendarDays } from "@/lib/format";
 
@@ -114,6 +114,8 @@ export default function BookingModule() {
   
   const [receiptData, setReceiptData] = useState<any>(null);
   const firstRef = useRef<HTMLInputElement>(null);
+  const savingRef = useRef(false);
+  const transactionNoRef = useRef<string | null>(null);
 
   useEffect(() => { firstRef.current?.focus(); }, []);
 
@@ -265,8 +267,13 @@ export default function BookingModule() {
   }, [checkIn, checkOut, existingBookings, isExclusive, selectedRooms]);
 
   const handleSave = useCallback(async (proceedConflict = false) => {
+    if (savingRef.current) return;
     if (dateValidationError) { toast.error(dateValidationError); return; }
     if (total === 0) { toast.error("Enter amount"); return; }
+    if (![total, deposit, balance, corkage, drinksCork, liquorCork, funcHall, extraBed, discount].every(Number.isFinite)) {
+      toast.error("Check the booking amounts and try again.");
+      return;
+    }
     if (!proceedConflict) {
       const conflict = hasDateConflict();
       if (conflict.conflict) { setDateConflictMessage(conflict.message); setShowDateConflict(true); return; }
@@ -274,12 +281,15 @@ export default function BookingModule() {
       if (!pendingSameDateProceed && hasSameDateBooking()) { setShowSameDateWarning(true); return; }
     }
     
-    if (deposit > 0 && !depositDate) { toast.error("Deposit Date is required"); return; }
+    if (deposit > 0 && (!depositDate || Number.isNaN(Date.parse(`${depositDate}T00:00:00`)))) { toast.error("Enter a valid Deposit Date"); return; }
+    savingRef.current = true;
     setSaving(true);
-    const txNo = `SR-${Date.now()}`;
+    const txNo = transactionNoRef.current ?? `SR-${Date.now()}`;
+    transactionNoRef.current = txNo;
     const now = new Date().toISOString();
     try {
-      await addTransaction({
+      const existingTransactionId = await findTransactionIdByNumber(txNo);
+      if (!existingTransactionId) await addTransaction({
         transaction_no: txNo, date_time: now, module: "Booking",
         customer_name: customerName || undefined, booking_type: bookingType,
         check_in: checkIn || undefined, check_out: checkOut || undefined,
@@ -304,6 +314,7 @@ export default function BookingModule() {
         payment_method: payment,
         extra_bed_charges: extraBed,
       });
+      transactionNoRef.current = null;
       toast.success("Booking saved!");
 
       const rData = {
@@ -340,12 +351,18 @@ export default function BookingModule() {
       setExtraBedCharges("");
       setWithFunctionHall(false); setFunctionHallDays("");
       setFunctionHallRate(funcHallSettingRate.toString());
-      getTransactions({ module: "Booking" }).then(setExistingBookings);
+      const savedBookings = await getTransactions({ module: "Booking" });
+      setExistingBookings(savedBookings);
       setPending8amProceed(false);
       setPendingSameDateProceed(false);
       firstRef.current?.focus();
-    } catch { toast.error("Failed to save"); }
-    setSaving(false);
+    } catch (error) {
+      const details = error instanceof Error ? error.message : typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error);
+      toast.error(`Failed to save booking: ${details}`);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }, [customerName, bookingType, stayType, checkIn, checkOut, corkage, funcHall, a, k8, k5, k4, headcount, total, deposit, balance, paymentStatus, payment, selectedRooms, numTables, hasDateConflict, has8amActiveConflict, pending8amProceed, hasSameDateBooking, pendingSameDateProceed, isExclusive, exclusiveFee, exclusiveTotal, roomFee, adultFeePerDay, kids8FeePerDay, kids5FeePerDay, withFunctionHall, fhDays, fhRate, functionHallTotal, funcHallSettingRate, drinksCork, liquorCork, discount, days, billableDays, dateValidationError, depositDate]);
 
   useEffect(() => {

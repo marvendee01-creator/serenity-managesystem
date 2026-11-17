@@ -222,12 +222,23 @@ export async function saveSettings(settings: Settings): Promise<void> {
 
 // ─── Transactions ───
 
+export async function findTransactionIdByNumber(transactionNo: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("transaction_no", transactionNo)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
 export async function addTransaction(t: Omit<Transaction, "id">): Promise<number> {
   const { data, error } = await supabase
     .from("transactions")
     .insert({
       transaction_no: t.transaction_no,
       date_time: t.date_time,
+      date_settled: t.date_settled ?? null,
       module: t.module,
       game_type: t.game_type ?? null,
       room_type: t.room_type ?? null,
